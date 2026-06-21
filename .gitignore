@@ -144,6 +144,7 @@ vite.config.ts.timestamp-*
 
 # Environment
 .env
+backend/src/main/resources/application.yml
 
 # Mobile
 mobile/node_modules/

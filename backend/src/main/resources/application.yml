@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:swiftcare}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:password}
+    url: jdbc:postgresql://ep-restless-dew-aiymc9ap-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require
+    username: neondb_owner
+    password: npg_7crnEjBW2ioK
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -23,5 +23,5 @@ server:
 
 app:
   jwt:
-    secret: ${JWT_SECRET}
-    expiry-ms: ${JWT_EXPIRY_MS:86400000}
+    secret: swiftcare-dev-secret-key-minimum-32-characters-long
+    expiry-ms: 86400000
