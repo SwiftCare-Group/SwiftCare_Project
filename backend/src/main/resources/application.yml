@@ -25,3 +25,6 @@ app:
   jwt:
     secret: swiftcare-dev-secret-key-minimum-32-characters-long
     expiry-ms: 86400000
+
+paystack:
+  secret-key: your_paystack_test_secret_key
