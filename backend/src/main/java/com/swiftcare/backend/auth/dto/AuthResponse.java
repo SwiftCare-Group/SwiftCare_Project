@@ -1,0 +1,23 @@
+package com.swiftcare.backend.auth.dto;
+
+import com.swiftcare.backend.common.enums.Tier;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AuthResponse {
+
+    private String accessToken;
+    private String tokenType;
+    private UUID patientId;
+    private String name;
+    private String email;
+    private Tier tier;
+}
