@@ -141,3 +141,24 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Environment
+.env
+backend/src/main/resources/application.yml
+
+# Mobile
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/.env
+
+# Backend
+backend/build/
+backend/.gradle/
+backend/bin/
+backend/.env
+
+# OS / IDE
+.DS_Store
+*.iml
+.idea/
