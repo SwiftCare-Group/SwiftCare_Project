@@ -2,6 +2,7 @@ package com.swiftcare.consultation_service.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import jakarta.persistence.Column;
 
 @Entity
 @Table(name = "prescriptions")
@@ -15,7 +16,8 @@ public class Prescription {
     private Long patientId;       // Who is this prescription for?
     private Long doctorId;        // Which doctor wrote it?
 
-    private String qrCodeData;    // The actual QR code content
+    @Column(columnDefinition = "TEXT")
+    private String qrCodeData;   // The actual QR code content
     private String status;        // ACTIVE, FULLY_DISPENSED, PARTIALLY_DISPENSED
 
     private LocalDateTime issuedAt;   // When was it created?
