@@ -11,7 +11,7 @@ public class SymptomSubmission {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long patientId;
+    private String patientId;
 
     @Column(columnDefinition = "TEXT")
     private String symptoms;
@@ -34,8 +34,8 @@ public class SymptomSubmission {
     }
 
     public Long getId() { return id; }
-    public Long getPatientId() { return patientId; }
-    public void setPatientId(Long patientId) { this.patientId = patientId; }
+    public String getPatientId() { return patientId; }
+    public void setPatientId(String patientId) { this.patientId = patientId; }
     public String getSymptoms() { return symptoms; }
     public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
     public Integer getSeverityScore() { return severityScore; }

@@ -16,19 +16,26 @@ public class SymptomController {
 
     @PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody SymptomRequest request) {
-        if (request.getPatientId() == null || request.getSymptoms() == null
-                || request.getSymptoms().isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "patientId and symptoms are required"));
+        try {
+            if (request.getPatientId() == null || request.getSymptoms() == null
+                    || request.getSymptoms().isBlank()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "patientId and symptoms are required"));
+            }
+            SymptomSubmission submission = new SymptomSubmission();
+            submission.setPatientId(request.getPatientId());
+            submission.setSymptoms(request.getSymptoms());
+            submission.setSeverityScore(75);
+            submission.setLabel("SEVERE");
+            submission.setIsEmergency(false);
+            submission.setFirstAidContent("Rest and monitor your condition.");
+            SymptomSubmission saved = repository.save(submission);
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage(), "cause", e.getClass().getName()));
         }
-        SymptomSubmission submission = new SymptomSubmission();
-        submission.setPatientId(request.getPatientId());
-        submission.setSymptoms(request.getSymptoms());
-        submission.setSeverityScore(75);
-        submission.setLabel("SEVERE");
-        submission.setIsEmergency(false);
-        submission.setFirstAidContent("Rest and monitor your condition.");
-        return ResponseEntity.ok(repository.save(submission));
     }
 
     @GetMapping("/{id}")
@@ -49,7 +56,7 @@ public class SymptomController {
     }
 
     @GetMapping("/patient/{patientId}")
-    public ResponseEntity<List<SymptomSubmission>> getByPatient(@PathVariable Long patientId) {
+    public ResponseEntity<List<SymptomSubmission>> getByPatient(@PathVariable String patientId) {
         return ResponseEntity.ok(
                 repository.findByPatientIdOrderByCreatedAtDesc(patientId)
         );
