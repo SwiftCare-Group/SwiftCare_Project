@@ -6,7 +6,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
@@ -28,3 +28,10 @@ app:
 
 paystack:
   secret-key: your_paystack_test_secret_key
+
+ai:
+  api-key: your_claude_or_openai_key_here
+  model: claude-haiku-4-5
+
+firebase:
+  credentials-path: firebase-service-account.json

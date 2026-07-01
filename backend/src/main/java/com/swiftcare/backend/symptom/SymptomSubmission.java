@@ -1,23 +1,41 @@
 package com.swiftcare.backend.symptom;
 
+import com.swiftcare.backend.patient.Patient;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "symptom_submissions")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SymptomSubmission {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    private Long patientId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id", nullable = false)
+    private Patient patient;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String symptoms;
 
+    @Column
     private Integer severityScore;
-    private String label;
+
+    @Column
+    private String severityLabel;
+
+    @Column
     private Boolean isEmergency;
 
     @Column(columnDefinition = "TEXT")
@@ -26,27 +44,12 @@ public class SymptomSubmission {
     @Column(columnDefinition = "TEXT")
     private String aiRawResponse;
 
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
+        this.isEmergency = false;
     }
-
-    public Long getId() { return id; }
-    public Long getPatientId() { return patientId; }
-    public void setPatientId(Long patientId) { this.patientId = patientId; }
-    public String getSymptoms() { return symptoms; }
-    public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
-    public Integer getSeverityScore() { return severityScore; }
-    public void setSeverityScore(Integer severityScore) { this.severityScore = severityScore; }
-    public String getLabel() { return label; }
-    public void setLabel(String label) { this.label = label; }
-    public Boolean getIsEmergency() { return isEmergency; }
-    public void setIsEmergency(Boolean isEmergency) { this.isEmergency = isEmergency; }
-    public String getFirstAidContent() { return firstAidContent; }
-    public void setFirstAidContent(String firstAidContent) { this.firstAidContent = firstAidContent; }
-    public String getAiRawResponse() { return aiRawResponse; }
-    public void setAiRawResponse(String aiRawResponse) { this.aiRawResponse = aiRawResponse; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
 }

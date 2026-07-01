@@ -1,57 +1,48 @@
 package com.swiftcare.backend.symptom;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.swiftcare.backend.common.exception.ResourceNotFoundException;
+import com.swiftcare.backend.patient.PatientRepository;
+import com.swiftcare.backend.symptom.dto.FirstAidResponse;
+import com.swiftcare.backend.symptom.dto.SymptomResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
-import java.util.Map;
+
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/symptoms")
-@CrossOrigin(origins = "*")
+@RequestMapping("/symptoms")
+@RequiredArgsConstructor
 public class SymptomController {
 
-    @Autowired
-    private SymptomSubmissionRepository repository;
+    private final SymptomService symptomService;
+    private final PatientRepository patientRepository;
 
     @PostMapping("/submit")
-    public ResponseEntity<?> submit(@RequestBody SymptomRequest request) {
-        if (request.getPatientId() == null || request.getSymptoms() == null
-                || request.getSymptoms().isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "patientId and symptoms are required"));
-        }
-        SymptomSubmission submission = new SymptomSubmission();
-        submission.setPatientId(request.getPatientId());
-        submission.setSymptoms(request.getSymptoms());
-        submission.setSeverityScore(75);
-        submission.setLabel("SEVERE");
-        submission.setIsEmergency(false);
-        submission.setFirstAidContent("Rest and monitor your condition.");
-        return ResponseEntity.ok(repository.save(submission));
+    public ResponseEntity<SymptomResponse> submit(
+            @AuthenticationPrincipal String email,
+            @Valid @RequestBody SymptomRequest request) {
+        UUID patientId = getPatientId(email);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(symptomService.submitSymptoms(patientId, request));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getById(@PathVariable Long id) {
-        return repository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<SymptomResponse> getSubmission(@PathVariable UUID id) {
+        return ResponseEntity.ok(symptomService.getSubmission(id));
     }
 
     @GetMapping("/{id}/firstaid")
-    public ResponseEntity<?> getFirstAid(@PathVariable Long id) {
-        return repository.findById(id)
-                .map(s -> ResponseEntity.ok(Map.of(
-                        "firstAidContent", s.getFirstAidContent(),
-                        "label", s.getLabel()
-                )))
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<FirstAidResponse> getFirstAid(@PathVariable UUID id) {
+        return ResponseEntity.ok(symptomService.getFirstAid(id));
     }
 
-    @GetMapping("/patient/{patientId}")
-    public ResponseEntity<List<SymptomSubmission>> getByPatient(@PathVariable Long patientId) {
-        return ResponseEntity.ok(
-                repository.findByPatientIdOrderByCreatedAtDesc(patientId)
-        );
+    private UUID getPatientId(String email) {
+        return patientRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"))
+                .getId();
     }
 }

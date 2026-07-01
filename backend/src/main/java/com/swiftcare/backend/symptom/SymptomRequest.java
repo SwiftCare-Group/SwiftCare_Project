@@ -1,14 +1,11 @@
 package com.swiftcare.backend.symptom;
 
-public class SymptomRequest {
-    private Long patientId;
-    private String symptoms;
-    private String healthProfileSnapshot;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
 
-    public Long getPatientId() { return patientId; }
-    public void setPatientId(Long patientId) { this.patientId = patientId; }
-    public String getSymptoms() { return symptoms; }
-    public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
-    public String getHealthProfileSnapshot() { return healthProfileSnapshot; }
-    public void setHealthProfileSnapshot(String healthProfileSnapshot) { this.healthProfileSnapshot = healthProfileSnapshot; }
+@Data
+public class SymptomRequest {
+
+    @NotBlank(message = "Symptoms description is required")
+    private String symptoms;
 }
