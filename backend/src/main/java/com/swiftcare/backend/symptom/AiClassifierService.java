@@ -76,7 +76,25 @@ public class AiClassifierService {
 
     private AiClassificationResult parseResponse(String responseBody) throws Exception {
         JsonNode root = objectMapper.readTree(responseBody);
-        String content = root.path("content").get(0).path("text").asText();
+        
+        // Claude API returns content as array of objects with type and text
+        JsonNode contentArray = root.path("content");
+        if (contentArray.isEmpty()) {
+            throw new Exception("Empty response from AI");
+        }
+        
+        String content = contentArray.get(0).path("text").asText();
+        
+        // Extract JSON from the response — Claude sometimes wraps it in markdown
+        content = content.trim();
+        if (content.contains("```json")) {
+            content = content.substring(content.indexOf("```json") + 7);
+            content = content.substring(0, content.indexOf("```"));
+        } else if (content.contains("```")) {
+            content = content.substring(content.indexOf("```") + 3);
+            content = content.substring(0, content.indexOf("```"));
+        }
+        content = content.trim();
 
         JsonNode result = objectMapper.readTree(content);
 
