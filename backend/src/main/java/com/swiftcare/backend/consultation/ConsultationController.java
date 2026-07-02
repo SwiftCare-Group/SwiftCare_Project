@@ -5,6 +5,7 @@ import com.swiftcare.backend.common.security.PremiumRequired;
 import com.swiftcare.backend.consultation.dto.ConsultationRequest;
 import com.swiftcare.backend.consultation.dto.ConsultationResponse;
 import com.swiftcare.backend.patient.PatientRepository;
+import com.swiftcare.backend.consultation.dto.DoctorResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,7 +26,7 @@ public class ConsultationController {
     private final PatientRepository patientRepository;
 
     @GetMapping("/doctors")
-    public ResponseEntity<List<Doctor>> getAvailableDoctors() {
+    public ResponseEntity<List<DoctorResponse>> getAvailableDoctors() {
         return ResponseEntity.ok(consultationService.getAvailableDoctors());
     }
 

@@ -4,6 +4,7 @@ import com.swiftcare.backend.pharmacy.DispensationRecord;
 import com.swiftcare.backend.pharmacy.dto.DispenseRequest;
 import com.swiftcare.backend.prescription.dto.PrescriptionRequest;
 import com.swiftcare.backend.prescription.dto.PrescriptionResponse;
+import com.swiftcare.backend.pharmacy.dto.DispensationRecordResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -39,14 +40,14 @@ public class PrescriptionController {
     }
 
     @PutMapping("/{id}/dispense")
-    public ResponseEntity<DispensationRecord> dispense(
+    public ResponseEntity<DispensationRecordResponse> dispense(
             @PathVariable UUID id,
             @Valid @RequestBody DispenseRequest request) {
         return ResponseEntity.ok(prescriptionService.dispense(id, request));
     }
 
     @GetMapping("/{id}/remaining")
-    public ResponseEntity<List<DispensationRecord>> getRemaining(@PathVariable UUID id) {
+    public ResponseEntity<List<DispensationRecordResponse>> getRemaining(@PathVariable UUID id) {
         return ResponseEntity.ok(prescriptionService.getRemainingDrugs(id));
     }
 }

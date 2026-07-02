@@ -5,6 +5,7 @@ import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.common.exception.UnauthorizedException;
 import com.swiftcare.backend.consultation.dto.ConsultationRequest;
 import com.swiftcare.backend.consultation.dto.ConsultationResponse;
+import com.swiftcare.backend.consultation.dto.DoctorResponse;
 import com.swiftcare.backend.patient.Patient;
 import com.swiftcare.backend.patient.PatientRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +25,19 @@ public class ConsultationService {
     private final DoctorRepository doctorRepository;
     private final PatientRepository patientRepository;
 
-    public List<Doctor> getAvailableDoctors() {
-        return doctorRepository.findAllByIsAvailableOnlineTrueAndIsDeletedFalse();
+    public List<DoctorResponse> getAvailableDoctors() {
+        return doctorRepository.findAllByIsAvailableOnlineTrueAndIsDeletedFalse()
+                .stream()
+                .map(d -> DoctorResponse.builder()
+                        .id(d.getId())
+                        .name(d.getName())
+                        .email(d.getEmail())
+                        .licenseNo(d.getLicenseNo())
+                        .departmentId(d.getDepartment().getId())
+                        .departmentName(d.getDepartment().getName())
+                        .isAvailableOnline(d.isAvailableOnline())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     @Transactional

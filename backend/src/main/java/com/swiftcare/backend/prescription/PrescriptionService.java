@@ -14,6 +14,7 @@ import com.swiftcare.backend.pharmacy.DispensationRecordRepository;
 import com.swiftcare.backend.pharmacy.dto.DispenseRequest;
 import com.swiftcare.backend.prescription.dto.PrescriptionRequest;
 import com.swiftcare.backend.prescription.dto.PrescriptionResponse;
+import com.swiftcare.backend.pharmacy.dto.DispensationRecordResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -85,7 +86,7 @@ public class PrescriptionService {
     }
 
     @Transactional
-    public DispensationRecord dispense(UUID prescriptionId, DispenseRequest request) {
+    public DispensationRecordResponse dispense(UUID prescriptionId, DispenseRequest request) {
         Prescription prescription = prescriptionRepository.findById(prescriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Prescription not found"));
 
@@ -103,12 +104,26 @@ public class PrescriptionService {
             record.setDispensedAt(LocalDateTime.now());
         }
 
-        return dispensationRecordRepository.save(record);
+        return mapToDispensationResponse(dispensationRecordRepository.save(record));
     }
 
-    public List<DispensationRecord> getRemainingDrugs(UUID prescriptionId) {
+    public List<DispensationRecordResponse> getRemainingDrugs(UUID prescriptionId) {
         return dispensationRecordRepository
-                .findAllByPrescriptionIdAndStatus(prescriptionId, DispensationStatus.PENDING);
+                .findAllByPrescriptionIdAndStatus(prescriptionId, DispensationStatus.PENDING)
+                .stream()
+                .map(this::mapToDispensationResponse)
+                .collect(Collectors.toList());
+    }
+
+    private DispensationRecordResponse mapToDispensationResponse(DispensationRecord record) {
+        return DispensationRecordResponse.builder()
+                .id(record.getId())
+                .prescriptionId(record.getPrescription().getId())
+                .drugName(record.getDrugName())
+                .status(record.getStatus())
+                .pharmacyName(record.getPharmacyName())
+                .dispensedAt(record.getDispensedAt())
+                .build();
     }
 
     private String buildQrData(UUID consultationId, List<String> drugs) {
