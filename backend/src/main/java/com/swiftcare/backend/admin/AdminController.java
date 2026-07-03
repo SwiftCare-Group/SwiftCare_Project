@@ -3,6 +3,7 @@ package com.swiftcare.backend.admin;
 import com.swiftcare.backend.consultation.Doctor;
 import com.swiftcare.backend.consultation.DoctorRepository;
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
+import com.swiftcare.backend.common.security.AdminRequired;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ public class AdminController {
     private final PasswordEncoder passwordEncoder;
 
     @PostMapping("/departments")
+    @AdminRequired
     public ResponseEntity<Department> createDepartment(
             @RequestBody CreateDepartmentRequest request) {
 
@@ -44,6 +46,7 @@ public class AdminController {
     }
 
     @PostMapping("/doctors")
+    @AdminRequired
     public ResponseEntity<Doctor> createDoctor(
             @RequestBody CreateDoctorRequest request) {
 
