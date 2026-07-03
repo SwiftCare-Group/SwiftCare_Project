@@ -20,10 +20,10 @@ public class SymptomController {
             if (request.getPatientId() == null || request.getSymptoms() == null
                     || request.getSymptoms().isBlank()) {
                 return ResponseEntity.badRequest()
-                        .body(Map.of("error", "patientId and symptoms are required"));
+                        .body(Map.of("error", "pat gbientId and symptoms are required"));
             }
             SymptomSubmission submission = new SymptomSubmission();
-            submission.setPatientId(request.getPatientId());
+            submission.setPatientId(java.util.UUID.fromString(request.getPatientId()));
             submission.setSymptoms(request.getSymptoms());
             submission.setSeverityScore(75);
             submission.setLabel("SEVERE");
@@ -58,7 +58,7 @@ public class SymptomController {
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<List<SymptomSubmission>> getByPatient(@PathVariable String patientId) {
         return ResponseEntity.ok(
-                repository.findByPatientIdOrderByCreatedAtDesc(patientId)
+                repository.findByPatientIdOrderByCreatedAtDesc(java.util.UUID.fromString(patientId))
         );
     }
 }

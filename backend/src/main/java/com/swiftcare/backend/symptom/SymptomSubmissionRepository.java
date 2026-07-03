@@ -6,5 +6,5 @@ import java.util.List;
 
 @Repository
 public interface SymptomSubmissionRepository extends JpaRepository<SymptomSubmission, Long> {
-    List<SymptomSubmission> findByPatientIdOrderByCreatedAtDesc(String patientId);
+    List<SymptomSubmission> findByPatientIdOrderByCreatedAtDesc(java.util.UUID patientId);
 }

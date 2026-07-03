@@ -8,10 +8,10 @@ import java.time.LocalDateTime;
 public class SymptomSubmission {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private java.util.UUID id;
 
-    private String patientId;
+    private java.util.UUID patientId;
 
     @Column(columnDefinition = "TEXT")
     private String symptoms;
@@ -33,9 +33,9 @@ public class SymptomSubmission {
         createdAt = LocalDateTime.now();
     }
 
-    public Long getId() { return id; }
-    public String getPatientId() { return patientId; }
-    public void setPatientId(String patientId) { this.patientId = patientId; }
+    public java.util.UUID getId() { return id; }
+    public java.util.UUID getPatientId() { return patientId; }
+    public void setPatientId(java.util.UUID patientId) { this.patientId = patientId; }
     public String getSymptoms() { return symptoms; }
     public void setSymptoms(String symptoms) { this.symptoms = symptoms; }
     public Integer getSeverityScore() { return severityScore; }
