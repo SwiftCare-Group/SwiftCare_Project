@@ -30,6 +30,7 @@ public class PatientController {
                 "email", patient.getEmail(),
                 "phone", patient.getPhone(),
                 "tier", patient.getTier(),
+                "role", patient.getRole(),
                 "createdAt", patient.getCreatedAt()
         ));
     }

@@ -20,9 +20,10 @@ export default function RootLayout() {
     }
 
     try {
-      // Try patient first
       const response = await api.get('/patients/me');
+      console.log('Patient me response:', JSON.stringify(response.data));
       const role = response.data.role;
+      console.log('Role detected:', role);
 
       if (role === 'ADMIN') {
         router.replace('/(admin)/dashboard');
