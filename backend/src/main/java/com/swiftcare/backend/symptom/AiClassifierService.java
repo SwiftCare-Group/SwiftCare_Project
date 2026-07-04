@@ -11,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -30,19 +31,24 @@ public class AiClassifierService {
         String prompt = buildPrompt(symptoms, healthProfile);
 
         Map<String, Object> requestBody = Map.of(
-                "model", model,
-                "max_tokens", 500,
-                "messages", new Object[]{
-                        Map.of("role", "user", "content", prompt)
-                }
+                "contents", List.of(
+                        Map.of("parts", List.of(
+                                Map.of("text", prompt)
+                        ))
+                ),
+                "generationConfig", Map.of(
+                        "temperature", 0.1,
+                        "maxOutputTokens", 500
+                )
         );
+
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/"
+                + model + ":generateContent?key=" + apiKey;
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.anthropic.com/v1/messages"))
+                .uri(URI.create(url))
                 .header("Content-Type", "application/json")
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", "2023-06-01")
                 .POST(HttpRequest.BodyPublishers.ofString(
                         objectMapper.writeValueAsString(requestBody)))
                 .build();
@@ -50,47 +56,54 @@ public class AiClassifierService {
         HttpResponse<String> response = client.send(request,
                 HttpResponse.BodyHandlers.ofString());
 
+        log.info("Gemini response: {}", response.body());
         return parseResponse(response.body());
     }
 
     private String buildPrompt(String symptoms, String healthProfile) {
         return """
-                You are an emergency medical triage AI. Your job is to assess symptom severity ACCURATELY.
+                You are an emergency medical triage AI. Assess symptom severity ACCURATELY.
                 
                 SEVERITY SCALE:
-                - MILD (1-3): Minor symptoms, no immediate danger. Examples: mild headache, slight cold, minor cuts.
-                - MODERATE (4-6): Significant symptoms needing medical attention soon. Examples: high fever, moderate pain, persistent vomiting.
-                - SEVERE (7-8): Serious symptoms requiring urgent care. Examples: severe chest pain, difficulty breathing, high fever with confusion.
-                - CRITICAL (9-10): Life-threatening emergency. Examples: unconsciousness, severe difficulty breathing, heart attack symptoms, stroke.
+                - MILD (1-3): Minor symptoms, no immediate danger. Examples: mild headache, slight cold.
+                - MODERATE (4-6): Significant symptoms needing attention soon. Examples: high fever, moderate pain.
+                - SEVERE (7-8): Serious symptoms requiring urgent care. Examples: severe chest pain, difficulty breathing.
+                - CRITICAL (9-10): Life-threatening emergency. Examples: unconsciousness, heart attack, stroke symptoms.
+                
+                IMPORTANT RULES:
+                - "difficulty breathing" = SEVERE or CRITICAL, score 7-10
+                - "unconscious" or "unconsciousness" = CRITICAL, score 9-10, isEmergency: true
+                - "chest pain" = SEVERE, score 7-8
+                - "mild headache" or "slight cold" = MILD, score 1-3
                 
                 Patient Symptoms: %s
                 Patient Health Profile: %s
                 
-                IMPORTANT: "difficulty breathing" and "unconscious" are CRITICAL symptoms. Score them 9-10.
-                
-                Respond ONLY with valid JSON, no markdown, no explanation:
-                {
-                "severityScore": <integer 1-10>,
-                "severityLabel": <"MILD" | "MODERATE" | "SEVERE" | "CRITICAL">,
-                "isEmergency": <true | false>,
-                "firstAidContent": "<detailed first aid instructions if SEVERE or CRITICAL, empty string if MILD or MODERATE>"
-                }
+                Respond ONLY with this exact JSON, no markdown, no explanation:
+                {"severityScore": <1-10>, "severityLabel": "<MILD|MODERATE|SEVERE|CRITICAL>", "isEmergency": <true|false>, "firstAidContent": "<instructions if SEVERE/CRITICAL, empty string otherwise>"}
                 """.formatted(symptoms, healthProfile);
     }
 
     private AiClassificationResult parseResponse(String responseBody) throws Exception {
         JsonNode root = objectMapper.readTree(responseBody);
-        
-        // Claude API returns content as array of objects with type and text
-        JsonNode contentArray = root.path("content");
-        if (contentArray.isEmpty()) {
-            throw new Exception("Empty response from AI");
+
+        if (root.has("error")) {
+            throw new Exception("AI API error: " + root.path("error").path("message").asText());
         }
-        
-        String content = contentArray.get(0).path("text").asText();
-        
-        // Extract JSON from the response — Claude sometimes wraps it in markdown
-        content = content.trim();
+
+        // Gemini format: candidates[0].content.parts[0].text
+        String content = root.path("candidates")
+                .get(0)
+                .path("content")
+                .path("parts")
+                .get(0)
+                .path("text")
+                .asText()
+                .trim();
+
+        log.info("AI content response: {}", content);
+
+        // Strip markdown if present
         if (content.contains("```json")) {
             content = content.substring(content.indexOf("```json") + 7);
             content = content.substring(0, content.indexOf("```"));

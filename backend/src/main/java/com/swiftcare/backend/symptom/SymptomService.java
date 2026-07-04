@@ -31,15 +31,10 @@ public class SymptomService {
 
         AiClassificationResult result;
         try {
-            result = aiClassifierService.classify(request.getSymptoms(), healthProfileSnapshot);
+        result = aiClassifierService.classify(request.getSymptoms(), healthProfileSnapshot);
         } catch (Exception e) {
-            log.error("AI classification failed: {}", e.getMessage());
-            result = AiClassificationResult.builder()
-                    .severityScore(3)
-                    .severityLabel("MILD")
-                    .isEmergency(false)
-                    .firstAidContent("")
-                    .build();
+        log.error("AI classification failed: {}", e.getMessage());
+        result = ruleBasedClassify(request.getSymptoms());
         }
 
         SymptomSubmission submission = SymptomSubmission.builder()
@@ -95,4 +90,44 @@ public class SymptomService {
                 .createdAt(submission.getCreatedAt())
                 .build();
     }
+
+    private AiClassificationResult ruleBasedClassify(String symptoms) {
+        String s = symptoms.toLowerCase();
+
+        if (s.contains("unconscious") || s.contains("not breathing") ||
+                s.contains("heart attack") || s.contains("stroke") ||
+                s.contains("severe bleeding") || s.contains("unresponsive")) {
+                return AiClassificationResult.builder()
+                        .severityScore(10).severityLabel("CRITICAL")
+                        .isEmergency(true)
+                        .firstAidContent("Call emergency services immediately. Keep the patient still and monitor breathing. Do not leave them alone.")
+                        .build();
+        }
+
+        if (s.contains("difficulty breathing") || s.contains("chest pain") ||
+                s.contains("severe pain") || s.contains("high fever") ||
+                s.contains("vomiting blood") || s.contains("can't breathe")) {
+                return AiClassificationResult.builder()
+                        .severityScore(8).severityLabel("SEVERE")
+                        .isEmergency(false)
+                        .firstAidContent("Seek urgent medical attention. Sit upright if having breathing difficulty. Stay calm and avoid exertion.")
+                        .build();
+        }
+
+        if (s.contains("fever") || s.contains("vomiting") ||
+                s.contains("moderate pain") || s.contains("persistent") ||
+                s.contains("dizziness") || s.contains("headache")) {
+                return AiClassificationResult.builder()
+                        .severityScore(5).severityLabel("MODERATE")
+                        .isEmergency(false)
+                        .firstAidContent("")
+                        .build();
+        }
+
+        return AiClassificationResult.builder()
+                .severityScore(2).severityLabel("MILD")
+                .isEmergency(false)
+                .firstAidContent("")
+                .build();
+        }
 }
