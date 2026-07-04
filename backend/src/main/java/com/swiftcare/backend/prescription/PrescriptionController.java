@@ -21,6 +21,7 @@ import java.util.UUID;
 public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;
+    private final PatientRepository patientRepository;
 
     @PostMapping
     public ResponseEntity<PrescriptionResponse> issue(
@@ -49,5 +50,14 @@ public class PrescriptionController {
     @GetMapping("/{id}/remaining")
     public ResponseEntity<List<DispensationRecordResponse>> getRemaining(@PathVariable UUID id) {
         return ResponseEntity.ok(prescriptionService.getRemainingDrugs(id));
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<List<PrescriptionResponse>> getMyPrescriptions(
+            @AuthenticationPrincipal String email) {
+        UUID patientId = patientRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"))
+                .getId();
+        return ResponseEntity.ok(prescriptionService.getPatientPrescriptions(patientId));
     }
 }

@@ -4,6 +4,7 @@ import com.swiftcare.backend.consultation.Doctor;
 import com.swiftcare.backend.consultation.DoctorRepository;
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.common.security.AdminRequired;
+import com.swiftcare.backend.admin.dto.DepartmentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin")
@@ -26,7 +28,7 @@ public class AdminController {
 
     @PostMapping("/departments")
     @AdminRequired
-    public ResponseEntity<Department> createDepartment(
+    public ResponseEntity<DepartmentResponse> createDepartment(
             @RequestBody CreateDepartmentRequest request) {
 
         Hospital hospital = hospitalRepository.findAllByIsActiveTrue()
@@ -41,13 +43,23 @@ public class AdminController {
                 .queueCapacity(request.getQueueCapacity())
                 .build();
 
+        Department saved = departmentRepository.save(department);
+
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(departmentRepository.save(department));
-    }
+                .body(DepartmentResponse.builder()
+                        .id(saved.getId())
+                        .hospitalId(hospital.getId())
+                        .hospitalName(hospital.getName())
+                        .name(saved.getName())
+                        .operatingHours(saved.getOperatingHours())
+                        .queueCapacity(saved.getQueueCapacity())
+                        .isActive(saved.isActive())
+                        .build());
+     }
 
     @PostMapping("/doctors")
     @AdminRequired
-    public ResponseEntity<Doctor> createDoctor(
+    public ResponseEntity<Map<String, Object>> createDoctor(
             @RequestBody CreateDoctorRequest request) {
 
         Department department = departmentRepository.findById(request.getDepartmentId())
@@ -61,7 +73,17 @@ public class AdminController {
                 .department(department)
                 .build();
 
+        Doctor saved = doctorRepository.save(doctor);
+
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(doctorRepository.save(doctor));
+                .body(Map.of(
+                        "id", saved.getId(),
+                        "name", saved.getName(),
+                        "email", saved.getEmail(),
+                        "licenseNo", saved.getLicenseNo(),
+                        "departmentId", department.getId(),
+                        "departmentName", department.getName(),
+                        "isAvailableOnline", saved.isAvailableOnline()
+                ));
     }
 }

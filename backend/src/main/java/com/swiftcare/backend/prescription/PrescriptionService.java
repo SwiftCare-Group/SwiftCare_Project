@@ -160,4 +160,11 @@ public class PrescriptionService {
                 .issuedAt(prescription.getIssuedAt())
                 .build();
     }
+
+    public List<PrescriptionResponse> getPatientPrescriptions(UUID patientId) {
+        return prescriptionRepository.findAllByPatientId(patientId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 }

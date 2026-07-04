@@ -10,4 +10,5 @@ import java.util.UUID;
 public interface PrescriptionRepository extends JpaRepository<Prescription, UUID> {
     Optional<Prescription> findByConsultationId(UUID consultationId);
     Optional<Prescription> findByQrCodeHash(String qrCodeHash);
+    List<Prescription> findAllByPatientId(UUID patientId);
 }

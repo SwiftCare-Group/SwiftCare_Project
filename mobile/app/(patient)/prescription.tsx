@@ -14,8 +14,8 @@ import { Colors } from '../../constants/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PrescriptionScreen() {
-  const [consultations, setConsultations] = useState<any[]>([]);
-  const [prescriptions, setPrescriptions] = useState<Record<string, any>>({});
+  //const [consultations, setConsultations] = useState<any[]>([]);
+  const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [remaining, setRemaining] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedQr, setExpandedQr] = useState<string | null>(null);
@@ -26,32 +26,22 @@ export default function PrescriptionScreen() {
 
   const fetchData = async () => {
     try {
-      const consultationsRes = await api.get('/consultations');
-      const completed = consultationsRes.data.filter(
-        (c: any) => c.status === 'COMPLETED'
-      );
-      setConsultations(completed);
+      const prescriptionsRes = await api.get('/prescriptions/my');
+      const prescList = prescriptionsRes.data;
 
-      const prescMap: Record<string, any> = {};
       const remainingMap: Record<string, any[]> = {};
-
       await Promise.all(
-        completed.map(async (con: any) => {
+        prescList.map(async (presc: any) => {
           try {
-            const prescRes = await api.get(`/prescriptions`);
-            const presc = prescRes.data;
-            if (presc) {
-              prescMap[con.id] = presc;
-              const remainRes = await api.get(`/prescriptions/${presc.id}/remaining`);
-              remainingMap[presc.id] = remainRes.data;
-            }
+            const remainRes = await api.get(`/prescriptions/${presc.id}/remaining`);
+            remainingMap[presc.id] = remainRes.data;
           } catch {
-            // no prescription yet
+            remainingMap[presc.id] = [];
           }
         })
       );
 
-      setPrescriptions(prescMap);
+      setPrescriptions(prescList);
       setRemaining(remainingMap);
     } catch (error) {
       console.error('Failed to fetch prescriptions');
@@ -76,7 +66,7 @@ export default function PrescriptionScreen() {
           Present the QR code at any pharmacy to collect your medication.
         </Text>
 
-        {consultations.length === 0 ? (
+        {Object.keys(prescriptions).length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>💊</Text>
             <Text style={styles.emptyText}>No prescriptions yet</Text>
@@ -85,17 +75,14 @@ export default function PrescriptionScreen() {
             </Text>
           </View>
         ) : (
-          consultations.map(con => {
-            const presc = prescriptions[con.id];
-            if (!presc) return null;
-
+          (prescriptions as any[]).map((presc: any) => {
             const remainingDrugs = remaining[presc.id] || [];
             const allDispensed = remainingDrugs.length === 0;
 
             return (
-              <View key={con.id} style={styles.prescriptionCard}>
+              <View key={presc.id} style={styles.prescriptionCard}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.doctorName}>Dr. {con.doctorName}</Text>
+                  <Text style={styles.doctorName}>Prescription</Text>
                   <View style={[
                     styles.statusBadge,
                     { backgroundColor: allDispensed ? Colors.successLight : Colors.warningLight }
