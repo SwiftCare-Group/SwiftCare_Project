@@ -10,6 +10,7 @@ import com.swiftcare.backend.common.exception.UnauthorizedException;
 import com.swiftcare.backend.common.security.JwtUtil;
 import com.swiftcare.backend.patient.Patient;
 import com.swiftcare.backend.patient.PatientRepository;
+import com.swiftcare.backend.auth.dto.StaffAuthResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final com.swiftcare.backend.consultation.DoctorRepository doctorRepository;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -132,5 +134,43 @@ public class AuthService {
 
         refreshTokenRepository.save(refreshToken);
         return refreshToken.getToken();
+    }
+    
+    @Transactional
+    public StaffAuthResponse staffLogin(LoginRequest request) {
+        com.swiftcare.backend.consultation.Doctor doctor = doctorRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+
+        if (!passwordEncoder.matches(request.getPassword(), doctor.getPasswordHash())) {
+            throw new UnauthorizedException("Invalid email or password");
+        }
+
+        String token = jwtUtil.generateToken(doctor.getEmail(), doctor.getRole().name());
+        String refreshToken = createStaffRefreshToken(doctor);
+
+        return StaffAuthResponse.builder()
+                .accessToken(token)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .staffId(doctor.getId())
+                .name(doctor.getName())
+                .email(doctor.getEmail())
+                .role(doctor.getRole())
+                .build();
+    }
+
+    private String createStaffRefreshToken(com.swiftcare.backend.consultation.Doctor doctor) {
+        com.swiftcare.backend.patient.Patient fakePatient = patientRepository.findByEmail(doctor.getEmail())
+                .orElse(null);
+
+        if (fakePatient != null) {
+            RefreshToken refreshToken = RefreshToken.builder()
+                    .patient(fakePatient)
+                    .token(java.util.UUID.randomUUID().toString())
+                    .build();
+            refreshTokenRepository.save(refreshToken);
+            return refreshToken.getToken();
+        }
+        return java.util.UUID.randomUUID().toString();
     }
 }

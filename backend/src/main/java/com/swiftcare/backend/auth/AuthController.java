@@ -4,6 +4,7 @@ import com.swiftcare.backend.auth.dto.AuthResponse;
 import com.swiftcare.backend.auth.dto.LoginRequest;
 import com.swiftcare.backend.auth.dto.RefreshTokenRequest;
 import com.swiftcare.backend.auth.dto.RegisterRequest;
+import com.swiftcare.backend.auth.dto.StaffAuthResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,5 +37,10 @@ public class AuthController {
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
         authService.logout(request.getRefreshToken());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/staff-login")
+    public ResponseEntity<StaffAuthResponse> staffLogin(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.staffLogin(request));
     }
 }

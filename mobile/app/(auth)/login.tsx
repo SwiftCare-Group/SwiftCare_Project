@@ -109,6 +109,14 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </View>
+      <TouchableOpacity
+        style={styles.staffLink}
+        onPress={() => router.push('/(auth)/staff-login')}
+      >
+        <Text style={styles.staffLinkText}>
+          Doctor or Pharmacist? <Text style={styles.staffLinkBold}>Staff Login →</Text>
+        </Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -196,5 +204,18 @@ passwordInput: {
 eyeButton: {
   paddingHorizontal: 14,
   paddingVertical: 14,
+},
+staffLink: {
+  alignItems: 'center',
+  marginTop: 12,
+  paddingVertical: 8,
+},
+staffLinkText: {
+  fontSize: 13,
+  color: Colors.textDisabled,
+},
+staffLinkBold: {
+  color: Colors.primary,
+  fontWeight: '700',
 },
 });

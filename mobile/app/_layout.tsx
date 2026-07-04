@@ -20,21 +20,33 @@ export default function RootLayout() {
     }
 
     try {
+      // Try patient first
       const response = await api.get('/patients/me');
       const role = response.data.role;
 
-      if (role === 'DOCTOR') {
-        router.replace('/(doctor)/queue');
-      } else if (role === 'PHARMACIST') {
-        router.replace('/(pharmacist)/dispense');
-      } else if (role === 'ADMIN') {
+      if (role === 'ADMIN') {
         router.replace('/(admin)/dashboard');
       } else {
         router.replace('/(patient)/home');
       }
     } catch {
-      await AsyncStorage.removeItem('accessToken');
-      router.replace('/(auth)/login');
+      // Try staff
+      try {
+        const response = await api.get('/doctors/me');
+        const role = response.data.role;
+
+        if (role === 'DOCTOR') {
+          router.replace('/(doctor)/queue');
+        } else if (role === 'PHARMACIST') {
+          router.replace('/(pharmacist)/dispense');
+        } else {
+          await AsyncStorage.removeItem('accessToken');
+          router.replace('/(auth)/login');
+        }
+      } catch {
+        await AsyncStorage.removeItem('accessToken');
+        router.replace('/(auth)/login');
+      }
     }
   };
 

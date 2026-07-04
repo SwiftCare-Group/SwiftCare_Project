@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.swiftcare.backend.common.enums.Role;
 
 import java.util.UUID;
 
@@ -47,5 +48,12 @@ public class Doctor {
     protected void onCreate() {
         this.isAvailableOnline = true;
         this.isDeleted = false;
+        if (this.role == null) {
+            this.role = Role.DOCTOR;
+        }
     }
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
 }
