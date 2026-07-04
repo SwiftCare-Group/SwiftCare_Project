@@ -55,22 +55,26 @@ public class AiClassifierService {
 
     private String buildPrompt(String symptoms, String healthProfile) {
         return """
-                You are a medical triage assistant. Analyze the following patient symptoms
-                and health profile, then classify the severity.
-
+                You are an emergency medical triage AI. Your job is to assess symptom severity ACCURATELY.
+                
+                SEVERITY SCALE:
+                - MILD (1-3): Minor symptoms, no immediate danger. Examples: mild headache, slight cold, minor cuts.
+                - MODERATE (4-6): Significant symptoms needing medical attention soon. Examples: high fever, moderate pain, persistent vomiting.
+                - SEVERE (7-8): Serious symptoms requiring urgent care. Examples: severe chest pain, difficulty breathing, high fever with confusion.
+                - CRITICAL (9-10): Life-threatening emergency. Examples: unconsciousness, severe difficulty breathing, heart attack symptoms, stroke.
+                
                 Patient Symptoms: %s
-
                 Patient Health Profile: %s
-
-                Respond ONLY with a valid JSON object in this exact format:
+                
+                IMPORTANT: "difficulty breathing" and "unconscious" are CRITICAL symptoms. Score them 9-10.
+                
+                Respond ONLY with valid JSON, no markdown, no explanation:
                 {
-                  "severityScore": <integer 1-10>,
-                  "severityLabel": <"MILD" | "MODERATE" | "SEVERE" | "CRITICAL">,
-                  "isEmergency": <true | false>,
-                  "firstAidContent": "<brief first aid instructions if emergency, empty string otherwise>"
+                "severityScore": <integer 1-10>,
+                "severityLabel": <"MILD" | "MODERATE" | "SEVERE" | "CRITICAL">,
+                "isEmergency": <true | false>,
+                "firstAidContent": "<detailed first aid instructions if SEVERE or CRITICAL, empty string if MILD or MODERATE>"
                 }
-
-                Do not include any explanation or text outside the JSON object.
                 """.formatted(symptoms, healthProfile);
     }
 

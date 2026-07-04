@@ -35,7 +35,7 @@ export default function LoginScreen() {
       const response = await api.post('/auth/login', { email, password });
       const { accessToken } = response.data;
       await AsyncStorage.setItem('accessToken', accessToken);
-      router.replace('/(patient)/profile');
+      router.replace('/(patient)/home');
     } catch (error: any) {
       const message =
         error.response?.data?.message || 'Login failed. Try again.';

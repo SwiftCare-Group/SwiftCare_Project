@@ -30,7 +30,7 @@ paystack:
   secret-key: your_paystack_test_secret_key
 
 ai:
-  api-key: your_claude_or_openai_key_here
+  api-key: your_claude_or_openai_key
   model: claude-haiku-4-5
 
 firebase:

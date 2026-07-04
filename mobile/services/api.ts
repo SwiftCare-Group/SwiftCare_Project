@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const api = axios.create({
 //   baseURL: 'http://10.0.2.2:8080/api/v1', // Android emulator
-  baseURL: 'http://100.112.24.95:8080/api/v1',
+  baseURL: 'http://100.112.23.228:8080/api/v1',
   timeout: 10000,
 });
 
