@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLocalSearchParams } from 'expo-router';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 
@@ -28,6 +29,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AppointmentsScreen() {
+  const { preSelectedDept } = useLocalSearchParams<{ preSelectedDept: string }>();
+
   const [appointments, setAppointments] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +56,13 @@ export default function AppointmentsScreen() {
     fetchAppointments();
     fetchDepartments();
   }, []);
+
+  useEffect(() => {
+    if (preSelectedDept) {
+      setSelectedDept(preSelectedDept);
+      setShowBooking(true);
+    }
+  }, [preSelectedDept]);
 
   const fetchAppointments = async () => {
     try {
@@ -157,7 +167,6 @@ export default function AppointmentsScreen() {
 
         {showBooking && (
           <View style={styles.bookingCard}>
-            {/* Tab Toggle */}
             <View style={styles.tabToggle}>
               <TouchableOpacity
                 style={[styles.tabButton, activeTab === 'hospital' && styles.tabButtonActive]}
@@ -177,7 +186,6 @@ export default function AppointmentsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Department Selection */}
             <Text style={styles.bookingLabel}>Select Department</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deptScroll}>
               {departments.map(dept => (
@@ -193,7 +201,6 @@ export default function AppointmentsScreen() {
               ))}
             </ScrollView>
 
-            {/* Date Picker */}
             <View style={styles.dateHeader}>
               <Text style={styles.bookingLabel}>Available Date & Time</Text>
               <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
@@ -216,7 +223,6 @@ export default function AppointmentsScreen() {
               ))}
             </ScrollView>
 
-            {/* Time Slots */}
             <View style={styles.timeGrid}>
               {TIME_SLOTS.map(time => (
                 <TouchableOpacity
@@ -231,7 +237,6 @@ export default function AppointmentsScreen() {
               ))}
             </View>
 
-            {/* Symptom hint */}
             <View style={styles.symptomHint}>
               <Text style={styles.symptomHintLabel}>Your Symptom</Text>
               <Text style={styles.symptomHintText}>Submit symptoms first for accurate queue priority</Text>
@@ -251,7 +256,6 @@ export default function AppointmentsScreen() {
           </View>
         )}
 
-        {/* Appointments List */}
         <Text style={styles.sectionTitle}>Your Appointments</Text>
 
         {appointments.length === 0 ? (
