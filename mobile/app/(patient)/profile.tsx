@@ -187,8 +187,8 @@ export default function ProfileScreen() {
                   disabled={loadingUpgrade}
                 >
                   <Text style={styles.planBestLabel}>Best Value</Text>
-                  <Text style={styles.planButtonLabel}>Yearly</Text>
-                  <Text style={styles.planButtonPrice}>GHS 1,000</Text>
+                  <Text style={styles.planButtonLabelBest}>Yearly</Text>
+                  <Text style={styles.planButtonPriceBest}>GHS 1,000</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -234,10 +234,12 @@ const styles = StyleSheet.create({
   upgradeSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 20, lineHeight: 20 },
   planRow: { flexDirection: 'row', gap: 12 },
   planButton: { flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12, padding: 14, alignItems: 'center' },
-  planButtonBest: { backgroundColor: Colors.white },
+  planButtonBest: { flex: 1, backgroundColor: Colors.white, borderRadius: 12, padding: 14, alignItems: 'center' },
   planBestLabel: { fontSize: 10, color: Colors.primary, fontWeight: '700', marginBottom: 4 },
   planButtonLabel: { fontSize: 14, color: Colors.white, fontWeight: '600' },
   planButtonPrice: { fontSize: 16, color: Colors.white, fontWeight: '800', marginTop: 4 },
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginTop: 20, borderWidth: 1.5, borderColor: Colors.danger, borderRadius: 14, paddingVertical: 14 },
   logoutText: { color: Colors.danger, fontSize: 15, fontWeight: '700' },
+  planButtonLabelBest: { fontSize: 14, color: Colors.primary, fontWeight: '600',},
+  planButtonPriceBest: { fontSize: 16, color: Colors.primary, fontWeight: '800', marginTop: 4,},
 });
