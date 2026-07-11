@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -25,19 +27,24 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const { mediumTap, successNotification, errorNotification } = useHaptics();
+
 
   const handleLogin = async () => {
+    mediumTap();
     if (!email || !password) {
       Alert.alert('Error', 'Email and password are required');
       return;
     }
     setLoading(true);
     try {
+      successNotification();
       const response = await api.post('/auth/login', { email, password });
       const { accessToken } = response.data;
       await AsyncStorage.setItem('accessToken', accessToken);
       router.replace('/(patient)/home');
     } catch (error: any) {
+      errorNotification();
       Alert.alert('Error', error.response?.data?.message || 'Login failed. Try again.');
     } finally {
       setLoading(false);

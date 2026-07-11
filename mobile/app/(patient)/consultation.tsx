@@ -15,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+
 
 export default function ConsultationScreen() {
   const [doctors, setDoctors] = useState<any[]>([]);
@@ -25,6 +27,7 @@ export default function ConsultationScreen() {
   const [showBooking, setShowBooking] = useState(false);
   const [sessionUrl, setSessionUrl] = useState<string | null>(null);
   const [showSession, setShowSession] = useState(false);
+  const { mediumTap, successNotification, errorNotification } = useHaptics();
 
   useEffect(() => { fetchData(); }, []);
 
@@ -44,12 +47,14 @@ export default function ConsultationScreen() {
   };
 
   const handleBook = async () => {
+    mediumTap();
     if (!selectedDoctor) {
       Alert.alert('Error', 'Please select a doctor');
       return;
     }
     setBooking(true);
     try {
+      successNotification();
       const scheduledAt = new Date();
       scheduledAt.setHours(scheduledAt.getHours() + 1);
       await api.post('/consultations', {
@@ -61,6 +66,7 @@ export default function ConsultationScreen() {
       setSelectedDoctor(null);
       fetchData();
     } catch (error: any) {
+      errorNotification();
       const message = error.response?.data?.message || 'Failed to book consultation';
       if (message.includes('Premium') || error.response?.status === 401) {
         Alert.alert('Premium Required', 'Online consultations are available for Premium subscribers only. Upgrade in your profile to access this feature.');
@@ -73,6 +79,7 @@ export default function ConsultationScreen() {
   };
 
   const handleJoin = async (consultationId: string) => {
+    mediumTap();
     try {
       const response = await api.put(`/consultations/${consultationId}/join`);
       setSessionUrl(response.data.sessionUrl);

@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -28,14 +30,18 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { mediumTap, successNotification, errorNotification } = useHaptics();
+
 
   const handleRegister = async () => {
+    mediumTap();
     if (!name || !email || !phone || !dateOfBirth || !password) {
       Alert.alert('Error', 'All fields are required');
       return;
     }
     setLoading(true);
     try {
+      successNotification();
       const response = await api.post('/auth/register', {
         name, email, phone, dateOfBirth, password,
       });
@@ -43,6 +49,7 @@ export default function RegisterScreen() {
       await AsyncStorage.setItem('accessToken', accessToken);
       router.replace('/(auth)/health-profile');
     } catch (error: any) {
+      errorNotification();
       const message = error.response?.data?.message || 'Registration failed. Try again.';
       Alert.alert('Error', message);
     } finally {

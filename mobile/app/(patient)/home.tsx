@@ -18,6 +18,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +38,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { lightTap } = useHaptics();
 
   const fetchData = async () => {
     try {
@@ -207,7 +210,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={index}
                 style={styles.quickAction}
-                onPress={() => router.push(action.route as any)}
+                onPress={() => {lightTap(); router.push(action.route as any); }}
               >
                 <View style={styles.quickActionIcon}>
                   <Ionicons name={action.icon as any} size={24} color={Colors.primary} />
@@ -232,10 +235,10 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={dept.id}
                   style={styles.clinicCard}
-                  onPress={() => router.push({
+                  onPress={() => {lightTap(); router.push({
                     pathname: '/(patient)/appointments',
                     params: { preSelectedDept: dept.id },
-                  })}
+                  }); }}
                 >
                   <View style={styles.clinicIcon}>
                     <Ionicons name="business-outline" size={26} color={Colors.primary} />

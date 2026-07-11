@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+
 
 const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
   MILD: { color: Colors.severityMild, bg: Colors.severityMildBg, icon: 'checkmark-circle-outline' },
@@ -39,8 +41,11 @@ export default function SymptomsScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [charCount, setCharCount] = useState(0);
+  const { mediumTap, successNotification, warningNotification } = useHaptics();
+
 
   const handleSubmit = async () => {
+    mediumTap();
     if (!symptoms.trim()) {
       Alert.alert('Error', 'Please describe your symptoms');
       return;
@@ -53,11 +58,14 @@ export default function SymptomsScreen() {
       await AsyncStorage.setItem('lastSeverityScore', String(response.data.severityScore));
 
       if (response.data.isEmergency) {
+        warningNotification();
         Alert.alert(
           '🚨 EMERGENCY DETECTED',
           'Your symptoms indicate a potential emergency. Please proceed to the hospital immediately or call emergency services.',
           [{ text: 'Understood', style: 'destructive' }]
         );
+      } else{
+        successNotification();
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to submit symptoms');

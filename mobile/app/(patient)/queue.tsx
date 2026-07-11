@@ -14,12 +14,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+
 
 export default function QueueScreen() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [queueStatuses, setQueueStatuses] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { lightTap, warningNotification } = useHaptics();
 
   const fetchData = async () => {
     try {
@@ -65,6 +68,7 @@ export default function QueueScreen() {
         text: 'Yes',
         style: 'destructive',
         onPress: async () => {
+          warningNotification();
           try {
             await api.put(`/appointments/${appointmentId}/cancel`);
             fetchData();

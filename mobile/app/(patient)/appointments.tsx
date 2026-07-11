@@ -16,6 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams } from 'expo-router';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+
 
 const { width } = Dimensions.get('window');
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -40,6 +42,8 @@ export default function AppointmentsScreen() {
   const [selectedTime, setSelectedTime] = useState<string>('09:00');
   const [showBooking, setShowBooking] = useState(false);
   const [activeTab, setActiveTab] = useState<'hospital' | 'online'>('hospital');
+  const { mediumTap, successNotification, errorNotification } = useHaptics();
+
 
   const getDates = () => {
     const dates = [];
@@ -85,6 +89,7 @@ export default function AppointmentsScreen() {
   };
 
   const handleBook = async () => {
+    mediumTap();
     if (!selectedDept) {
       Alert.alert('Error', 'Please select a department');
       return;
@@ -92,6 +97,7 @@ export default function AppointmentsScreen() {
 
     setBooking(true);
     try {
+      successNotification();
       const today = new Date();
       const scheduledTime = new Date(today);
       scheduledTime.setDate(selectedDate);
@@ -112,6 +118,7 @@ export default function AppointmentsScreen() {
       setSelectedDept(null);
       fetchAppointments();
     } catch (error: any) {
+      errorNotification();
       Alert.alert('Error', error.response?.data?.message || 'Failed to book appointment');
     } finally {
       setBooking(false);

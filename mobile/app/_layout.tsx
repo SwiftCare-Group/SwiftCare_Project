@@ -1,20 +1,31 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import api from '../services/api';
+
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const router = useRouter();
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
     checkAuth();
   }, []);
 
+  useEffect(() => {
+    if (appReady) {
+      SplashScreen.hideAsync();
+    }
+  }, [appReady]);
+
   const checkAuth = async () => {
     const token = await AsyncStorage.getItem('accessToken');
     if (!token) {
+      setAppReady(true);
       router.replace('/(auth)/login');
       return;
     }
@@ -31,7 +42,6 @@ export default function RootLayout() {
         router.replace('/(patient)/home');
       }
     } catch {
-      // Try staff
       try {
         const response = await api.get('/doctors/me');
         const role = response.data.role;
@@ -48,12 +58,14 @@ export default function RootLayout() {
         await AsyncStorage.removeItem('accessToken');
         router.replace('/(auth)/login');
       }
+    } finally {
+      setAppReady(true);
     }
   };
 
   return (
     <>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }} />
     </>
   );
