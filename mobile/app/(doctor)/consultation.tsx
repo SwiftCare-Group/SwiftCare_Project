@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { showToast } from '../../utils/toast';
+
 
 export default function DoctorConsultationScreen() {
   const [consultations, setConsultations] = useState<any[]>([]);
@@ -74,14 +76,14 @@ export default function DoctorConsultationScreen() {
         consultationId: activeConsultation.id,
         drugs: drugList,
       });
-      Alert.alert('Success', 'Prescription issued successfully');
+      showToast.success('Prescription issued successfully');
       setShowPrescription(false);
       setDrugs('');
       setNotes('');
       setActiveConsultation(null);
       fetchConsultations();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to issue prescription');
+      showToast.error(error.response?.data?.message || 'Failed to issue prescription');
     } finally {
       setSubmitting(false);
     }

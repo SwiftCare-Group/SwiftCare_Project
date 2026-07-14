@@ -19,6 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { showToast } from '../../utils/toast';
+
 
 
 export default function LoginScreen() {
@@ -33,7 +35,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     mediumTap();
     if (!email || !password) {
-      Alert.alert('Error', 'Email and password are required');
+      showToast.success('Welcome back!');
       return;
     }
     setLoading(true);
@@ -45,7 +47,7 @@ export default function LoginScreen() {
       router.replace('/(patient)/home');
     } catch (error: any) {
       errorNotification();
-      Alert.alert('Error', error.response?.data?.message || 'Login failed. Try again.');
+      showToast.error(error.response?.data?.message || 'Login failed. Try again.');
     } finally {
       setLoading(false);
     }

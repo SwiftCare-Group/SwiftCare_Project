@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
-
+import { showToast } from '../../utils/toast';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -50,8 +50,7 @@ export default function RegisterScreen() {
       router.replace('/(auth)/health-profile');
     } catch (error: any) {
       errorNotification();
-      const message = error.response?.data?.message || 'Registration failed. Try again.';
-      Alert.alert('Error', message);
+      showToast.error(error.response?.data?.message || 'Registration failed. Try again.');
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import Toast from 'react-native-toast-message';
 import api from '../services/api';
 
 SplashScreen.preventAutoHideAsync();
@@ -32,10 +33,7 @@ export default function RootLayout() {
 
     try {
       const response = await api.get('/patients/me');
-      console.log('Patient me response:', JSON.stringify(response.data));
       const role = response.data.role;
-      console.log('Role detected:', role);
-
       if (role === 'ADMIN') {
         router.replace('/(admin)/dashboard');
       } else {
@@ -45,7 +43,6 @@ export default function RootLayout() {
       try {
         const response = await api.get('/doctors/me');
         const role = response.data.role;
-
         if (role === 'DOCTOR') {
           router.replace('/(doctor)/queue');
         } else if (role === 'PHARMACIST') {
@@ -67,6 +64,7 @@ export default function RootLayout() {
     <>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }} />
+      <Toast />
     </>
   );
 }

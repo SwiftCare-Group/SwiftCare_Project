@@ -16,6 +16,8 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { showToast } from '../../utils/toast';
+
 
 export default function DispenseScreen() {
   const router = useRouter();
@@ -56,11 +58,14 @@ export default function DispenseScreen() {
       });
       const remainingRes = await api.get(`/prescriptions/${prescription.id}/remaining`);
       setRemaining(remainingRes.data);
-      Alert.alert('Updated', status === 'DISPENSED' ? `${drugName} dispensed` : `${drugName} marked unavailable`);
+      showToast.success(status === 'DISPENSED'
+        ? `${drugName} dispensed successfully`
+        : `${drugName} marked as unavailable`
+      );
     } catch {
-      Alert.alert('Error', 'Failed to update dispensation status');
+      showToast.error('Failed to update dispensation status');
     } finally {
-      setDispensing(null);
+      showToast.error('Prescription not found. Please check the ID and try again.');
     }
   };
 

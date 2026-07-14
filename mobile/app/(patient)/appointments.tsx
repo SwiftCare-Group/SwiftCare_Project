@@ -17,6 +17,7 @@ import { useLocalSearchParams } from 'expo-router';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { showToast } from '../../utils/toast';
 
 
 const { width } = Dimensions.get('window');
@@ -113,13 +114,13 @@ export default function AppointmentsScreen() {
         severityScore,
       });
 
-      Alert.alert('Success', 'Appointment booked successfully');
+      showToast.success('Your appointment has been booked successfully');
       setShowBooking(false);
       setSelectedDept(null);
       fetchAppointments();
     } catch (error: any) {
       errorNotification();
-      Alert.alert('Error', error.response?.data?.message || 'Failed to book appointment');
+      showToast.error(error.response?.data?.message || 'Failed to book appointment');
     } finally {
       setBooking(false);
     }
@@ -136,7 +137,7 @@ export default function AppointmentsScreen() {
             await api.put(`/appointments/${appointmentId}/cancel`);
             fetchAppointments();
           } catch {
-            Alert.alert('Error', 'Failed to cancel appointment');
+            showToast.error('Failed to cancel appointment');
           }
         },
       },

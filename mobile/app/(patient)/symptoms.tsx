@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { showToast } from '../../utils/toast';
 
 
 const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
@@ -68,7 +69,7 @@ export default function SymptomsScreen() {
         successNotification();
       }
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to submit symptoms');
+      showToast.error(error.response?.data?.message || 'Failed to submit symptoms');
     } finally {
       setLoading(false);
     }
