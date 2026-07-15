@@ -162,3 +162,8 @@ backend/.env
 .DS_Store
 *.iml
 .idea/
+
+target/
+.idea/
+*.iml
+.env

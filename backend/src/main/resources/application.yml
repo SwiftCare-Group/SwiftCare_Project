@@ -28,3 +28,10 @@ app:
 
 paystack:
   secret-key: your_paystack_test_secret_key
+
+ai:
+  api-key: your_claude_openai_key
+  model: gemini-2.0-flash-lite
+
+firebase:
+  credentials-path: firebase-service-account.json

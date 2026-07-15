@@ -28,7 +28,7 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/register", "/auth/login", "/auth/refresh", "/subscriptions/webhook").permitAll()
+                .requestMatchers("/auth/register", "/auth/login", "/auth/refresh", "/auth/logout","/auth/staff-login", "/subscriptions/webhook").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/departments/**").permitAll()
                 .anyRequest().authenticated()
