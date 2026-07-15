@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import api from '../services/api';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Splash screen may already be prevented from hiding.
+});
 
 export default function RootLayout() {
   const router = useRouter();
@@ -18,55 +20,101 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (appReady) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => {
+        // Ignore if splash screen is already hidden.
+      });
     }
   }, [appReady]);
 
+  const logoutInvalidUser = async () => {
+    await AsyncStorage.removeItem('accessToken');
+    router.replace('/(auth)/login');
+  };
+
   const checkAuth = async () => {
-    const token = await AsyncStorage.getItem('accessToken');
-    if (!token) {
-      setAppReady(true);
-      router.replace('/(auth)/login');
-      return;
-    }
-
     try {
-      const response = await api.get('/patients/me');
-      console.log('Patient me response:', JSON.stringify(response.data));
-      const role = response.data.role;
-      console.log('Role detected:', role);
+      const token = await AsyncStorage.getItem('accessToken');
 
-      if (role === 'ADMIN') {
-        router.replace('/(admin)/dashboard');
-      } else {
-        router.replace('/(patient)/home');
+      if (!token) {
+        router.replace('/(auth)/login');
+        return;
       }
-    } catch {
+
       try {
-        const response = await api.get('/doctors/me');
-        const role = response.data.role;
+        const patientResponse = await api.get('/patients/me');
+        const role = patientResponse.data?.role;
+
+        console.log(
+          'Patient profile:',
+          JSON.stringify(patientResponse.data)
+        );
+
+        if (role === 'ADMIN') {
+          router.replace('/(admin)/dashboard');
+        } else {
+          router.replace('/(patient)/home');
+        }
+
+        return;
+      } catch (patientError: any) {
+        console.log(
+          'Patient profile check failed:',
+          patientError.response?.status ||
+            patientError.message
+        );
+      }
+
+      try {
+        const staffResponse = await api.get('/doctors/me');
+        const role = staffResponse.data?.role;
 
         if (role === 'DOCTOR') {
           router.replace('/(doctor)/queue');
         } else if (role === 'PHARMACIST') {
           router.replace('/(pharmacist)/dispense');
         } else {
-          await AsyncStorage.removeItem('accessToken');
-          router.replace('/(auth)/login');
+          await logoutInvalidUser();
         }
-      } catch {
-        await AsyncStorage.removeItem('accessToken');
-        router.replace('/(auth)/login');
+      } catch (staffError: any) {
+        console.log(
+          'Staff profile check failed:',
+          staffError.response?.status ||
+            staffError.message
+        );
+
+        await logoutInvalidUser();
       }
+    } catch (error) {
+      console.error('Authentication check failed:', error);
+      await logoutInvalidUser();
     } finally {
       setAppReady(true);
     }
   };
 
   return (
+    <ThemeProvider>
+      <AppNavigator />
+    </ThemeProvider>
+  );
+}
+
+function AppNavigator() {
+  const { isDarkMode, colors } = useTheme();
+
+  return (
     <>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          contentStyle: {
+            backgroundColor: colors.background,
+          },
+        }}
+      />
     </>
   );
 }
