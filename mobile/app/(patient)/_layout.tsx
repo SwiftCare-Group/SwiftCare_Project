@@ -1,282 +1,139 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
-import { View } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 
-import { useTheme } from "../../context/ThemeContext";
+import { useTheme } from '../../context/ThemeContext';
 
 export default function PatientLayout() {
-  const { colors } = useTheme();
-
-  const renderIcon = (
-    icon: any,
-    focusedIcon: any,
-    color: string,
-    size: number,
-    focused: boolean
-  ) => {
-    return (
-      <View
-        style={{
-          alignItems: "center",
-          justifyContent: "center",
-          width: 48,
-          height: 34,
-          borderRadius: 18,
-          backgroundColor: focused
-            ? colors.primaryLight
-            : "transparent",
-        }}
-      >
-        <Ionicons
-          name={focused ? focusedIcon : icon}
-          size={focused ? size + 2 : size}
-          color={color}
-        />
-      </View>
-    );
-  };
-
+  const { colors, isDarkMode } = useTheme();
 
   return (
+
+    
     <Tabs
       screenOptions={{
         headerShown: false,
 
-        tabBarActiveTintColor:
-          colors.primary,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textDisabled,
 
-        tabBarInactiveTintColor:
-          colors.textDisabled,
-
-
-        tabBarStyle: {
-
-          position: "absolute",
-
-          left: 16,
-          right: 16,
-          bottom: 18,
-
-          height: 70,
-
-          borderRadius: 25,
-
-          backgroundColor:
-            colors.surface,
-
-          borderTopWidth: 0,
-
-          elevation: 10,
-
-          shadowColor: "#000",
-
-          shadowOffset: {
-            width: 0,
-            height: 6,
-          },
-
-          shadowOpacity: 0.12,
-
-          shadowRadius: 12,
-
-          paddingTop: 8,
-
-          paddingBottom: 8,
-        },
-
-
-        tabBarLabelStyle: {
-
-          fontSize: 10,
-
-          fontWeight: "700",
-
-          marginTop: 2,
-        },
-
-
+       tabBarStyle: {
+  backgroundColor: colors.surface,
+  borderTopColor: colors.border,
+  borderTopWidth: 1,
+  height: 68,
+  paddingTop: 5,
+  paddingBottom: 8,
+},
+tabBarLabelStyle: {
+  fontSize: 10,
+  fontWeight: '600',
+},
         tabBarHideOnKeyboard: true,
 
-
         sceneStyle: {
-
-          backgroundColor:
-            colors.background,
+          backgroundColor: colors.background,
         },
       }}
-
-
     >
-
-
       <Tabs.Screen
-
         name="home"
-
         options={{
-
-          title: "Home",
-
-          tabBarIcon: ({
-            color,
-            size,
-            focused,
-          }) =>
-            renderIcon(
-              "home-outline",
-              "home",
-              color,
-              size,
-              focused
-            ),
+          title: 'Home',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'home' : 'home-outline'}
+              size={size}
+              color={color}
+            />
+          ),
         }}
       />
 
-
-
       <Tabs.Screen
-
         name="appointments"
-
         options={{
-
-          title: "Visits",
-
-          tabBarIcon: ({
-            color,
-            size,
-            focused,
-          }) =>
-            renderIcon(
-              "calendar-outline",
-              "calendar",
-              color,
-              size,
-              focused
-            ),
+          title: 'Appointments',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'calendar' : 'calendar-outline'}
+              size={size}
+              color={color}
+            />
+          ),
         }}
       />
 
-
-
       <Tabs.Screen
-
         name="queue"
-
         options={{
-
-          title: "Queue",
-
-          tabBarIcon: ({
-            color,
-            size,
-            focused,
-          }) =>
-            renderIcon(
-              "list-outline",
-              "list",
-              color,
-              size,
-              focused
-            ),
+          title: 'Queue',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'list' : 'list-outline'}
+              size={size}
+              color={color}
+            />
+          ),
         }}
       />
 
-
-
       <Tabs.Screen
-
-        name="services"
-
-        options={{
-
-          title: "Services",
-
-          tabBarIcon: ({
-            color,
-            size,
-            focused,
-          }) =>
-            renderIcon(
-              "apps-outline",
-              "apps",
-              color,
-              size,
-              focused
-            ),
-        }}
+  name="services"
+  options={{
+    title: 'Services',
+    tabBarIcon: ({ color, size, focused }) => (
+      <Ionicons
+        name={focused ? 'apps' : 'apps-outline'}
+        size={size}
+        color={color}
       />
+    ),
+  }}
+/>
 
-
-
-      <Tabs.Screen
-
-        name="profile"
-
-        options={{
-
-          title: "Profile",
-
-          tabBarIcon: ({
-            color,
-            size,
-            focused,
-          }) =>
-            renderIcon(
-              "person-outline",
-              "person",
-              color,
-              size,
-              focused
-            ),
-        }}
+<Tabs.Screen
+  name="profile"
+  options={{
+    title: 'Profile',
+    tabBarIcon: ({ color, size, focused }) => (
+      <Ionicons
+        name={focused ? 'person' : 'person-outline'}
+        size={size}
+        color={color}
       />
-
-
-
-      {/* Hidden screens */}
-
-
+    ),
+  }}
+/>
       <Tabs.Screen
-
         name="symptoms"
-
         options={{
           href: null,
         }}
       />
 
-
       <Tabs.Screen
-
         name="consultation"
-
         options={{
           href: null,
         }}
       />
 
-
+      
       <Tabs.Screen
-
         name="prescription"
-
         options={{
           href: null,
         }}
       />
-
 
       <Tabs.Screen
-
-        name="medical-history"
-
-        options={{
-          href: null,
-        }}
-      />
-
-
+  name="medical-history"
+  options={{
+    href: null,
+  }}
+/>
     </Tabs>
+
   );
 }
+
