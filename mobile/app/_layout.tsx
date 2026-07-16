@@ -34,15 +34,21 @@ export default function RootLayout() {
     try {
       const response = await api.get('/patients/me');
       const role = response.data.role;
+
       if (role === 'ADMIN') {
         router.replace('/(admin)/dashboard');
-      } else {
+      } else if (role === 'PATIENT') {
         router.replace('/(patient)/home');
+      } else {
+        // unexpected role — clear and redirect
+        await AsyncStorage.removeItem('accessToken');
+        router.replace('/(auth)/login');
       }
     } catch {
       try {
         const response = await api.get('/doctors/me');
         const role = response.data.role;
+
         if (role === 'DOCTOR') {
           router.replace('/(doctor)/queue');
         } else if (role === 'PHARMACIST') {

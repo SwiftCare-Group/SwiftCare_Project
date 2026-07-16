@@ -15,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { QueueSkeleton } from '../../components/SkeletonCard';
+
 
 
 export default function QueueScreen() {
@@ -80,14 +82,22 @@ export default function QueueScreen() {
     ]);
   };
 
-  if (loading) {
+ if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <LinearGradient
+          colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+          style={styles.header}
+        >
+          <Text style={styles.headerTitle}>Queue Details</Text>
+          <Text style={styles.headerSubtitle}>Loading your queue position...</Text>
+        </LinearGradient>
+        <QueueSkeleton />
+      </SafeAreaView>
     );
   }
 
+  
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient

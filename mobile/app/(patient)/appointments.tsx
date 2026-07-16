@@ -18,6 +18,7 @@ import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
 import { showToast } from '../../utils/toast';
+import { AppointmentListSkeleton } from '../../components/SkeletonCard';
 
 
 const { width } = Dimensions.get('window');
@@ -146,9 +147,17 @@ export default function AppointmentsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <LinearGradient
+          colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+          style={styles.header}
+        >
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>Appointments</Text>
+          </View>
+        </LinearGradient>
+        <AppointmentListSkeleton />
+      </SafeAreaView>
     );
   }
 
