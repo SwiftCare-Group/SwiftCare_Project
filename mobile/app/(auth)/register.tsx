@@ -1,16 +1,16 @@
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { useState } from 'react';
+  View,
+} from "react-native";import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -69,11 +69,12 @@ export default function RegisterScreen() {
         >
           <Ionicons name="arrow-back-outline" size={22} color={Colors.white} />
         </TouchableOpacity>
-        <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Ionicons name="person-add-outline" size={32} color={Colors.white} />
-          </View>
-          <Text style={styles.appName}>Create Account</Text>
+<View style={styles.logoContainer}>
+  <Image
+    source={require("../../assets/icon.png")}
+    style={styles.headerLogo}
+    resizeMode="cover"
+  />          <Text style={styles.appName}>Create Account</Text>
           <Text style={styles.appTagline}>Join SwiftCare to manage your healthcare</Text>
         </View>
       </LinearGradient>
@@ -196,7 +197,6 @@ const styles = StyleSheet.create({
   headerGradient: { paddingTop: 16, paddingBottom: 32, paddingHorizontal: 20 },
   backButton: { marginBottom: 16 },
   logoContainer: { alignItems: 'center' },
-  logo: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   appName: { fontSize: 24, fontWeight: '800', color: Colors.white, marginBottom: 4 },
   appTagline: { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
   formContainer: { backgroundColor: Colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, padding: 24, flex: 1 },
@@ -208,6 +208,12 @@ const styles = StyleSheet.create({
   registerButton: { backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
   registerButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   buttonDisabled: { opacity: 0.6 },
+  headerLogo: {
+  width: 104,
+  height: 104,
+  borderRadius: 26,
+  marginBottom: 14,
+},
   linkButton: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },
   linkText: { fontSize: 14, color: Colors.textSecondary },
   linkTextBold: { color: Colors.primary, fontWeight: '700' },
