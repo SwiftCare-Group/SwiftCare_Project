@@ -10,12 +10,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";import { SafeAreaView } from "react-native-safe-area-context";
+} from 'react-native';
+import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../services/api';
+import { Colors } from '../../constants/colors';
+import { useHaptics } from '../../hooks/useHaptics';
+import { showToast } from '../../utils/toast';
+
 
 import { Colors } from "../../constants/colors";
 import { useHaptics } from "../../hooks/useHaptics";
@@ -72,6 +78,7 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       errorNotification();
+      showToast.error(error.response?.data?.message || 'Login failed. Try again.');
 
       console.log(
         "Login error:",

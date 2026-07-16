@@ -1,8 +1,11 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StatusBar } from "expo-status-bar";
-import * as SplashScreen from "expo-splash-screen";
-import { Stack, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import Toast from 'react-native-toast-message';
+import api from '../services/api';
 
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 import api from "../services/api";
@@ -29,13 +32,20 @@ export default function RootLayout() {
 
 
 
-  useEffect(() => {
-    const logoutInvalidUser = async () => {
-      await AsyncStorage.removeItem("accessToken");
-      router.replace("/(auth)/login");
-    };
+    try {
+      const response = await api.get('/patients/me');
+      const role = response.data.role;
 
-    const checkAuth = async () => {
+      if (role === 'ADMIN') {
+        router.replace('/(admin)/dashboard');
+      } else if (role === 'PATIENT') {
+        router.replace('/(patient)/home');
+      } else {
+        // unexpected role — clear and redirect
+        await AsyncStorage.removeItem('accessToken');
+        router.replace('/(auth)/login');
+      }
+    } catch {
       try {
         const token = await AsyncStorage.getItem("accessToken");
 
@@ -133,17 +143,9 @@ function AppNavigator() {
 
   return (
     <>
-      <StatusBar style={isDarkMode ? "light" : "dark"} />
-
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: "slide_from_right",
-          contentStyle: {
-            backgroundColor: colors.background,
-          },
-        }}
-      />
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false }} />
+      <Toast />
     </>
   );
 }

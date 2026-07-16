@@ -16,16 +16,8 @@ import { addNotification } from '../../services/notificationStorage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
-import { useTheme } from '../../context/ThemeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueueSkeleton } from '../../components/SkeletonCard';
 
-type Appointment = {
-  id: string;
-  departmentName?: string;
-  createdAt?: string;
-  scheduledTime?: string;
-  status?: string;
-};
 
 type QueueStatus = {
   currentPosition?: number;
@@ -271,35 +263,22 @@ useEffect(() => {
     });
   };
 
-  if (loading) {
+ if (loading) {
     return (
-      <View
-        style={[
-          styles.centered,
-          {
-            backgroundColor: colors.background,
-          },
-        ]}
-      >
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-        />
-
-        <Text
-          style={[
-            styles.loadingText,
-            {
-              color: colors.textSecondary,
-            },
-          ]}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <LinearGradient
+          colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+          style={styles.header}
         >
-          Loading your queue…
-        </Text>
-      </View>
+          <Text style={styles.headerTitle}>Queue Details</Text>
+          <Text style={styles.headerSubtitle}>Loading your queue position...</Text>
+        </LinearGradient>
+        <QueueSkeleton />
+      </SafeAreaView>
     );
   }
 
+  
   return (
     <SafeAreaView
       style={[

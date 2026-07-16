@@ -16,6 +16,7 @@ import { WebView } from 'react-native-webview';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { showToast } from '../../utils/toast';
 
 
 export default function ConsultationScreen() {
@@ -61,7 +62,7 @@ export default function ConsultationScreen() {
         doctorId: selectedDoctor,
         scheduledAt: scheduledAt.toISOString().slice(0, 19),
       });
-      Alert.alert('Success', 'Consultation booked successfully');
+      showToast.success('Consultation booked successfully');
       setShowBooking(false);
       setSelectedDoctor(null);
       fetchData();
@@ -71,7 +72,8 @@ export default function ConsultationScreen() {
       if (message.includes('Premium') || error.response?.status === 401) {
         Alert.alert('Premium Required', 'Online consultations are available for Premium subscribers only. Upgrade in your profile to access this feature.');
       } else {
-        Alert.alert('Error', message);
+        showToast.error(message);
+        showToast.error('Failed to join session');
       }
     } finally {
       setBooking(false);

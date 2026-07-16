@@ -16,20 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
-import { useTheme } from '../../context/ThemeContext';
+import { showToast } from '../../utils/toast';
 
-type ProfileData = {
-  name?: string;
-  email?: string;
-  phone?: string;
-  tier?: string;
-};
-
-type SubscriptionData = {
-  plan?: string;
-  status?: string;
-  expiresAt?: string;
-};
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -86,11 +74,7 @@ export default function ProfileScreen() {
         [{ text: 'OK' }]
       );
     } catch (error: any) {
-      Alert.alert(
-        'Error',
-        error.response?.data?.message ||
-          'Failed to initiate upgrade.'
-      );
+      showToast.error(error.response?.data?.message || 'Failed to initiate upgrade.');
     } finally {
       setLoadingUpgrade(false);
     }

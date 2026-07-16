@@ -17,6 +17,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addNotification } from '../../services/notificationStorage';
 import api from '../../services/api';
 import { useHaptics } from '../../hooks/useHaptics';
+import { showToast } from '../../utils/toast';
+import { AppointmentListSkeleton } from '../../components/SkeletonCard';
+
 import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
@@ -296,6 +299,7 @@ await addNotification({
         'Your appointment was booked successfully.'
       );
 
+      showToast.success('Your appointment has been booked successfully');
       setShowBooking(false);
       setSelectedDept(null);
       setSelectedDate(new Date());
@@ -304,29 +308,25 @@ await addNotification({
       await fetchAppointments();
     } catch (error: any) {
       errorNotification();
-
-      Alert.alert(
-        'Booking Failed',
-        error.response?.data?.message ||
-          'Failed to book appointment.'
-      );
+      showToast.error(error.response?.data?.message || 'Failed to book appointment');
     } finally {
       setBooking(false);
     }
   };
 
-  const handleCancel = (
-    appointmentId: string
-  ) => {
-    mediumTap();
-
-    Alert.alert(
-      'Cancel Appointment',
-      'Are you sure you want to cancel this appointment?',
-      [
-        {
-          text: 'No',
-          style: 'cancel',
+  const handleCancel = async (appointmentId: string) => {
+    Alert.alert('Cancel Appointment', 'Are you sure?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.put(`/appointments/${appointmentId}/cancel`);
+            fetchAppointments();
+          } catch {
+            showToast.error('Failed to cancel appointment');
+          }
         },
         {
           text: 'Yes, Cancel',
@@ -388,20 +388,17 @@ await addNotification({
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.centered,
-          {
-            backgroundColor:
-              colors.background,
-          },
-        ]}
-      >
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-        />
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <LinearGradient
+          colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+          style={styles.header}
+        >
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>Appointments</Text>
+          </View>
+        </LinearGradient>
+        <AppointmentListSkeleton />
+      </SafeAreaView>
     );
   }
 
