@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { HomeScreenSkeleton } from '../../components/SkeletonCard';
 
 
 const { width } = Dimensions.get('window');
@@ -95,9 +96,9 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <HomeScreenSkeleton />
+      </SafeAreaView>
     );
   }
 
