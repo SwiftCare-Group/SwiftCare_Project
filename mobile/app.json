@@ -33,15 +33,13 @@
 
     "plugins": [
       "expo-router",
-      [
-  "expo-splash-screen",
-  {
-    "image": "./assets/splash-icon.png",
-    "imageWidth": 230,
-    "resizeMode": "contain",
-    "backgroundColor": "#E8F8F3"
-  }
-]
-    ]
+      "expo-splash-screen"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bbb0e029-e53b-4c30-b2b6-17188419eb71"
+      }
+    }
   }
 }

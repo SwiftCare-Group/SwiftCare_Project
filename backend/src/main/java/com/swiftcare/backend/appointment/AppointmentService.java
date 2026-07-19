@@ -56,7 +56,7 @@ public class AppointmentService {
                 .appointment(saved)
                 .currentPosition(queuePosition)
                 .estimatedCallTime(calculateEstimatedCallTime(
-                        department, queuePosition))
+                        department, queuePosition, request.getScheduledTime()))
                 .build();
 
         queueEntryRepository.save(queueEntry);
@@ -128,7 +128,7 @@ public class AppointmentService {
         return position;
     }
 
-    private LocalDateTime calculateEstimatedCallTime(Department department, int position) {
+    private LocalDateTime calculateEstimatedCallTime(Department department, int position, LocalDateTime scheduledTime) {
         // Parse department opening hour from operatingHours string e.g. "08:00 - 17:00"
         String[] hours = department.getOperatingHours().split(" - ");
         String[] openTime = hours[0].trim().split(":");
@@ -146,7 +146,7 @@ public class AppointmentService {
             departmentOpen = departmentOpen.plusDays(1);
         }
 
-        return departmentOpen.plusMinutes((long) position * 15);
+            return scheduledTime.plusMinutes((long) (position - 1) * 15);
     }
 
     private void recalculateQueuePositions(UUID departmentId) {
@@ -165,7 +165,8 @@ public class AppointmentService {
                         entry.setEstimatedCallTime(
                                 calculateEstimatedCallTime(
                                         appointment.getDepartment(),
-                                        appointment.getQueuePosition()));
+                                        appointment.getQueuePosition(),
+                                        appointment.getScheduledTime()));
                         queueEntryRepository.save(entry);
                     });
         }

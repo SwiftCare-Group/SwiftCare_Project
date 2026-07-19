@@ -24,6 +24,7 @@ public class ConsultationController {
 
     private final ConsultationService consultationService;
     private final PatientRepository patientRepository;
+    private final com.swiftcare.backend.consultation.DoctorRepository doctorRepository;
 
     @GetMapping("/doctors")
     public ResponseEntity<List<DoctorResponse>> getAvailableDoctors() {
@@ -74,5 +75,13 @@ public class ConsultationController {
         return patientRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"))
                 .getId();
+    }
+
+    @GetMapping("/doctor")
+    public ResponseEntity<List<ConsultationResponse>> getDoctorConsultations(
+            @AuthenticationPrincipal String email) {
+        Doctor doctor = doctorRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found"));
+        return ResponseEntity.ok(consultationService.getDoctorConsultations(doctor.getId()));
     }
 }

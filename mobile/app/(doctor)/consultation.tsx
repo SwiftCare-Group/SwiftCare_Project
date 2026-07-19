@@ -36,7 +36,7 @@ export default function DoctorConsultationScreen() {
 
   const fetchConsultations = async () => {
     try {
-      const response = await api.get('/consultations');
+      const response = await api.get('/consultations/doctor');
       setConsultations(response.data.filter(
         (c: any) => c.status === 'SCHEDULED' || c.status === 'IN_PROGRESS'
       ));

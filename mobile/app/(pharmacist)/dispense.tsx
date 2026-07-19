@@ -30,17 +30,18 @@ export default function DispenseScreen() {
 
   const handleLookup = async () => {
     if (!qrCode.trim()) {
-      Alert.alert('Error', 'Please enter the prescription ID');
+      showToast.error('Please enter the prescription ID');
       return;
     }
     setLoading(true);
     try {
-      const response = await api.get(`/prescriptions/${qrCode.trim()}`);
+      const cleanId = qrCode.trim().replace(/\s/g, '');
+      const response = await api.get(`/prescriptions/${cleanId}`);
       setPrescription(response.data);
-      const remainingRes = await api.get(`/prescriptions/${qrCode.trim()}/remaining`);
+      const remainingRes = await api.get(`/prescriptions/${cleanId}/remaining`);
       setRemaining(remainingRes.data);
     } catch {
-      Alert.alert('Not Found', 'Prescription not found. Please check the ID and try again.');
+      showToast.error('Prescription not found. Please check the ID and try again.');
     } finally {
       setLoading(false);
     }

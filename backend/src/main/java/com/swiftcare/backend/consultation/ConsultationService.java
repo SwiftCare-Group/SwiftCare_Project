@@ -128,4 +128,12 @@ public class ConsultationService {
                 .createdAt(consultation.getCreatedAt())
                 .build();
     }
+
+    public List<ConsultationResponse> getDoctorConsultations(UUID doctorId) {
+        return consultationRepository
+                .findAllByDoctorIdAndStatus(doctorId, ConsultationStatus.SCHEDULED)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 }

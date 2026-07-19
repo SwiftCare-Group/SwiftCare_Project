@@ -20,6 +20,7 @@ import { useHaptics } from '../../hooks/useHaptics';
 import { showToast } from '../../utils/toast';
 import { AppointmentListSkeleton } from '../../components/SkeletonCard';
 
+
 import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');

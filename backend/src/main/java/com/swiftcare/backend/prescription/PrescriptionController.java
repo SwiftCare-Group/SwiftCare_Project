@@ -34,8 +34,14 @@ public class PrescriptionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PrescriptionResponse> getOne(@PathVariable UUID id) {
-        return ResponseEntity.ok(prescriptionService.getPrescription(id));
+    public ResponseEntity<PrescriptionResponse> getOne(@PathVariable String id) {
+        try {
+            UUID prescriptionId = UUID.fromString(id.trim());
+            return ResponseEntity.ok(prescriptionService.getPrescription(prescriptionId));
+        } catch (IllegalArgumentException e) {
+            // not a valid UUID — try QR hash lookup
+            return ResponseEntity.ok(prescriptionService.getPrescriptionByHash(id.trim()));
+        }
     }
 
     @GetMapping("/{id}/qr")

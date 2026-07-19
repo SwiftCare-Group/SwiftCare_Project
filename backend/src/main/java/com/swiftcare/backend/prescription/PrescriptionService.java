@@ -167,4 +167,10 @@ public class PrescriptionService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
+
+    public PrescriptionResponse getPrescriptionByHash(String hash) {
+        Prescription prescription = prescriptionRepository.findByQrCodeHash(hash)
+                .orElseThrow(() -> new ResourceNotFoundException("Prescription not found"));
+        return mapToResponse(prescription);
+    }
 }

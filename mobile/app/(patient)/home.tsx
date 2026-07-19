@@ -20,6 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { HomeScreenSkeleton } from '../../components/SkeletonCard';
+
 import { useTheme } from '../../context/ThemeContext';
 import { getUnreadNotificationCount } from '../../services/notificationStorage';
 
@@ -187,6 +189,9 @@ useFocusEffect(
 
   if (loading) {
     return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <HomeScreenSkeleton />
+      </SafeAreaView>
       <View
         style={[
           styles.centered,
