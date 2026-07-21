@@ -4,18 +4,17 @@
     "slug": "swiftcare",
     "version": "1.0.0",
     "orientation": "portrait",
-
     "icon": "./assets/icon.png",
-
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": "swiftcare",
-
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.swiftcare.app"
+      "bundleIdentifier": "com.swiftcare.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -25,23 +24,27 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.swiftcare.app"
     },
-
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-
     "plugins": [
       "expo-router",
       [
-  "expo-splash-screen",
-  {
-    "image": "./assets/splash-icon.png",
-    "imageWidth": 230,
-    "resizeMode": "contain",
-    "backgroundColor": "#E8F8F3"
-  }
-]
-    ]
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 230,
+          "resizeMode": "contain",
+          "backgroundColor": "#E8F8F3"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "766e72be-596a-401b-9be5-3f83f0be9a23"
+      }
+    }
   }
 }

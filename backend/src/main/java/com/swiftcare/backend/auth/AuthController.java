@@ -39,8 +39,12 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/staff-login")
-    public ResponseEntity<StaffAuthResponse> staffLogin(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.staffLogin(request));
-    }
+    @PostMapping("/staff/login")
+public ResponseEntity<StaffAuthResponse> staffLogin(
+        @Valid @RequestBody LoginRequest request
+) {
+    return ResponseEntity.ok(
+            authService.staffLogin(request)
+    );
+}
 }

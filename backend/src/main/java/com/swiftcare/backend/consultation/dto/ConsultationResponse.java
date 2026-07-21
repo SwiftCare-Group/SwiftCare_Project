@@ -14,13 +14,19 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ConsultationResponse {
+
     private UUID id;
     private UUID patientId;
     private UUID doctorId;
+    private UUID queueEntryId;
+    
+
     private String doctorName;
+
     private LocalDateTime scheduledAt;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
+
     private String sessionUrl;
     private ConsultationStatus status;
     private String notes;

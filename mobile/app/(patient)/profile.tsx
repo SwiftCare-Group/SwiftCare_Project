@@ -209,15 +209,17 @@ const handleLogout = async () => {
         </Text>
       </LinearGradient>
 
-      <ScrollView
-        style={[
-          styles.container,
-          { backgroundColor: colors.background },
-        ]}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Account details */}
+<ScrollView
+  style={[
+    styles.container,
+    { backgroundColor: colors.background },
+  ]}
+  showsVerticalScrollIndicator={false}
+  contentContainerStyle={[
+    styles.content,
+    styles.scrollContent,
+  ]}
+>        {/* Account details */}
         <View
           style={[
             styles.card,
@@ -830,6 +832,9 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
+  scrollContent: {
+  paddingBottom: 220,
+},
 
   menuTextContainer: {
     flex: 1,
