@@ -5,8 +5,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import Toast from 'react-native-toast-message';
-import api from '../services/api';
-
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 import api from "../services/api";
 
@@ -32,20 +30,28 @@ export default function RootLayout() {
 
 
 
-    try {
-      const response = await api.get('/patients/me');
-      const role = response.data.role;
+    // try {
+    //   const response = await api.get('/patients/me');
+    //   const role = response.data.role;
 
-      if (role === 'ADMIN') {
-        router.replace('/(admin)/dashboard');
-      } else if (role === 'PATIENT') {
-        router.replace('/(patient)/home');
-      } else {
-        // unexpected role — clear and redirect
-        await AsyncStorage.removeItem('accessToken');
-        router.replace('/(auth)/login');
-      }
-    } catch {
+    //   if (role === 'ADMIN') {
+    //     router.replace('/(admin)/dashboard');
+    //   } else if (role === 'PATIENT') {
+    //     router.replace('/(patient)/home');
+    //   } else {
+    //     // unexpected role — clear and redirect
+    //     await AsyncStorage.removeItem('accessToken');
+    //     router.replace('/(auth)/login');
+    //   }
+    // } catch {
+
+    useEffect(() => {
+      const logoutInvalidUser = async () => {
+        await AsyncStorage.removeItem("accessToken");
+        router.replace("/(auth)/login");
+      };
+
+      const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem("accessToken");
 

@@ -328,35 +328,35 @@ await addNotification({
             showToast.error('Failed to cancel appointment');
           }
         },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
+        // {
+        //   text: 'Yes, Cancel',
+        //   style: 'destructive',
 
-          onPress: async () => {
-            try {
-              await api.put(
-                `/appointments/${appointmentId}/cancel`
-              );
+        //   onPress: async () => {
+        //     try {
+        //       await api.put(
+        //         `/appointments/${appointmentId}/cancel`
+        //       );
 
-              successNotification();
+        //       successNotification();
 
-              Alert.alert(
-                'Appointment Cancelled',
-                'Your appointment has been cancelled.'
-              );
+        //       Alert.alert(
+        //         'Appointment Cancelled',
+        //         'Your appointment has been cancelled.'
+        //       );
 
-              await fetchAppointments();
-            } catch (error: any) {
-              errorNotification();
+        //       await fetchAppointments();
+        //     } catch (error: any) {
+        //       errorNotification();
 
-              Alert.alert(
-                'Cancellation Failed',
-                error.response?.data?.message ||
-                  'Failed to cancel appointment.'
-              );
-            }
-          },
-        },
+        //       Alert.alert(
+        //         'Cancellation Failed',
+        //         error.response?.data?.message ||
+        //           'Failed to cancel appointment.'
+        //       );
+        //     }
+        //   },
+      },
       ]
     );
   };
