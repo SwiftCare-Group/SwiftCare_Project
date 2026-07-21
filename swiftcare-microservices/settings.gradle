@@ -1,0 +1,11 @@
+rootProject.name = 'swiftcare-microservices'
+
+include 'shared-kernel'
+include 'api-gateway'
+include 'identity-service'
+include 'appointment-service'
+include 'clinical-service'
+include 'symptom-service'
+include 'subscription-service'
+include 'notification-service'
+include 'database-migration-runner'
