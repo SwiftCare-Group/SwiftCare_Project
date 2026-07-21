@@ -70,23 +70,26 @@ export default function LoginScreen() {
       } else {
         router.replace("/(patient)/home");
       }
-    } catch (error: any) {
-      errorNotification();
+    }catch (error: any) {
+  console.log('Login error details:', {
+    message: error.message,
+    code: error.code,
+    baseURL: error.config?.baseURL,
+    url: error.config?.url,
+    method: error.config?.method,
+    fullURL: `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`,
+    status: error.response?.status,
+    responseData: error.response?.data,
+  });
 
-      console.log(
-        "Login error:",
-        error.response?.data ?? error.message
-      );
-
-      Alert.alert(
-        "Login failed",
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          "Unable to sign in. Check your details and try again."
-      );
-    } finally {
-      setLoading(false);
-    }
+  Alert.alert(
+    'Login Failed',
+    error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      'Unable to connect to the server.'
+  );
+}
   };
 
   return (

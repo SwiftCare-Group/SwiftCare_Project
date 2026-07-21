@@ -33,7 +33,7 @@ export default function StaffLoginScreen() {
     }
     setLoading(true);
     try {
-      const response = await api.post('/auth/staff-login', { email, password });
+      const response = await api.post('/auth/staff/login', { email, password });
       const { accessToken, role } = response.data;
       await AsyncStorage.setItem('accessToken', accessToken);
 
@@ -43,10 +43,19 @@ export default function StaffLoginScreen() {
         router.replace('/(pharmacist)/dispense');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Login failed. Try again.');
-    } finally {
-      setLoading(false);
-    }
+  console.log(
+    'STAFF LOGIN ERROR:',
+    error.response?.status,
+    error.response?.data || error.message
+  );
+
+  Alert.alert(
+    'Login failed',
+    error.response?.data?.message ||
+      error.response?.data?.error ||
+      'Unable to sign in'
+  );
+}
   };
 
   return (

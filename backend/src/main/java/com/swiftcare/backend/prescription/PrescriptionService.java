@@ -11,10 +11,10 @@ import com.swiftcare.backend.consultation.Consultation;
 import com.swiftcare.backend.consultation.ConsultationRepository;
 import com.swiftcare.backend.pharmacy.DispensationRecord;
 import com.swiftcare.backend.pharmacy.DispensationRecordRepository;
+import com.swiftcare.backend.pharmacy.dto.DispensationRecordResponse;
 import com.swiftcare.backend.pharmacy.dto.DispenseRequest;
 import com.swiftcare.backend.prescription.dto.PrescriptionRequest;
 import com.swiftcare.backend.prescription.dto.PrescriptionResponse;
-import com.swiftcare.backend.pharmacy.dto.DispensationRecordResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,6 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,11 +41,42 @@ public class PrescriptionService {
     private final DispensationRecordRepository dispensationRecordRepository;
 
     @Transactional
-    public PrescriptionResponse issuePrescription(PrescriptionRequest request) throws Exception {
-        Consultation consultation = consultationRepository.findById(request.getConsultationId())
-                .orElseThrow(() -> new ResourceNotFoundException("Consultation not found"));
+    public PrescriptionResponse issuePrescription(
+            PrescriptionRequest request
+    ) throws WriterException, IOException, NoSuchAlgorithmException {
 
-        String qrData = buildQrData(consultation.getId(), request.getDrugs());
+        Consultation consultation = consultationRepository
+                .findById(request.getConsultationId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Consultation not found")
+                );
+
+        if (prescriptionRepository.existsByConsultationId(consultation.getId())) {
+            throw new IllegalStateException(
+                    "A prescription has already been issued for this consultation"
+            );
+        }
+
+        if (request.getDrugs() == null || request.getDrugs().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "At least one drug must be included in the prescription"
+            );
+        }
+
+        List<String> drugs = request.getDrugs()
+                .stream()
+                .filter(drug -> drug != null && !drug.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+
+        if (drugs.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "At least one valid drug must be included in the prescription"
+            );
+        }
+
+        String qrData = buildQrData(consultation.getId(), drugs);
         String qrHash = hashQrData(qrData);
         String qrCodeBase64 = generateQrCodeBase64(qrData);
 
@@ -54,68 +84,147 @@ public class PrescriptionService {
                 .consultation(consultation)
                 .doctor(consultation.getDoctor())
                 .patient(consultation.getPatient())
-                .drugs(request.getDrugs())
+                .drugs(drugs)
                 .qrCodeData(qrCodeBase64)
                 .qrCodeHash(qrHash)
                 .build();
 
-        Prescription saved = prescriptionRepository.save(prescription);
+        Prescription savedPrescription =
+                prescriptionRepository.save(prescription);
 
-        // create pending dispensation records for each drug
-        for (String drug : request.getDrugs()) {
+        for (String drug : drugs) {
             DispensationRecord record = DispensationRecord.builder()
-                    .prescription(saved)
+                    .prescription(savedPrescription)
                     .drugName(drug)
+                    .status(DispensationStatus.PENDING)
                     .build();
+
             dispensationRecordRepository.save(record);
         }
 
-        return mapToResponse(saved);
+        log.info(
+                "Prescription {} issued for consultation {}",
+                savedPrescription.getId(),
+                consultation.getId()
+        );
+
+        return mapToResponse(savedPrescription);
     }
 
+    @Transactional(readOnly = true)
     public PrescriptionResponse getPrescription(UUID prescriptionId) {
-        Prescription prescription = prescriptionRepository.findById(prescriptionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Prescription not found"));
+        Prescription prescription = prescriptionRepository
+                .findById(prescriptionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Prescription not found")
+                );
+
         return mapToResponse(prescription);
     }
 
+    @Transactional(readOnly = true)
     public String getQrCode(UUID prescriptionId) {
-        Prescription prescription = prescriptionRepository.findById(prescriptionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Prescription not found"));
+        Prescription prescription = prescriptionRepository
+                .findById(prescriptionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Prescription not found")
+                );
+
         return prescription.getQrCodeData();
     }
 
     @Transactional
-    public DispensationRecordResponse dispense(UUID prescriptionId, DispenseRequest request) {
-        Prescription prescription = prescriptionRepository.findById(prescriptionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Prescription not found"));
+    public DispensationRecordResponse dispense(
+            UUID prescriptionId,
+            DispenseRequest request
+    ) {
+        prescriptionRepository.findById(prescriptionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Prescription not found")
+                );
+
+        if (request.getDrugName() == null
+                || request.getDrugName().isBlank()) {
+            throw new IllegalArgumentException("Drug name is required");
+        }
+
+        if (request.getStatus() == null) {
+            throw new IllegalArgumentException(
+                    "Dispensation status is required"
+            );
+        }
 
         DispensationRecord record = dispensationRecordRepository
                 .findAllByPrescriptionId(prescriptionId)
                 .stream()
-                .filter(r -> r.getDrugName().equalsIgnoreCase(request.getDrugName()))
+                .filter(existingRecord ->
+                        existingRecord.getDrugName()
+                                .equalsIgnoreCase(
+                                        request.getDrugName().trim()
+                                )
+                )
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Drug not found in prescription"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Drug not found in prescription"
+                        )
+                );
 
         record.setStatus(request.getStatus());
         record.setPharmacyName(request.getPharmacyName());
 
         if (request.getStatus() == DispensationStatus.DISPENSED) {
             record.setDispensedAt(LocalDateTime.now());
+        } else {
+            record.setDispensedAt(null);
         }
 
-        return mapToDispensationResponse(dispensationRecordRepository.save(record));
+        DispensationRecord savedRecord =
+                dispensationRecordRepository.save(record);
+
+        log.info(
+                "Dispensation record {} updated to {}",
+                savedRecord.getId(),
+                savedRecord.getStatus()
+        );
+
+        return mapToDispensationResponse(savedRecord);
     }
 
-    public List<DispensationRecordResponse> getRemainingDrugs(UUID prescriptionId) {
+    @Transactional(readOnly = true)
+    public List<DispensationRecordResponse> getRemainingDrugs(
+            UUID prescriptionId
+    ) {
+        if (!prescriptionRepository.existsById(prescriptionId)) {
+            throw new ResourceNotFoundException(
+                    "Prescription not found"
+            );
+        }
+
         return dispensationRecordRepository
-                .findAllByPrescriptionIdAndStatus(prescriptionId, DispensationStatus.PENDING)
+                .findAllByPrescriptionIdAndStatus(
+                        prescriptionId,
+                        DispensationStatus.PENDING
+                )
                 .stream()
                 .map(this::mapToDispensationResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private DispensationRecordResponse mapToDispensationResponse(DispensationRecord record) {
+    @Transactional(readOnly = true)
+    public List<PrescriptionResponse> getPatientPrescriptions(
+            UUID patientId
+    ) {
+        return prescriptionRepository
+                .findAllByPatientId(patientId)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    private DispensationRecordResponse mapToDispensationResponse(
+            DispensationRecord record
+    ) {
         return DispensationRecordResponse.builder()
                 .id(record.getId())
                 .prescriptionId(record.getPrescription().getId())
@@ -126,45 +235,74 @@ public class PrescriptionService {
                 .build();
     }
 
-    private String buildQrData(UUID consultationId, List<String> drugs) {
-        return String.format("SWIFTCARE|%s|%s|%s",
-                consultationId,
-                String.join(",", drugs),
-                UUID.randomUUID());
-    }
-
-    private String hashQrData(String data) throws NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] hash = digest.digest(data.getBytes(StandardCharsets.UTF_8));
-        return HexFormat.of().formatHex(hash);
-    }
-
-    private String generateQrCodeBase64(String data) throws WriterException, IOException {
-        QRCodeWriter qrCodeWriter = new QRCodeWriter();
-        BitMatrix bitMatrix = qrCodeWriter.encode(data, BarcodeFormat.QR_CODE, 300, 300);
-
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        MatrixToImageWriter.writeToStream(bitMatrix, "PNG", outputStream);
-
-        return Base64.getEncoder().encodeToString(outputStream.toByteArray());
-    }
-
-    private PrescriptionResponse mapToResponse(Prescription prescription) {
+    private PrescriptionResponse mapToResponse(
+            Prescription prescription
+    ) {
         return PrescriptionResponse.builder()
                 .id(prescription.getId())
-                .consultationId(prescription.getConsultation().getId())
-                .patientId(prescription.getPatient().getId())
-                .doctorId(prescription.getDoctor().getId())
+                .consultationId(
+                        prescription.getConsultation().getId()
+                )
+                .patientId(
+                        prescription.getPatient().getId()
+                )
+                .doctorId(
+                        prescription.getDoctor().getId()
+                )
                 .drugs(prescription.getDrugs())
                 .qrCodeData(prescription.getQrCodeData())
                 .issuedAt(prescription.getIssuedAt())
                 .build();
     }
 
-    public List<PrescriptionResponse> getPatientPrescriptions(UUID patientId) {
-        return prescriptionRepository.findAllByPatientId(patientId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    private String buildQrData(
+            UUID consultationId,
+            List<String> drugs
+    ) {
+        return String.format(
+                "SWIFTCARE|%s|%s|%s",
+                consultationId,
+                String.join(",", drugs),
+                UUID.randomUUID()
+        );
+    }
+
+    private String hashQrData(
+            String data
+    ) throws NoSuchAlgorithmException {
+        MessageDigest digest =
+                MessageDigest.getInstance("SHA-256");
+
+        byte[] hash = digest.digest(
+                data.getBytes(StandardCharsets.UTF_8)
+        );
+
+        return HexFormat.of().formatHex(hash);
+    }
+
+    private String generateQrCodeBase64(
+            String data
+    ) throws WriterException, IOException {
+        QRCodeWriter qrCodeWriter = new QRCodeWriter();
+
+        BitMatrix bitMatrix = qrCodeWriter.encode(
+                data,
+                BarcodeFormat.QR_CODE,
+                300,
+                300
+        );
+
+        try (ByteArrayOutputStream outputStream =
+                     new ByteArrayOutputStream()) {
+
+            MatrixToImageWriter.writeToStream(
+                    bitMatrix,
+                    "PNG",
+                    outputStream
+            );
+
+            return Base64.getEncoder()
+                    .encodeToString(outputStream.toByteArray());
+        }
     }
 }

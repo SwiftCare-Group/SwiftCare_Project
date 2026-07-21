@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,16 +11,16 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";import { useState } from 'react';
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
-
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -33,40 +34,59 @@ export default function RegisterScreen() {
   const { mediumTap, successNotification, errorNotification } = useHaptics();
 
 
-  const handleRegister = async () => {
-    mediumTap();
-    if (!name || !email || !phone || !dateOfBirth || !password) {
-      Alert.alert('Error', 'All fields are required');
-      return;
-    }
-    setLoading(true);
-    try {
-      successNotification();
-      const response = await api.post('/auth/register', {
-        name, email, phone, dateOfBirth, password,
-      });
-      const { accessToken } = response.data;
-      await AsyncStorage.setItem('accessToken', accessToken);
-      router.replace('/(auth)/health-profile');
-    } catch (error: any) {
-      errorNotification();
-      const message = error.response?.data?.message || 'Registration failed. Try again.';
-      Alert.alert('Error', message);
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleRegister = async () => {
+  mediumTap();
 
+  if (!name.trim() || !email.trim() || !phone.trim() || !dateOfBirth.trim() || !password) {
+    errorNotification();
+    Alert.alert('Error', 'All fields are required');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const response = await api.post('/auth/register', {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      dateOfBirth: dateOfBirth.trim(),
+      password,
+    });
+
+    const { accessToken } = response.data;
+
+    if (!accessToken) {
+      throw new Error('No access token was returned');
+    }
+
+    await AsyncStorage.setItem('accessToken', accessToken);
+
+    successNotification();
+    router.replace('/(auth)/health-profile');
+  } catch (error: any) {
+    errorNotification();
+
+    const message =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      'Registration failed. Try again.';
+
+    Alert.alert('Registration Failed', message);
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
         colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
         style={styles.headerGradient}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+      <TouchableOpacity
+  style={styles.backButton}
+  onPress={() => router.replace('/(auth)/login')}
+>
           <Ionicons name="arrow-back-outline" size={22} color={Colors.white} />
         </TouchableOpacity>
 <View style={styles.logoContainer}>

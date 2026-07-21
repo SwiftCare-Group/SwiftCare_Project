@@ -17,7 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -26,21 +28,43 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AppointmentService {
 
+    private static final int DEFAULT_CONSULTATION_MINUTES = 15;
+
     private final AppointmentRepository appointmentRepository;
     private final QueueEntryRepository queueEntryRepository;
     private final PatientRepository patientRepository;
     private final DepartmentRepository departmentRepository;
 
     @Transactional
-    public AppointmentResponse bookAppointment(UUID patientId, AppointmentRequest request) {
+    public AppointmentResponse bookAppointment(
+            UUID patientId,
+            AppointmentRequest request
+    ) {
         Patient patient = patientRepository.findById(patientId)
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException(
+                                "Patient not found"
+                        )
+                );
 
-        Department department = departmentRepository.findById(request.getDepartmentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+        Department department = departmentRepository
+                .findById(request.getDepartmentId())
+                .orElseThrow(
+                        () -> new ResourceNotFoundException(
+                                "Department not found"
+                        )
+                );
+
+        validateAppointmentRequest(request);
 
         int queuePosition = calculateQueuePosition(
-                patient, request.getDepartmentId(), request.getSeverityScore());
+                patient,
+                request.getDepartmentId(),
+                request.getSeverityScore()
+        );
+
+        boolean emergency = request.getSeverityScore() >= 9;
+        boolean premium = patient.getTier() == Tier.PREMIUM;
 
         Appointment appointment = Appointment.builder()
                 .patient(patient)
@@ -48,23 +72,64 @@ public class AppointmentService {
                 .scheduledTime(request.getScheduledTime())
                 .severityScore(request.getSeverityScore())
                 .queuePosition(queuePosition)
+                .isEmergency(emergency)
+                .status(AppointmentStatus.PENDING)
                 .build();
 
-        Appointment saved = appointmentRepository.save(appointment);
+        Appointment savedAppointment =
+                appointmentRepository.save(appointment);
+
+        LocalDateTime estimatedCallTime =
+                calculateEstimatedCallTime(
+                        department,
+                        request.getScheduledTime(),
+                        queuePosition
+                );
 
         QueueEntry queueEntry = QueueEntry.builder()
-                .appointment(saved)
+                .appointment(savedAppointment)
+
+                // Patient information
+                .patientId(patient.getId())
+                .patientName(patient.getName())
+                .patientNumber(patient.getPhone())
+                .age(calculateAge(patient.getDateOfBirth()))
+
+                // Department information
+                .departmentId(department.getId())
+
+                // Queue priority information
+                .severityScore(request.getSeverityScore())
+                .severityLabel(
+                        calculateSeverityLabel(
+                                request.getSeverityScore()
+                        )
+                )
+                .premium(premium)
+                .emergency(emergency)
+
+                // Queue time and position
+                .scheduledTime(request.getScheduledTime())
                 .currentPosition(queuePosition)
-                .estimatedCallTime(calculateEstimatedCallTime(
-                        department, queuePosition))
+                .estimatedCallTime(estimatedCallTime)
+
+                // Queue status
+                .status(QueueStatus.WAITING)
+
+                // Timestamps
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
 
         queueEntryRepository.save(queueEntry);
 
-        return mapToResponse(saved);
+        return mapToResponse(savedAppointment);
     }
 
-    public List<AppointmentResponse> getPatientAppointments(UUID patientId) {
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> getPatientAppointments(
+            UUID patientId
+    ) {
         return appointmentRepository
                 .findAllByPatientIdOrderByCreatedAtDesc(patientId)
                 .stream()
@@ -72,111 +137,228 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public AppointmentResponse getAppointment(UUID appointmentId) {
-        Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+        Appointment appointment = appointmentRepository
+                .findById(appointmentId)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException(
+                                "Appointment not found"
+                        )
+                );
+
         return mapToResponse(appointment);
     }
 
+    @Transactional(readOnly = true)
     public QueueStatusResponse getQueueStatus(UUID appointmentId) {
-        QueueEntry entry = queueEntryRepository.findByAppointmentId(appointmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Queue entry not found"));
+        QueueEntry entry = queueEntryRepository
+                .findByAppointmentId(appointmentId)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException(
+                                "Queue entry not found"
+                        )
+                );
+
+        String queueStatus = entry.getStatus() != null
+                ? entry.getStatus().name()
+                : QueueStatus.WAITING.name();
 
         return QueueStatusResponse.builder()
                 .appointmentId(appointmentId)
                 .currentPosition(entry.getCurrentPosition())
                 .estimatedCallTime(entry.getEstimatedCallTime())
                 .isEmergency(entry.isEmergency())
-                .status(entry.getStatus().name())
+                .status(queueStatus)
                 .build();
     }
 
     @Transactional
     public AppointmentResponse cancelAppointment(UUID appointmentId) {
-        Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+        Appointment appointment = appointmentRepository
+                .findById(appointmentId)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException(
+                                "Appointment not found"
+                        )
+                );
+
+        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+            throw new IllegalStateException(
+                    "This appointment has already been cancelled."
+            );
+        }
 
         appointment.setStatus(AppointmentStatus.CANCELLED);
-        appointmentRepository.save(appointment);
+        Appointment savedAppointment =
+                appointmentRepository.save(appointment);
 
-        queueEntryRepository.findByAppointmentId(appointmentId).ifPresent(entry -> {
-            entry.setStatus(QueueStatus.CANCELLED);
-            queueEntryRepository.save(entry);
-        });
+        queueEntryRepository
+                .findByAppointmentId(appointmentId)
+                .ifPresent(entry -> {
+                    entry.setStatus(QueueStatus.CANCELLED);
+                    entry.setUpdatedAt(LocalDateTime.now());
+                    queueEntryRepository.save(entry);
+                });
 
-        recalculateQueuePositions(appointment.getDepartment().getId());
+        recalculateQueuePositions(
+                appointment.getDepartment().getId()
+        );
 
-        return mapToResponse(appointment);
+        return mapToResponse(savedAppointment);
     }
 
-    private int calculateQueuePosition(Patient patient, UUID departmentId, int severityScore) {
-        List<Appointment> active = appointmentRepository
-                .findAllByDepartmentIdAndStatusOrderBySeverityScoreDescScheduledTimeAsc(
-                        departmentId, AppointmentStatus.PENDING);
+    private int calculateQueuePosition(
+            Patient patient,
+            UUID departmentId,
+            int severityScore
+    ) {
+        List<Appointment> activeAppointments =
+                appointmentRepository
+                        .findAllByDepartmentIdAndStatusOrderBySeverityScoreDescScheduledTimeAsc(
+                                departmentId,
+                                AppointmentStatus.PENDING
+                        );
 
         int position = 1;
-        for (Appointment existing : active) {
+
+        for (Appointment existing : activeAppointments) {
             if (existing.getSeverityScore() > severityScore) {
                 position++;
-            } else if (existing.getSeverityScore() == severityScore) {
-                if (existing.getPatient().getTier() == Tier.PREMIUM
-                        && patient.getTier() != Tier.PREMIUM) {
+                continue;
+            }
+
+            if (existing.getSeverityScore() == severityScore) {
+                boolean existingPatientIsPremium =
+                        existing.getPatient().getTier()
+                                == Tier.PREMIUM;
+
+                boolean newPatientIsPremium =
+                        patient.getTier() == Tier.PREMIUM;
+
+                if (existingPatientIsPremium
+                        && !newPatientIsPremium) {
                     position++;
                 }
             }
         }
+
         return position;
     }
 
-    private LocalDateTime calculateEstimatedCallTime(Department department, int position) {
-        // Parse department opening hour from operatingHours string e.g. "08:00 - 17:00"
-        String[] hours = department.getOperatingHours().split(" - ");
-        String[] openTime = hours[0].trim().split(":");
-        int openHour = Integer.parseInt(openTime[0]);
-        int openMin = Integer.parseInt(openTime[1]);
+    private LocalDateTime calculateEstimatedCallTime(
+            Department department,
+            LocalDateTime scheduledTime,
+            int position
+    ) {
+        LocalDateTime startingTime = scheduledTime;
 
-        LocalDateTime departmentOpen = LocalDateTime.now()
-                .withHour(openHour)
-                .withMinute(openMin)
-                .withSecond(0)
-                .withNano(0);
-
-        // If department opens tomorrow (already past today's opening)
-        if (LocalDateTime.now().isAfter(departmentOpen)) {
-            departmentOpen = departmentOpen.plusDays(1);
+        if (startingTime == null) {
+            startingTime = LocalDateTime.now();
         }
 
-        return departmentOpen.plusMinutes((long) position * 15);
+        /*
+         * When operating hours are unavailable or incorrectly formatted,
+         * use the appointment time instead of crashing the request.
+         */
+        if (department.getOperatingHours() == null
+                || department.getOperatingHours().isBlank()) {
+            return startingTime.plusMinutes(
+                    (long) Math.max(position - 1, 0)
+                            * DEFAULT_CONSULTATION_MINUTES
+            );
+        }
+
+        try {
+            String[] hours =
+                    department.getOperatingHours().split(" - ");
+
+            String[] openingTime =
+                    hours[0].trim().split(":");
+
+            int openingHour =
+                    Integer.parseInt(openingTime[0]);
+
+            int openingMinute =
+                    Integer.parseInt(openingTime[1]);
+
+            LocalDateTime departmentOpeningTime =
+                    startingTime
+                            .withHour(openingHour)
+                            .withMinute(openingMinute)
+                            .withSecond(0)
+                            .withNano(0);
+
+            LocalDateTime queueStartTime =
+                    startingTime.isAfter(departmentOpeningTime)
+                            ? startingTime
+                            : departmentOpeningTime;
+
+            return queueStartTime.plusMinutes(
+                    (long) Math.max(position - 1, 0)
+                            * DEFAULT_CONSULTATION_MINUTES
+            );
+
+        } catch (RuntimeException exception) {
+            return startingTime.plusMinutes(
+                    (long) Math.max(position - 1, 0)
+                            * DEFAULT_CONSULTATION_MINUTES
+            );
+        }
     }
 
     private void recalculateQueuePositions(UUID departmentId) {
-        List<Appointment> active = appointmentRepository
-                .findAllByDepartmentIdAndStatusOrderBySeverityScoreDescScheduledTimeAsc(
-                        departmentId, AppointmentStatus.PENDING);
+        List<Appointment> activeAppointments =
+                appointmentRepository
+                        .findAllByDepartmentIdAndStatusOrderBySeverityScoreDescScheduledTimeAsc(
+                                departmentId,
+                                AppointmentStatus.PENDING
+                        );
 
-        for (int i = 0; i < active.size(); i++) {
-            Appointment appointment = active.get(i);
-            appointment.setQueuePosition(i + 1);
+        for (int index = 0;
+             index < activeAppointments.size();
+             index++) {
+
+            Appointment appointment =
+                    activeAppointments.get(index);
+
+            int newPosition = index + 1;
+
+            appointment.setQueuePosition(newPosition);
             appointmentRepository.save(appointment);
 
-            queueEntryRepository.findByAppointmentId(appointment.getId())
+            queueEntryRepository
+                    .findByAppointmentId(appointment.getId())
                     .ifPresent(entry -> {
-                        entry.setCurrentPosition(appointment.getQueuePosition());
+                        entry.setCurrentPosition(newPosition);
+
                         entry.setEstimatedCallTime(
                                 calculateEstimatedCallTime(
                                         appointment.getDepartment(),
-                                        appointment.getQueuePosition()));
+                                        appointment.getScheduledTime(),
+                                        newPosition
+                                )
+                        );
+
+                        entry.setUpdatedAt(LocalDateTime.now());
+
                         queueEntryRepository.save(entry);
                     });
         }
     }
 
-    private AppointmentResponse mapToResponse(Appointment appointment) {
+    private AppointmentResponse mapToResponse(
+            Appointment appointment
+    ) {
         return AppointmentResponse.builder()
                 .id(appointment.getId())
                 .patientId(appointment.getPatient().getId())
-                .departmentId(appointment.getDepartment().getId())
-                .departmentName(appointment.getDepartment().getName())
+                .departmentId(
+                        appointment.getDepartment().getId()
+                )
+                .departmentName(
+                        appointment.getDepartment().getName()
+                )
                 .scheduledTime(appointment.getScheduledTime())
                 .queuePosition(appointment.getQueuePosition())
                 .severityScore(appointment.getSeverityScore())
@@ -184,5 +366,62 @@ public class AppointmentService {
                 .status(appointment.getStatus())
                 .createdAt(appointment.getCreatedAt())
                 .build();
+    }
+
+    private void validateAppointmentRequest(
+            AppointmentRequest request
+    ) {
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Appointment request is required."
+            );
+        }
+
+        if (request.getDepartmentId() == null) {
+            throw new IllegalArgumentException(
+                    "Department ID is required."
+            );
+        }
+
+        if (request.getScheduledTime() == null) {
+            throw new IllegalArgumentException(
+                    "Scheduled time is required."
+            );
+        }
+
+        int severityScore = request.getSeverityScore();
+
+        if (severityScore < 0 || severityScore > 10) {
+            throw new IllegalArgumentException(
+                    "Severity score must be between 0 and 10."
+            );
+        }
+    }
+
+    private Integer calculateAge(LocalDate dateOfBirth) {
+        if (dateOfBirth == null) {
+            return null;
+        }
+
+        return Period.between(
+                dateOfBirth,
+                LocalDate.now()
+        ).getYears();
+    }
+
+    private String calculateSeverityLabel(int severityScore) {
+        if (severityScore >= 9) {
+            return "CRITICAL";
+        }
+
+        if (severityScore >= 7) {
+            return "SEVERE";
+        }
+
+        if (severityScore >= 4) {
+            return "MODERATE";
+        }
+
+        return "MILD";
     }
 }

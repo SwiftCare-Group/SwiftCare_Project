@@ -2,14 +2,16 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const api = axios.create({
+  
   // Android emulator:
   // baseURL: 'http://10.0.2.2:8080/api/v1',
 
   // Physical iPhone connected to your phone hotspot:
-  baseURL: 'http://172.20.10.3:8080/api/v1',
+  baseURL: 'http://172.19.92.110:8080/api/v1',
 
   timeout: 10000,
 });
+console.log('API BASE URL:', api.defaults.baseURL);
 
 api.interceptors.request.use(async config => {
   const token = await AsyncStorage.getItem('accessToken');

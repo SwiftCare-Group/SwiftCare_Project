@@ -2,6 +2,7 @@ package com.swiftcare.backend.consultation;
 
 import com.swiftcare.backend.common.enums.ConsultationStatus;
 import com.swiftcare.backend.patient.Patient;
+import com.swiftcare.backend.queue.QueueEntry;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,24 +24,25 @@ public class Consultation {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "patient_id", nullable = false)
     private Patient patient;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "doctor_id", nullable = false)
     private Doctor doctor;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "queue_entry_id", unique = true)
+    private QueueEntry queueEntry;
 
     @Column(nullable = false)
     private LocalDateTime scheduledAt;
 
-    @Column
     private LocalDateTime startedAt;
 
-    @Column
     private LocalDateTime endedAt;
 
-    @Column
     private String sessionUrl;
 
     @Enumerated(EnumType.STRING)
@@ -50,12 +52,17 @@ public class Consultation {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.status = ConsultationStatus.SCHEDULED;
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+
+        if (status == null) {
+            status = ConsultationStatus.SCHEDULED;
+        }
     }
 }
