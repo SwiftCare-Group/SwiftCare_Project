@@ -13,9 +13,9 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
   flyway:
-    enabled: true
-    locations: classpath:db/migration
-
+  enabled: true
+  locations: classpath:db/migration
+  validate-on-migrate: false
 server:
   port: 8080
   servlet:
