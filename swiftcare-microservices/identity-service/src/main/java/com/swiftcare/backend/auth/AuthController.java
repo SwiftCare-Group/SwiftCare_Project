@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.swiftcare.backend.auth.dto.ForgotPasswordRequest;
+import com.swiftcare.backend.auth.dto.ResetPasswordRequest;
 
 @RestController
 @RequestMapping("/auth")
@@ -20,7 +22,8 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(authService.register(request));
     }
 
     @PostMapping("/login")
@@ -40,11 +43,26 @@ public class AuthController {
     }
 
     @PostMapping("/staff/login")
-public ResponseEntity<StaffAuthResponse> staffLogin(
-        @Valid @RequestBody LoginRequest request
+    public ResponseEntity<StaffAuthResponse> staffLogin(
+            @Valid @RequestBody LoginRequest request
+    ) {
+        return ResponseEntity.ok(
+                authService.staffLogin(request)
+        );
+    }
+    @PostMapping("/forgot-password")
+public ResponseEntity<Void> forgotPassword(
+        @Valid @RequestBody ForgotPasswordRequest request
 ) {
-    return ResponseEntity.ok(
-            authService.staffLogin(request)
-    );
+    authService.forgotPassword(request);
+    return ResponseEntity.ok().build();
+}
+
+@PostMapping("/reset-password")
+public ResponseEntity<Void> resetPassword(
+        @Valid @RequestBody ResetPasswordRequest request
+) {
+    authService.resetPassword(request);
+    return ResponseEntity.ok().build();
 }
 }

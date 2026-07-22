@@ -1,6 +1,9 @@
 spring:
   application:
     name: database-migration-runner
+
+  config:
+    import: optional:classpath:application-secrets.yml
   main:
     web-application-type: none
   datasource:

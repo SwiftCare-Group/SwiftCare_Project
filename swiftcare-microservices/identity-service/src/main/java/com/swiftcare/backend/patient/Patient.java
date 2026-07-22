@@ -56,8 +56,15 @@ public class Patient {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        this.tier = Tier.FREE;
-        this.role = Role.PATIENT;
+
+        if (this.tier == null) {
+            this.tier = Tier.FREE;
+        }
+
+        if (this.role == null) {
+            this.role = Role.PATIENT;
+        }
+
         this.isDeleted = false;
     }
 }

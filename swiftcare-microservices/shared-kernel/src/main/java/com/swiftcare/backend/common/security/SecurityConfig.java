@@ -16,6 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
+
     private final JwtFilter jwtFilter;
 
     @Bean
@@ -23,24 +24,58 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> {})
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers("/auth/register", "/auth/login", "/auth/refresh", "/auth/logout", "/auth/staff/login").permitAll()
-                        .requestMatchers("/subscriptions/webhook").permitAll()
-                        .requestMatchers("/departments/**").permitAll()
-                        .requestMatchers("/internal/**").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                        .requestMatchers(
+                                "/actuator/health/**",
+                                "/actuator/info"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                "/auth/register",
+                                "/auth/login",
+                                "/auth/refresh",
+                                "/auth/logout",
+                                "/auth/staff/login",
+                                "/auth/forgot-password",
+                                "/auth/reset-password"
+                        ).permitAll()
+
+                        .requestMatchers("/subscriptions/webhook")
+                        .permitAll()
+
+                        .requestMatchers("/departments/**")
+                        .permitAll()
+
+                        .requestMatchers("/internal/**")
+                        .permitAll()
+
+                        .requestMatchers("/admin/**")
+                        .hasRole("ADMIN")
+
+                        .anyRequest()
+                        .authenticated()
+                )
+                .addFilterBefore(
+                        jwtFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
                 .build();
     }
 
     @Bean
-    PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 }

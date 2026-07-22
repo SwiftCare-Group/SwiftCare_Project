@@ -3,14 +3,19 @@ plugins {
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
 }
+
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_24
+    targetCompatibility = JavaVersion.VERSION_24
 }
+
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
+
     runtimeOnly 'org.postgresql:postgresql'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
