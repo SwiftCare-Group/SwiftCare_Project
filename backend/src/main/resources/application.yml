@@ -3,10 +3,13 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    # url: jdbc:postgresql://ep-restless-dew-aiymc9ap-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require
+    # username: neondb_owner
+    # password: npg_7crnEjBW2ioK
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update #validate
     show-sql: false
     properties:
       hibernate:
