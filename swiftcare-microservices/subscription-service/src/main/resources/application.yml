@@ -1,6 +1,10 @@
 spring:
   application:
     name: subscription-service
+
+  config:
+    import: optional:classpath:application-secrets.yml
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/swiftcare}
     username: ${DB_USERNAME:swiftcare}
