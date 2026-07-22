@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: identity-auth
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/patients/**,/api/v1/profile/**
+            - id: clinical-admin-doctors
+              uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/admin/doctors
+            - id: appointment-admin
+              uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/v1/admin/departments
+            - id: appointment
+              uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/v1/appointments/**,/api/v1/departments/**,/api/v1/queue/**
+            - id: clinical
+              uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/consultations/**,/api/v1/doctors/**,/api/v1/clinical-records/**,/api/v1/prescriptions/**,/api/v1/lab-results/**
+            - id: symptoms
+              uri: ${SYMPTOM_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/v1/symptoms/**
+            - id: subscriptions
+              uri: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/v1/subscriptions/**
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: '*'
+                allowedMethods: '*'
+                allowedHeaders: '*'
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway

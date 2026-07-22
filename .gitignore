@@ -167,3 +167,13 @@ target/
 .idea/
 *.iml
 .env
+
+# Local monolith backup
+backend-monolith-backup/
+
+# Local secrets
+swiftcare-microservices/.env
+swiftcare-microservices/start-swiftcare.cmd
+
+# Generated files
+swiftcare-microservices/**/build/
