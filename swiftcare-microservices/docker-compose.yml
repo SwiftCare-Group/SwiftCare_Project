@@ -1,0 +1,120 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: swiftcare
+      POSTGRES_USER: ${DB_USERNAME:-swiftcare}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-swiftcare}
+    ports:
+      - "5432:5432"
+    volumes:
+      - swiftcare-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-swiftcare} -d swiftcare"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  database-migration-runner:
+    build:
+      context: .
+      dockerfile: database-migration-runner/Dockerfile
+    environment: &database-env
+      DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/swiftcare}
+      DB_USERNAME: ${DB_USERNAME:-swiftcare}
+      DB_PASSWORD: ${DB_PASSWORD:-swiftcare}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: identity-service/Dockerfile
+    environment:
+      <<: *database-env
+      JWT_SECRET: ${JWT_SECRET:-change-this-development-secret-key-minimum-32-characters}
+    depends_on:
+      database-migration-runner:
+        condition: service_completed_successfully
+    ports: ["8081:8081"]
+
+  appointment-service:
+    build:
+      context: .
+      dockerfile: appointment-service/Dockerfile
+    environment:
+      <<: *database-env
+      JWT_SECRET: ${JWT_SECRET:-change-this-development-secret-key-minimum-32-characters}
+    depends_on:
+      database-migration-runner:
+        condition: service_completed_successfully
+    ports: ["8082:8082"]
+
+  clinical-service:
+    build:
+      context: .
+      dockerfile: clinical-service/Dockerfile
+    environment:
+      <<: *database-env
+      JWT_SECRET: ${JWT_SECRET:-change-this-development-secret-key-minimum-32-characters}
+    depends_on:
+      database-migration-runner:
+        condition: service_completed_successfully
+    ports: ["8083:8083"]
+
+  symptom-service:
+    build:
+      context: .
+      dockerfile: symptom-service/Dockerfile
+    environment:
+      <<: *database-env
+      JWT_SECRET: ${JWT_SECRET:-change-this-development-secret-key-minimum-32-characters}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gemini-2.0-flash-lite}
+    depends_on:
+      database-migration-runner:
+        condition: service_completed_successfully
+    ports: ["8084:8084"]
+
+  subscription-service:
+    build:
+      context: .
+      dockerfile: subscription-service/Dockerfile
+    environment:
+      <<: *database-env
+      JWT_SECRET: ${JWT_SECRET:-change-this-development-secret-key-minimum-32-characters}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+    depends_on:
+      database-migration-runner:
+        condition: service_completed_successfully
+    ports: ["8085:8085"]
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    environment:
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-firebase-service-account.json}
+    ports: ["8086:8086"]
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    environment:
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8082
+      CLINICAL_SERVICE_URL: http://clinical-service:8083
+      SYMPTOM_SERVICE_URL: http://symptom-service:8084
+      SUBSCRIPTION_SERVICE_URL: http://subscription-service:8085
+    depends_on:
+      - identity-service
+      - appointment-service
+      - clinical-service
+      - symptom-service
+      - subscription-service
+    ports: ["8080:8080"]
+
+volumes:
+  swiftcare-postgres:
