@@ -5,16 +5,38 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface AppointmentRepository extends JpaRepository<Appointment, UUID> {
-    List<Appointment> findAllByPatientIdOrderByCreatedAtDesc(UUID patientId);
-    List<Appointment> findAllByDepartmentIdAndStatusOrderBySeverityScoreDescScheduledTimeAsc(
-            UUID departmentId, AppointmentStatus status);
+public interface AppointmentRepository
+        extends JpaRepository<Appointment, UUID> {
 
-    @Query("SELECT COALESCE(MAX(a.queuePosition), 0) FROM Appointment a " +
-           "WHERE a.department.id = :departmentId AND a.status = 'PENDING'")
-    int findMaxQueuePositionByDepartmentId(UUID departmentId);
+    List<Appointment>
+    findAllByPatientIdOrderByCreatedAtDesc(
+            UUID patientId
+    );
+
+    List<Appointment>
+    findAllByDepartmentIdAndStatusOrderBySeverityScoreDescScheduledTimeAsc(
+            UUID departmentId,
+            AppointmentStatus status
+    );
+
+    boolean existsByDepartmentIdAndScheduledTimeAndStatus(
+            UUID departmentId,
+            LocalDateTime scheduledTime,
+            AppointmentStatus status
+    );
+
+    @Query("""
+        SELECT COALESCE(MAX(a.queuePosition), 0)
+        FROM Appointment a
+        WHERE a.department.id = :departmentId
+          AND a.status = 'PENDING'
+        """)
+    int findMaxQueuePositionByDepartmentId(
+            UUID departmentId
+    );
 }

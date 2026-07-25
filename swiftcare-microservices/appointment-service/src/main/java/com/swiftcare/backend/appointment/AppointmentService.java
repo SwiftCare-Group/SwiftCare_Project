@@ -57,6 +57,20 @@ public class AppointmentService {
 
         validateAppointmentRequest(request);
 
+        boolean slotTaken =
+        appointmentRepository
+                .existsByDepartmentIdAndScheduledTimeAndStatus(
+                        request.getDepartmentId(),
+                        request.getScheduledTime(),
+                        AppointmentStatus.PENDING
+                );
+
+if (slotTaken) {
+    throw new IllegalArgumentException(
+            "This appointment time is already booked. Please choose another time."
+    );
+}
+
         int queuePosition = calculateQueuePosition(
                 patient,
                 request.getDepartmentId(),
