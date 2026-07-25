@@ -17,7 +17,8 @@ public class AppointmentRequest {
     @NotNull(message = "Scheduled time is required")
     private LocalDateTime scheduledTime;
 
+    @NotNull(message = "Severity score is required")
     @Min(value = 1, message = "Severity score must be between 1 and 4")
     @Max(value = 4, message = "Severity score must be between 1 and 4")
-    private int severityScore;
+    private Integer severityScore;
 }

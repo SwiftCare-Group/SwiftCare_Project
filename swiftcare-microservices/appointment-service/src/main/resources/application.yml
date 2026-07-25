@@ -11,6 +11,15 @@ spring:
     password: ${DB_PASSWORD:swiftcare}
     driver-class-name: org.postgresql.Driver
 
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+      validation-timeout: 5000
+      idle-timeout: 300000
+      keepalive-time: 120000
+      max-lifetime: 600000
+
   jpa:
     hibernate:
       ddl-auto: validate
