@@ -1,8 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,12 +47,22 @@ type QueuePatient = {
   premium?: boolean;
 };
 
-const getSeverityDetails = (score: number, label?: string) => {
+const LIVE_REFRESH_INTERVAL_MS = 5000;
+const DEFAULT_CONSULTATION_MINUTES = 15;
+
+const getSeverityDetails = (
+  score: number,
+  label?: string
+) => {
   const normalizedLabel = label?.toUpperCase();
 
-  if (normalizedLabel === 'CRITICAL' || score >= 9) {
+  if (
+    normalizedLabel === 'EMERGENCY' ||
+    normalizedLabel === 'CRITICAL' ||
+    score >= 4
+  ) {
     return {
-      label: 'CRITICAL',
+      label: 'EMERGENCY',
       color: Colors.danger,
       backgroundColor: `${Colors.danger}18`,
       icon: 'warning' as const,
@@ -57,17 +72,20 @@ const getSeverityDetails = (score: number, label?: string) => {
   if (
     normalizedLabel === 'SEVERE' ||
     normalizedLabel === 'HIGH' ||
-    score >= 7
+    score === 3
   ) {
     return {
-      label: 'HIGH',
+      label: 'SEVERE',
       color: Colors.warning,
       backgroundColor: `${Colors.warning}18`,
       icon: 'alert-circle' as const,
     };
   }
 
-  if (normalizedLabel === 'MODERATE' || score >= 4) {
+  if (
+    normalizedLabel === 'MODERATE' ||
+    score === 2
+  ) {
     return {
       label: 'MODERATE',
       color: Colors.info,
@@ -85,7 +103,8 @@ const getSeverityDetails = (score: number, label?: string) => {
 };
 
 const getStatusDetails = (status?: string) => {
-  const normalizedStatus = status?.toUpperCase() ?? 'WAITING';
+  const normalizedStatus =
+    status?.toUpperCase() ?? 'WAITING';
 
   switch (normalizedStatus) {
     case 'CALLED':
@@ -102,6 +121,7 @@ const getStatusDetails = (status?: string) => {
         color: Colors.info,
         icon: 'medical-outline' as const,
       };
+
     case 'COMPLETED':
       return {
         label: 'Completed',
@@ -126,7 +146,9 @@ const getStatusDetails = (status?: string) => {
 };
 
 const formatAppointmentTime = (value?: string) => {
-  if (!value) return 'Not specified';
+  if (!value) {
+    return 'Not specified';
+  }
 
   const date = new Date(value);
 
@@ -146,28 +168,93 @@ const formatPatientId = (patient: QueuePatient) => {
   }
 
   if (patient.patientId) {
-    return `SC-${patient.patientId.slice(0, 6).toUpperCase()}`;
+    return `SC-${patient.patientId
+      .slice(0, 6)
+      .toUpperCase()}`;
   }
 
   return 'Not assigned';
 };
 
+const getBackendErrorMessage = (
+  error: any,
+  fallbackMessage: string
+) => {
+  const responseData = error?.response?.data;
+
+  if (typeof responseData === 'string') {
+    return responseData;
+  }
+
+  if (typeof responseData?.message === 'string') {
+    return responseData.message;
+  }
+
+  if (typeof responseData?.error === 'string') {
+    return responseData.error;
+  }
+
+  if (error?.response?.status === 401) {
+    return 'Your session has expired. Please sign in again.';
+  }
+
+  if (error?.response?.status === 403) {
+    return 'You do not have permission to perform this action.';
+  }
+
+  if (error?.response?.status === 409) {
+    return (
+      responseData?.message ??
+      'The queue changed before this action could be completed. Refresh and try again.'
+    );
+  }
+
+  if (!error?.response) {
+    return 'Unable to reach the SwiftCare server. Check your connection and try again.';
+  }
+
+  return error?.message ?? fallbackMessage;
+};
+
 export default function DoctorQueueScreen() {
   const router = useRouter();
 
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
-  const [queue, setQueue] = useState<QueuePatient[]>([]);
+  const [departments, setDepartments] = useState<
+    Department[]
+  >([]);
 
-  const [loadingDepartments, setLoadingDepartments] = useState(true);
-  const [loadingQueue, setLoadingQueue] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [processingPatientId, setProcessingPatientId] =
-  useState<string | null>(null);
+  const [selectedDept, setSelectedDept] = useState<
+    string | null
+  >(null);
+
+  const [queue, setQueue] = useState<QueuePatient[]>(
+    []
+  );
+
+  const [
+    loadingDepartments,
+    setLoadingDepartments,
+  ] = useState(true);
+
+  const [loadingQueue, setLoadingQueue] =
+    useState(false);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [errorMessage, setErrorMessage] =
+    useState('');
+
+  const [
+    processingPatientId,
+    setProcessingPatientId,
+  ] = useState<string | null>(null);
 
   const fetchQueue = useCallback(
-    async (departmentId: string, showLoader = false) => {
+    async (
+      departmentId: string,
+      showLoader = false
+    ) => {
       try {
         if (showLoader) {
           setLoadingQueue(true);
@@ -179,20 +266,28 @@ export default function DoctorQueueScreen() {
           `/departments/${departmentId}/queue`
         );
 
-        const queueData = Array.isArray(response.data)
-          ? response.data
-          : response.data?.queue ?? [];
+        const queueData: QueuePatient[] =
+          Array.isArray(response.data)
+            ? response.data
+            : response.data?.queue ?? [];
 
         setQueue(queueData);
       } catch (error: any) {
         console.error(
-          'Failed to fetch doctor queue:',
-          error?.response?.data ?? error?.message
+          'FAILED TO FETCH DOCTOR QUEUE:',
+          {
+            status: error?.response?.status,
+            data: error?.response?.data,
+            message: error?.message,
+            url: error?.config?.url,
+          }
         );
 
         setErrorMessage(
-          error?.response?.data?.message ??
-            'Unable to load the patient queue. Pull down to try again.'
+          getBackendErrorMessage(
+            error,
+            'Unable to load the patient queue.'
+          )
         );
       } finally {
         setLoadingQueue(false);
@@ -202,69 +297,140 @@ export default function DoctorQueueScreen() {
     []
   );
 
-  const fetchDepartments = useCallback(async () => {
-    try {
-      setLoadingDepartments(true);
-      setErrorMessage('');
+  const fetchDepartments = useCallback(
+    async () => {
+      try {
+        setLoadingDepartments(true);
+        setErrorMessage('');
 
-      const response = await api.get('/departments');
+        const response = await api.get(
+          '/departments'
+        );
 
-      const departmentData: Department[] = Array.isArray(response.data)
-        ? response.data
-        : response.data?.departments ?? [];
+        const departmentData: Department[] =
+          Array.isArray(response.data)
+            ? response.data
+            : response.data?.departments ?? [];
 
-      setDepartments(departmentData);
+        setDepartments(departmentData);
 
-      if (departmentData.length > 0) {
-        const firstDepartmentId = departmentData[0].id;
+        if (departmentData.length === 0) {
+          setSelectedDept(null);
+          setQueue([]);
+          return;
+        }
 
-        setSelectedDept(firstDepartmentId);
-        await fetchQueue(firstDepartmentId);
-      } else {
-        setQueue([]);
+        setSelectedDept(currentDepartmentId => {
+          const currentDepartmentStillExists =
+            departmentData.some(
+              department =>
+                department.id ===
+                currentDepartmentId
+            );
+
+          if (currentDepartmentStillExists) {
+            return currentDepartmentId;
+          }
+
+          return departmentData[0].id;
+        });
+      } catch (error: any) {
+        console.error(
+          'FAILED TO FETCH DEPARTMENTS:',
+          {
+            status: error?.response?.status,
+            data: error?.response?.data,
+            message: error?.message,
+            url: error?.config?.url,
+          }
+        );
+
+        setErrorMessage(
+          getBackendErrorMessage(
+            error,
+            'Unable to load hospital departments.'
+          )
+        );
+      } finally {
+        setLoadingDepartments(false);
       }
-    } catch (error: any) {
-      console.error(
-        'Failed to fetch departments:',
-        error?.response?.data ?? error?.message
-      );
-
-      setErrorMessage(
-        error?.response?.data?.message ??
-          'Unable to load hospital departments.'
-      );
-    } finally {
-      setLoadingDepartments(false);
-    }
-  }, [fetchQueue]);
+    },
+    []
+  );
 
   useEffect(() => {
     fetchDepartments();
   }, [fetchDepartments]);
 
   useEffect(() => {
-    if (!selectedDept) return;
+    if (!selectedDept) {
+      return;
+    }
 
-    const interval = setInterval(() => {
-      fetchQueue(selectedDept);
-    }, 30000);
-
-    return () => clearInterval(interval);
+    fetchQueue(selectedDept, true);
   }, [fetchQueue, selectedDept]);
 
-  const handleSelectDepartment = async (departmentId: string) => {
-    if (departmentId === selectedDept) return;
+  /*
+   * Refresh immediately whenever the doctor returns to
+   * this screen and continue refreshing every five seconds.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (!selectedDept) {
+        return undefined;
+      }
 
-    setSelectedDept(departmentId);
-    await fetchQueue(departmentId, true);
-  };
+      fetchQueue(selectedDept);
+
+      const intervalId = setInterval(() => {
+        /*
+         * Avoid overwriting the UI while an action such as
+         * call, skip, start, or complete is still processing.
+         */
+        if (!processingPatientId) {
+          fetchQueue(selectedDept);
+        }
+      }, LIVE_REFRESH_INTERVAL_MS);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [
+      fetchQueue,
+      processingPatientId,
+      selectedDept,
+    ])
+  );
+
+  const handleSelectDepartment = useCallback(
+    (departmentId: string) => {
+      if (
+        departmentId === selectedDept ||
+        processingPatientId
+      ) {
+        return;
+      }
+
+      setSelectedDept(departmentId);
+    },
+    [processingPatientId, selectedDept]
+  );
 
   const handleRefresh = useCallback(() => {
-    if (!selectedDept) return;
+    if (!selectedDept) {
+      return;
+    }
 
     setRefreshing(true);
     fetchQueue(selectedDept);
   }, [fetchQueue, selectedDept]);
+
+  const refreshSelectedDepartment =
+    useCallback(async () => {
+      if (selectedDept) {
+        await fetchQueue(selectedDept);
+      }
+    }, [fetchQueue, selectedDept]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -298,212 +464,353 @@ export default function DoctorQueueScreen() {
     );
   };
 
-const handleCallPatient = async (patient: QueuePatient) => {
-  try {
-    setProcessingPatientId(patient.id);
+  const handleCallPatient = async (
+    patient: QueuePatient
+  ) => {
+    try {
+      setProcessingPatientId(patient.id);
 
-    await api.patch(`/queue/${patient.id}/call`);
+      await api.patch(
+        `/queue/${patient.id}/call`
+      );
 
-    if (selectedDept) {
-      await fetchQueue(selectedDept);
+      await refreshSelectedDepartment();
+
+      Alert.alert(
+        'Patient called',
+        `${
+          patient.patientName ?? 'The patient'
+        } has been called.`
+      );
+    } catch (error: any) {
+      console.error('CALL PATIENT ERROR:', {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+        url: error?.config?.url,
+      });
+
+      Alert.alert(
+        'Unable to call patient',
+        getBackendErrorMessage(
+          error,
+          'The patient could not be called.'
+        )
+      );
+
+      await refreshSelectedDepartment();
+    } finally {
+      setProcessingPatientId(null);
+    }
+  };
+
+  const handleSkipPatient = (
+    patient: QueuePatient
+  ) => {
+    Alert.alert(
+      'Skip patient',
+      `Move ${
+        patient.patientName ?? 'this patient'
+      } to the end of the waiting queue?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Skip',
+          onPress: async () => {
+            try {
+              setProcessingPatientId(patient.id);
+
+              await api.patch(
+                `/queue/${patient.id}/skip`
+              );
+
+              await refreshSelectedDepartment();
+
+              Alert.alert(
+                'Patient skipped',
+                `${
+                  patient.patientName ??
+                  'The patient'
+                } has been moved to the end of the queue.`
+              );
+            } catch (error: any) {
+              console.error(
+                'SKIP PATIENT ERROR:',
+                {
+                  status:
+                    error?.response?.status,
+                  data: error?.response?.data,
+                  message: error?.message,
+                  url: error?.config?.url,
+                }
+              );
+
+              Alert.alert(
+                'Unable to skip patient',
+                getBackendErrorMessage(
+                  error,
+                  'The patient could not be skipped.'
+                )
+              );
+
+              await refreshSelectedDepartment();
+            } finally {
+              setProcessingPatientId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleStartConsultation = async (
+    patient: QueuePatient
+  ) => {
+    if (!patient.id) {
+      Alert.alert(
+        'Unable to start consultation',
+        'The queue entry ID is missing.'
+      );
+      return;
     }
 
+    try {
+      setProcessingPatientId(patient.id);
+
+      await api.patch(
+        `/queue/${patient.id}/start`
+      );
+
+      await refreshSelectedDepartment();
+
+      router.push({
+        pathname:
+          '/(doctor)/consultation/[queueEntryId]' as any,
+        params: {
+          queueEntryId: String(patient.id),
+          patientId: patient.patientId
+            ? String(patient.patientId)
+            : '',
+        },
+      });
+    } catch (error: any) {
+      console.error(
+        'START CONSULTATION ERROR:',
+        {
+          queueEntryId: patient.id,
+          status: error?.response?.status,
+          data: error?.response?.data,
+          message: error?.message,
+          url: error?.config?.url,
+        }
+      );
+
+      Alert.alert(
+        'Unable to start consultation',
+        getBackendErrorMessage(
+          error,
+          'The consultation could not be started.'
+        )
+      );
+
+      await refreshSelectedDepartment();
+    } finally {
+      setProcessingPatientId(null);
+    }
+  };
+
+  const handleCompleteConsultation = (
+    patient: QueuePatient
+  ) => {
     Alert.alert(
-      'Patient called',
-      `${patient.patientName ?? 'The patient'} has been called.`
+      'Complete consultation',
+      `Finish the consultation for ${
+        patient.patientName ?? 'this patient'
+      }?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Complete',
+          onPress: async () => {
+            try {
+              setProcessingPatientId(patient.id);
+
+              await api.patch(
+                `/queue/${patient.id}/complete`
+              );
+
+              await refreshSelectedDepartment();
+
+              Alert.alert(
+                'Consultation completed',
+                'The patient has been removed from the active queue and the remaining positions have been updated.'
+              );
+            } catch (error: any) {
+              console.error(
+                'COMPLETE CONSULTATION ERROR:',
+                {
+                  status:
+                    error?.response?.status,
+                  data: error?.response?.data,
+                  message: error?.message,
+                  url: error?.config?.url,
+                }
+              );
+
+              Alert.alert(
+                'Unable to complete consultation',
+                getBackendErrorMessage(
+                  error,
+                  'The consultation could not be completed.'
+                )
+              );
+
+              await refreshSelectedDepartment();
+            } finally {
+              setProcessingPatientId(null);
+            }
+          },
+        },
+      ]
     );
-} catch (error: any) {
-  console.error('CALL PATIENT ERROR:', {
-    status: error?.response?.status,
-    data: error?.response?.data,
-    message: error?.message,
-    url: error?.config?.url,
-  });
+  };
 
-  const backendMessage =
-    error?.response?.data?.message ??
-    error?.response?.data?.error ??
-    error?.response?.data ??
-    error?.message ??
-    'Please try again.';
-
-  Alert.alert(
-    'Unable to call patient',
-    typeof backendMessage === 'string'
-      ? backendMessage
-      : JSON.stringify(backendMessage)
-  );
-} finally {
-    setProcessingPatientId(null);
-  }
-};
-
-const handleStartConsultation = async (
-  patient: QueuePatient
-) => {
-  if (!patient.id) {
-    Alert.alert(
-      'Unable to start consultation',
-      'The queue entry ID is missing.'
-    );
-    return;
-  }
-
-  try {
-    setProcessingPatientId(patient.id);
-
-    await api.patch(`/queue/${patient.id}/start`);
-
+  const handleViewPatient = (
+    patient: QueuePatient
+  ) => {
     router.push({
       pathname:
-        '/(doctor)/consultation/[queueEntryId]' as any,
+        '/(doctor)/patient-details' as any,
       params: {
-        queueEntryId: String(patient.id),
-        patientId: patient.patientId
-          ? String(patient.patientId)
-          : '',
+        patientId: String(
+          patient.patientId ?? patient.id ?? ''
+        ),
+        patientName: String(
+          patient.patientName ?? ''
+        ),
+        age: String(patient.age ?? ''),
+        severityScore: String(
+          patient.severityScore ?? ''
+        ),
+        complaint: String(
+          patient.chiefComplaint ??
+            'No complaint information provided'
+        ),
+        appointmentTime: String(
+          patient.scheduledTime ?? ''
+        ),
+        queuePosition: String(
+          patient.queuePosition ?? ''
+        ),
       },
     });
-  } catch (error: any) {
-    console.error('START CONSULTATION ERROR:', {
-      queueEntryId: patient.id,
-      status: error?.response?.status,
-      data: error?.response?.data,
-      message: error?.message,
-      url: error?.config?.url,
-    });
+  };
 
-    Alert.alert(
-      'Unable to start consultation',
-      error?.response?.data?.message ??
-        error?.response?.data?.error ??
-        'An unexpected error occurred.'
-    );
-  } finally {
-    setProcessingPatientId(null);
-  }
-};const handleCompleteConsultation = (
-  patient: QueuePatient
-) => {
-  Alert.alert(
-    'Complete consultation',
-    `Finish the consultation for ${
-      patient.patientName ?? 'this patient'
-    }?`,
-    [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-      {
-        text: 'Complete',
-        onPress: async () => {
-          try {
-            setProcessingPatientId(patient.id);
-
-            await api.patch(
-              `/queue/${patient.id}/complete`
-            );
-
-            if (selectedDept) {
-              await fetchQueue(selectedDept);
-            }
-
-            Alert.alert(
-              'Consultation completed',
-              'The patient has been removed and the next patient is ready.'
-            );
-          } catch (error: any) {
-            Alert.alert(
-              'Unable to complete consultation',
-              error?.response?.data?.message ??
-                'Please try again.'
-            );
-          } finally {
-            setProcessingPatientId(null);
-          }
-        },
-      },
-    ]
+  const selectedDepartment = useMemo(
+    () =>
+      departments.find(
+        department =>
+          department.id === selectedDept
+      ),
+    [departments, selectedDept]
   );
-};
-const handleViewPatient = (patient: any) => {
-  router.push({
-    pathname: "/(doctor)/patient-details",
-    params: {
-      patientId: String(patient.patientId ?? patient.id ?? ""),
-      patientName: String(patient.patientName ?? patient.name ?? ""),
-      phone: String(patient.phone ?? ""),
-      age: String(patient.age ?? ""),
-      severityScore: String(patient.severityScore ?? ""),
-      complaint: String(
-        patient.chiefComplaint ??
-        patient.complaint ??
-        "No complaint information provided"
+
+  const waitingPatients = useMemo(
+    () =>
+      queue.filter(
+        patient =>
+          (
+            patient.status?.toUpperCase() ??
+            'WAITING'
+          ) === 'WAITING'
       ),
-      appointmentTime: String(
-        patient.appointmentTime ??
-        patient.scheduledTime ??
-        ""
-      ),
-      queuePosition: String(
-        patient.queuePosition ??
-        patient.position ??
-        ""
-      ),
-    },
-  });
-};
-  const selectedDepartment = departments.find(
-    department => department.id === selectedDept
+    [queue]
   );
-  const waitingPatients = queue.filter(
-  patient =>
-    (patient.status?.toUpperCase() ?? 'WAITING') === 'WAITING'
-);
 
-const calledPatients = queue.filter(
-  patient => patient.status?.toUpperCase() === 'CALLED'
-);
+  const calledPatients = useMemo(
+    () =>
+      queue.filter(
+        patient =>
+          patient.status?.toUpperCase() ===
+          'CALLED'
+      ),
+    [queue]
+  );
 
-const consultationPatients = queue.filter(
-  patient =>
-    patient.status?.toUpperCase() === 'IN_CONSULTATION'
-);
+  const consultationPatients = useMemo(
+    () =>
+      queue.filter(
+        patient =>
+          patient.status?.toUpperCase() ===
+          'IN_CONSULTATION'
+      ),
+    [queue]
+  );
 
-const waitingCount = waitingPatients.length;
-const calledCount = calledPatients.length;
-const consultationCount = consultationPatients.length;
-const nextWaitingPatientId = waitingPatients[0]?.id;
+  const waitingCount = waitingPatients.length;
+  const calledCount = calledPatients.length;
 
+  const consultationCount =
+    consultationPatients.length;
 
-const criticalCount = waitingPatients.filter(
-  patient => patient.isEmergency || patient.severityScore >= 9
-).length;
-const averageWait =
-  waitingPatients.length > 0
-    ? Math.round(
-        waitingPatients.reduce((total, patient, index) => {
-          const calculatedWait =
-            patient.estimatedWaitMinutes ??
-            index *
-              (selectedDepartment?.averageConsultationMinutes ?? 15);
+  const nextWaitingPatientId =
+    waitingPatients[0]?.id;
 
-          return total + calculatedWait;
-        }, 0) / waitingPatients.length
-      )
-    : 0;
+  const emergencyCount = waitingPatients.filter(
+    patient =>
+      patient.isEmergency ||
+      patient.severityScore >= 4
+  ).length;
+
+  const averageWait =
+    waitingPatients.length > 0
+      ? Math.round(
+          waitingPatients.reduce(
+            (total, patient, index) => {
+              const calculatedWait =
+                patient.estimatedWaitMinutes ??
+                index *
+                  (selectedDepartment
+                    ?.averageConsultationMinutes ??
+                    DEFAULT_CONSULTATION_MINUTES);
+
+              return total + calculatedWait;
+            },
+            0
+          ) / waitingPatients.length
+        )
+      : 0;
+
+  const hasBusyPatient =
+    calledCount > 0 ||
+    consultationCount > 0;
+
   if (loadingDepartments) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading doctor queue...</Text>
+        <ActivityIndicator
+          size="large"
+          color={Colors.primary}
+        />
+
+        <Text style={styles.loadingText}>
+          Loading doctor queue...
+        </Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={['top']}
+    >
       <LinearGradient
         colors={[
           Colors.headerGradientStart,
@@ -512,11 +819,16 @@ const averageWait =
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Patient Queue</Text>
+          <View
+            style={styles.headerTextContainer}
+          >
+            <Text style={styles.headerTitle}>
+              Patient Queue
+            </Text>
 
             <Text style={styles.headerSubtitle}>
-              Ordered by medical urgency
+              Live queue ordered by medical
+              urgency
             </Text>
           </View>
 
@@ -535,28 +847,40 @@ const averageWait =
 
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.departmentContent}
+          showsHorizontalScrollIndicator={
+            false
+          }
+          contentContainerStyle={
+            styles.departmentContent
+          }
         >
           {departments.map(department => {
-            const isSelected = selectedDept === department.id;
+            const isSelected =
+              selectedDept === department.id;
 
             return (
               <TouchableOpacity
                 key={department.id}
                 style={[
                   styles.departmentTab,
-                  isSelected && styles.departmentTabActive,
+                  isSelected &&
+                    styles.departmentTabActive,
                 ]}
                 onPress={() =>
-                  handleSelectDepartment(department.id)
+                  handleSelectDepartment(
+                    department.id
+                  )
+                }
+                disabled={
+                  processingPatientId !== null
                 }
                 activeOpacity={0.8}
               >
                 <Text
                   style={[
                     styles.departmentTabText,
-                    isSelected && styles.departmentTabTextActive,
+                    isSelected &&
+                      styles.departmentTabTextActive,
                   ]}
                 >
                   {department.name}
@@ -580,6 +904,20 @@ const averageWait =
           />
         }
       >
+        <View style={styles.liveStatusRow}>
+          <View style={styles.liveIndicator}>
+            <View style={styles.liveDot} />
+
+            <Text style={styles.liveText}>
+              Live queue
+            </Text>
+          </View>
+
+          <Text style={styles.liveRefreshText}>
+            Refreshes every 5 seconds
+          </Text>
+        </View>
+
         <View style={styles.statisticsRow}>
           <View style={styles.statisticCard}>
             <View style={styles.statisticIcon}>
@@ -590,8 +928,14 @@ const averageWait =
               />
             </View>
 
-<Text style={styles.statisticValue}>{waitingCount}</Text>
-<Text style={styles.statisticLabel}>Waiting</Text>          </View>
+            <Text style={styles.statisticValue}>
+              {waitingCount}
+            </Text>
+
+            <Text style={styles.statisticLabel}>
+              Waiting
+            </Text>
+          </View>
 
           <View style={styles.statisticCard}>
             <View
@@ -607,8 +951,13 @@ const averageWait =
               />
             </View>
 
-            <Text style={styles.statisticValue}>{criticalCount}</Text>
-            <Text style={styles.statisticLabel}>Critical</Text>
+            <Text style={styles.statisticValue}>
+              {emergencyCount}
+            </Text>
+
+            <Text style={styles.statisticLabel}>
+              Emergency
+            </Text>
           </View>
 
           <View style={styles.statisticCard}>
@@ -625,45 +974,76 @@ const averageWait =
               />
             </View>
 
-            <Text style={styles.statisticValue}>{averageWait}m</Text>
-            <Text style={styles.statisticLabel}>Avg. wait</Text>
+            <Text style={styles.statisticValue}>
+              {averageWait}m
+            </Text>
+
+            <Text style={styles.statisticLabel}>
+              Avg. wait
+            </Text>
           </View>
         </View>
 
         <View style={styles.queueHeading}>
-          <View>
+          <View style={styles.queueHeadingText}>
             <Text style={styles.queueTitle}>
-              {selectedDepartment?.name ?? 'Department'} queue
+              {selectedDepartment?.name ??
+                'Department'}{' '}
+              queue
             </Text>
 
-<Text style={styles.queueSubtitle}>
-  {waitingCount === 1
-    ? '1 patient waiting'
-    : `${waitingCount} patients waiting`}
-</Text>
-{calledCount > 0 || consultationCount > 0 ? (
-  <Text style={styles.activeQueueSubtitle}>
-    {calledCount > 0 ? `${calledCount} called` : ''}
-    {calledCount > 0 && consultationCount > 0 ? ' • ' : ''}
-    {consultationCount > 0
-      ? `${consultationCount} in consultation`
-      : ''}
-  </Text>
-) : null}
-      </View>
+            <Text style={styles.queueSubtitle}>
+              {waitingCount === 1
+                ? '1 patient waiting'
+                : `${waitingCount} patients waiting`}
+            </Text>
+
+            {hasBusyPatient ? (
+              <Text
+                style={
+                  styles.activeQueueSubtitle
+                }
+              >
+                {calledCount > 0
+                  ? `${calledCount} called`
+                  : ''}
+
+                {calledCount > 0 &&
+                consultationCount > 0
+                  ? ' • '
+                  : ''}
+
+                {consultationCount > 0
+                  ? `${consultationCount} in consultation`
+                  : ''}
+              </Text>
+            ) : null}
+          </View>
 
           <TouchableOpacity
             style={styles.refreshButton}
             onPress={handleRefresh}
-            disabled={refreshing}
+            disabled={
+              refreshing ||
+              processingPatientId !== null
+            }
           >
-            <Ionicons
-              name="refresh-outline"
-              size={18}
-              color={Colors.primary}
-            />
+            {refreshing ? (
+              <ActivityIndicator
+                size="small"
+                color={Colors.primary}
+              />
+            ) : (
+              <Ionicons
+                name="refresh-outline"
+                size={18}
+                color={Colors.primary}
+              />
+            )}
 
-            <Text style={styles.refreshText}>Refresh</Text>
+            <Text style={styles.refreshText}>
+              Refresh
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -675,7 +1055,9 @@ const averageWait =
               color={Colors.danger}
             />
 
-            <View style={styles.errorTextContainer}>
+            <View
+              style={styles.errorTextContainer}
+            >
               <Text style={styles.errorTitle}>
                 Queue could not be loaded
               </Text>
@@ -694,7 +1076,9 @@ const averageWait =
               color={Colors.primary}
             />
 
-            <Text style={styles.inlineLoadingText}>
+            <Text
+              style={styles.inlineLoadingText}
+            >
               Updating queue...
             </Text>
           </View>
@@ -710,93 +1094,214 @@ const averageWait =
               />
             </View>
 
-            <Text style={styles.emptyTitle}>Queue is clear</Text>
+            <Text style={styles.emptyTitle}>
+              Queue is clear
+            </Text>
 
             <Text style={styles.emptyText}>
-              There are no pending patients in this department.
+              There are no active patients in
+              this department.
             </Text>
           </View>
         ) : (
           queue.map((patient, index) => {
-            const severity = getSeverityDetails(
-              patient.severityScore,
-              patient.severityLabel
-            );
+            const severity =
+              getSeverityDetails(
+                patient.severityScore,
+                patient.severityLabel
+              );
 
-            const status = getStatusDetails(patient.status);
+            const status =
+              getStatusDetails(patient.status);
 
-const position =
-  patient.queuePosition && patient.queuePosition > 0
-    ? patient.queuePosition
-    : index + 1;
+            const normalizedStatus =
+              patient.status?.toUpperCase() ??
+              'WAITING';
+
+            const isWaiting =
+              normalizedStatus === 'WAITING';
+
+            const isCalled =
+              normalizedStatus === 'CALLED';
+
+            const isInConsultation =
+              normalizedStatus ===
+              'IN_CONSULTATION';
+
+            const isNextPatient =
+              isWaiting &&
+              patient.id ===
+                nextWaitingPatientId;
+
+            const isEmergency =
+              patient.isEmergency ||
+              patient.severityScore >= 4;
+
+            const position =
+              isWaiting &&
+              patient.queuePosition &&
+              patient.queuePosition > 0
+                ? patient.queuePosition
+                : isWaiting
+                  ? index + 1
+                  : 0;
+
             const estimatedWait =
               patient.estimatedWaitMinutes ??
-              index *
-                (selectedDepartment?.averageConsultationMinutes ?? 15);
+              Math.max(position - 1, 0) *
+                (selectedDepartment
+                  ?.averageConsultationMinutes ??
+                  DEFAULT_CONSULTATION_MINUTES);
 
             const patientName =
-              patient.patientName?.trim() || 'Patient name unavailable';
+              patient.patientName?.trim() ||
+              'Patient name unavailable';
 
-const normalizedStatus =
-  patient.status?.toUpperCase() ?? 'WAITING';
+            const isProcessing =
+              processingPatientId ===
+              patient.id;
 
-const isWaiting = normalizedStatus === 'WAITING';
-
-const isNextPatient =
-  isWaiting && patient.id === nextWaitingPatientId;
             return (
               <View
                 key={patient.id}
                 style={[
                   styles.patientCard,
-                  isNextPatient && styles.nextPatientCard,
-                  (patient.isEmergency ||
-                    patient.severityScore >= 9) &&
+                  isNextPatient &&
+                    styles.nextPatientCard,
+                  isEmergency &&
                     styles.emergencyCard,
+                  isCalled &&
+                    styles.calledPatientCard,
+                  isInConsultation &&
+                    styles.consultationPatientCard,
                 ]}
               >
                 {isNextPatient ? (
-                  <View style={styles.nextPatientBanner}>
-                    <View style={styles.nextPatientBannerLeft}>
+                  <View
+                    style={
+                      styles.nextPatientBanner
+                    }
+                  >
+                    <View
+                      style={
+                        styles.nextPatientBannerLeft
+                      }
+                    >
                       <Ionicons
                         name="megaphone-outline"
                         size={15}
                         color={Colors.white}
                       />
 
-                      <Text style={styles.nextPatientBannerText}>
+                      <Text
+                        style={
+                          styles.nextPatientBannerText
+                        }
+                      >
                         NEXT PATIENT
                       </Text>
                     </View>
 
-                    <Text style={styles.nextPatientQueue}>
+                    <Text
+                      style={
+                        styles.nextPatientQueue
+                      }
+                    >
                       Queue #{position}
                     </Text>
                   </View>
                 ) : null}
 
-                {patient.isEmergency ? (
-                  <View style={styles.emergencyBanner}>
+                {isCalled ? (
+                  <View style={styles.calledBanner}>
+                    <Ionicons
+                      name="megaphone"
+                      size={15}
+                      color={Colors.white}
+                    />
+
+                    <Text
+                      style={
+                        styles.calledBannerText
+                      }
+                    >
+                      PATIENT CALLED
+                    </Text>
+                  </View>
+                ) : null}
+
+                {isInConsultation ? (
+                  <View
+                    style={
+                      styles.consultationBanner
+                    }
+                  >
+                    <Ionicons
+                      name="medical"
+                      size={15}
+                      color={Colors.white}
+                    />
+
+                    <Text
+                      style={
+                        styles.consultationBannerText
+                      }
+                    >
+                      CONSULTATION IN PROGRESS
+                    </Text>
+                  </View>
+                ) : null}
+
+                {isEmergency ? (
+                  <View
+                    style={
+                      styles.emergencyBanner
+                    }
+                  >
                     <Ionicons
                       name="warning"
                       size={15}
                       color={Colors.white}
                     />
 
-                    <Text style={styles.emergencyBannerText}>
+                    <Text
+                      style={
+                        styles.emergencyBannerText
+                      }
+                    >
                       EMERGENCY CASE
                     </Text>
                   </View>
                 ) : null}
 
                 <View style={styles.cardTopRow}>
-                  <View style={styles.positionBadge}>
-                    <Text style={styles.positionText}>
-                      #{position}
-                    </Text>
+                  <View
+                    style={[
+                      styles.positionBadge,
+                      !isWaiting &&
+                        styles.activePositionBadge,
+                    ]}
+                  >
+                    {isWaiting ? (
+                      <Text
+                        style={styles.positionText}
+                      >
+                        #{position}
+                      </Text>
+                    ) : (
+                      <Ionicons
+                        name={status.icon}
+                        size={22}
+                        color={status.color}
+                      />
+                    )}
                   </View>
 
-                  <View style={styles.patientInformation}>
+                  <View
+                    style={
+                      styles.patientInformation
+                    }
+                  >
                     <Text
                       style={styles.patientName}
                       numberOfLines={1}
@@ -804,8 +1309,11 @@ const isNextPatient =
                       {patientName}
                     </Text>
 
-                    <Text style={styles.patientNumber}>
-                      ID: {formatPatientId(patient)}
+                    <Text
+                      style={styles.patientNumber}
+                    >
+                      ID:{' '}
+                      {formatPatientId(patient)}
                     </Text>
                   </View>
 
@@ -818,7 +1326,11 @@ const isNextPatient =
                       },
                     ]}
                   >
-                    <View style={styles.severityLabelRow}>
+                    <View
+                      style={
+                        styles.severityLabelRow
+                      }
+                    >
                       <Ionicons
                         name={severity.icon}
                         size={13}
@@ -828,7 +1340,10 @@ const isNextPatient =
                       <Text
                         style={[
                           styles.severityLabel,
-                          { color: severity.color },
+                          {
+                            color:
+                              severity.color,
+                          },
                         ]}
                       >
                         {severity.label}
@@ -838,10 +1353,12 @@ const isNextPatient =
                     <Text
                       style={[
                         styles.severityScore,
-                        { color: severity.color },
+                        {
+                          color: severity.color,
+                        },
                       ]}
                     >
-                      {patient.severityScore}/10
+                      {patient.severityScore}/4
                     </Text>
                   </View>
                 </View>
@@ -851,42 +1368,64 @@ const isNextPatient =
                   patient.premium) && (
                   <View style={styles.patientTags}>
                     {patient.age ? (
-                      <View style={styles.patientTag}>
+                      <View
+                        style={styles.patientTag}
+                      >
                         <Ionicons
                           name="calendar-outline"
                           size={13}
-                          color={Colors.textSecondary}
+                          color={
+                            Colors.textSecondary
+                          }
                         />
 
-                        <Text style={styles.patientTagText}>
+                        <Text
+                          style={
+                            styles.patientTagText
+                          }
+                        >
                           {patient.age} years
                         </Text>
                       </View>
                     ) : null}
 
                     {patient.gender ? (
-                      <View style={styles.patientTag}>
+                      <View
+                        style={styles.patientTag}
+                      >
                         <Ionicons
                           name="person-outline"
                           size={13}
-                          color={Colors.textSecondary}
+                          color={
+                            Colors.textSecondary
+                          }
                         />
 
-                        <Text style={styles.patientTagText}>
+                        <Text
+                          style={
+                            styles.patientTagText
+                          }
+                        >
                           {patient.gender}
                         </Text>
                       </View>
                     ) : null}
 
                     {patient.premium ? (
-                      <View style={styles.premiumTag}>
+                      <View
+                        style={styles.premiumTag}
+                      >
                         <Ionicons
                           name="diamond-outline"
                           size={13}
                           color={Colors.warning}
                         />
 
-                        <Text style={styles.premiumTagText}>
+                        <Text
+                          style={
+                            styles.premiumTagText
+                          }
+                        >
                           Premium
                         </Text>
                       </View>
@@ -894,12 +1433,20 @@ const isNextPatient =
                   </View>
                 )}
 
-                <View style={styles.complaintContainer}>
-                  <Text style={styles.complaintLabel}>
+                <View
+                  style={
+                    styles.complaintContainer
+                  }
+                >
+                  <Text
+                    style={styles.complaintLabel}
+                  >
                     Chief complaint
                   </Text>
 
-                  <Text style={styles.complaintText}>
+                  <Text
+                    style={styles.complaintText}
+                  >
                     {patient.chiefComplaint ||
                       'No complaint information provided'}
                   </Text>
@@ -907,7 +1454,9 @@ const isNextPatient =
 
                 <View style={styles.cardMetadata}>
                   <View style={styles.metadataItem}>
-                    <View style={styles.metadataIcon}>
+                    <View
+                      style={styles.metadataIcon}
+                    >
                       <Ionicons
                         name="calendar-outline"
                         size={15}
@@ -916,11 +1465,19 @@ const isNextPatient =
                     </View>
 
                     <View>
-                      <Text style={styles.metadataLabel}>
+                      <Text
+                        style={
+                          styles.metadataLabel
+                        }
+                      >
                         Appointment
                       </Text>
 
-                      <Text style={styles.metadataValue}>
+                      <Text
+                        style={
+                          styles.metadataValue
+                        }
+                      >
                         {formatAppointmentTime(
                           patient.scheduledTime
                         )}
@@ -928,10 +1485,16 @@ const isNextPatient =
                     </View>
                   </View>
 
-                  <View style={styles.metadataDivider} />
+                  <View
+                    style={
+                      styles.metadataDivider
+                    }
+                  />
 
                   <View style={styles.metadataItem}>
-                    <View style={styles.metadataIcon}>
+                    <View
+                      style={styles.metadataIcon}
+                    >
                       <Ionicons
                         name="hourglass-outline"
                         size={15}
@@ -940,30 +1503,46 @@ const isNextPatient =
                     </View>
 
                     <View>
-                      <Text style={styles.metadataLabel}>
+                      <Text
+                        style={
+                          styles.metadataLabel
+                        }
+                      >
                         Estimated wait
                       </Text>
 
-<Text style={styles.metadataValue}>
-  {!isWaiting
-    ? normalizedStatus === 'CALLED'
-      ? 'Called'
-      : normalizedStatus === 'IN_CONSULTATION'
-        ? 'In progress'
-        : status.label
-    : estimatedWait <= 0
-      ? 'Next'
-      : `${estimatedWait} min`}
-</Text>                    </View>
+                      <Text
+                        style={
+                          styles.metadataValue
+                        }
+                      >
+                        {!isWaiting
+                          ? isCalled
+                            ? 'Called now'
+                            : isInConsultation
+                              ? 'In progress'
+                              : status.label
+                          : estimatedWait <= 0
+                            ? 'Next'
+                            : `${estimatedWait} min`}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
                 <View style={styles.statusRow}>
-                  <View style={styles.statusContainer}>
+                  <View
+                    style={
+                      styles.statusContainer
+                    }
+                  >
                     <View
                       style={[
                         styles.statusDot,
-                        { backgroundColor: status.color },
+                        {
+                          backgroundColor:
+                            status.color,
+                        },
                       ]}
                     />
 
@@ -976,139 +1555,216 @@ const isNextPatient =
                     <Text
                       style={[
                         styles.statusText,
-                        { color: status.color },
+                        {
+                          color: status.color,
+                        },
                       ]}
                     >
                       {status.label}
                     </Text>
                   </View>
 
-<Text style={styles.queuePositionText}>
-  {isWaiting
-    ? `Queue position ${position}`
-    : normalizedStatus === 'CALLED'
-      ? 'Patient has been called'
-      : normalizedStatus === 'IN_CONSULTATION'
-        ? 'Consultation active'
-        : status.label}
-</Text>                </View>
+                  <Text
+                    style={
+                      styles.queuePositionText
+                    }
+                  >
+                    {isWaiting
+                      ? `Queue position ${position}`
+                      : isCalled
+                        ? 'Patient has been called'
+                        : isInConsultation
+                          ? 'Consultation active'
+                          : status.label}
+                  </Text>
+                </View>
 
-<View style={styles.actionRow}>
-  <TouchableOpacity
-    style={styles.viewPatientButton}
-    onPress={() => handleViewPatient(patient)}
-    activeOpacity={0.8}
-    disabled={processingPatientId === patient.id}
-  >
-    <Ionicons
-      name="person-outline"
-      size={17}
-      color={Colors.primary}
-    />
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={
+                      styles.viewPatientButton
+                    }
+                    onPress={() =>
+                      handleViewPatient(patient)
+                    }
+                    activeOpacity={0.8}
+                    disabled={isProcessing}
+                  >
+                    <Ionicons
+                      name="person-outline"
+                      size={17}
+                      color={Colors.primary}
+                    />
 
-    <Text style={styles.viewPatientButtonText}>
-      View patient
-    </Text>
-  </TouchableOpacity>
+                    <Text
+                      style={
+                        styles.viewPatientButtonText
+                      }
+                    >
+                      View patient
+                    </Text>
+                  </TouchableOpacity>
 
-  {patient.status?.toUpperCase() === 'WAITING' ? (
-    <TouchableOpacity
-      style={styles.startConsultationButton}
-      onPress={() => handleCallPatient(patient)}
-      activeOpacity={0.8}
-      disabled={
-        processingPatientId === patient.id ||
-        !isNextPatient
-      }
-    >
-      {processingPatientId === patient.id ? (
-        <ActivityIndicator
-          size="small"
-          color={Colors.white}
-        />
-      ) : (
-        <>
-          <Ionicons
-            name="megaphone-outline"
-            size={18}
-            color={Colors.white}
-          />
+                  {isWaiting ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.primaryActionButton,
+                        (!isNextPatient ||
+                          hasBusyPatient) &&
+                          styles.disabledButton,
+                      ]}
+                      onPress={() =>
+                        handleCallPatient(patient)
+                      }
+                      activeOpacity={0.8}
+                      disabled={
+                        isProcessing ||
+                        !isNextPatient ||
+                        hasBusyPatient
+                      }
+                    >
+                      {isProcessing ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={Colors.white}
+                        />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="megaphone-outline"
+                            size={18}
+                            color={Colors.white}
+                          />
 
-          <Text
-            style={styles.startConsultationButtonText}
-          >
-            Call patient
-          </Text>
-        </>
-      )}
-    </TouchableOpacity>
-  ) : null}
+                          <Text
+                            style={
+                              styles.primaryActionButtonText
+                            }
+                          >
+                            Call patient
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  ) : null}
 
-  {patient.status?.toUpperCase() === 'CALLED' ? (
-    <TouchableOpacity
-      style={styles.startConsultationButton}
-      onPress={() =>
-        handleStartConsultation(patient)
-      }
-      activeOpacity={0.8}
-      disabled={processingPatientId === patient.id}
-    >
-      {processingPatientId === patient.id ? (
-        <ActivityIndicator
-          size="small"
-          color={Colors.white}
-        />
-      ) : (
-        <>
-          <Ionicons
-            name="play-circle-outline"
-            size={18}
-            color={Colors.white}
-          />
+                  {isCalled ? (
+                    <View
+                      style={
+                        styles.calledActionsContainer
+                      }
+                    >
+                      <TouchableOpacity
+                        style={
+                          styles.skipPatientButton
+                        }
+                        onPress={() =>
+                          handleSkipPatient(patient)
+                        }
+                        activeOpacity={0.8}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={Colors.warning}
+                          />
+                        ) : (
+                          <>
+                            <Ionicons
+                              name="play-skip-forward-outline"
+                              size={17}
+                              color={Colors.warning}
+                            />
 
-          <Text
-            style={styles.startConsultationButtonText}
-          >
-            Start consultation
-          </Text>
-        </>
-      )}
-    </TouchableOpacity>
-  ) : null}
+                            <Text
+                              style={
+                                styles.skipPatientButtonText
+                              }
+                            >
+                              Skip
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
 
-  {patient.status?.toUpperCase() ===
-  'IN_CONSULTATION' ? (
-    <TouchableOpacity
-      style={styles.completeConsultationButton}
-      onPress={() =>
-        handleCompleteConsultation(patient)
-      }
-      activeOpacity={0.8}
-      disabled={processingPatientId === patient.id}
-    >
-      {processingPatientId === patient.id ? (
-        <ActivityIndicator
-          size="small"
-          color={Colors.white}
-        />
-      ) : (
-        <>
-          <Ionicons
-            name="checkmark-done-outline"
-            size={18}
-            color={Colors.white}
-          />
+                      <TouchableOpacity
+                        style={
+                          styles.primaryActionButton
+                        }
+                        onPress={() =>
+                          handleStartConsultation(
+                            patient
+                          )
+                        }
+                        activeOpacity={0.8}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={Colors.white}
+                          />
+                        ) : (
+                          <>
+                            <Ionicons
+                              name="play-circle-outline"
+                              size={18}
+                              color={Colors.white}
+                            />
 
-          <Text
-            style={styles.completeConsultationButtonText}
-          >
-            Complete consultation
-          </Text>
-        </>
-      )}
-    </TouchableOpacity>
-  ) : null}
-</View>              </View>
+                            <Text
+                              style={
+                                styles.primaryActionButtonText
+                              }
+                            >
+                              Start
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  {isInConsultation ? (
+                    <TouchableOpacity
+                      style={
+                        styles.completeConsultationButton
+                      }
+                      onPress={() =>
+                        handleCompleteConsultation(
+                          patient
+                        )
+                      }
+                      activeOpacity={0.8}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={Colors.white}
+                        />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="checkmark-done-outline"
+                            size={18}
+                            color={Colors.white}
+                          />
+
+                          <Text
+                            style={
+                              styles.completeConsultationButtonText
+                            }
+                          >
+                            Complete
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
             );
           })
         )}
@@ -1120,7 +1776,8 @@ const isNextPatient =
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor:
+      Colors.headerGradientStart,
   },
 
   container: {
@@ -1182,7 +1839,8 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor:
+      'rgba(255,255,255,0.18)',
   },
 
   departmentContent: {
@@ -1194,7 +1852,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor:
+      'rgba(255,255,255,0.16)',
   },
 
   departmentTabActive: {
@@ -1210,6 +1869,37 @@ const styles = StyleSheet.create({
   departmentTabTextActive: {
     color: Colors.primary,
     fontWeight: '800',
+  },
+
+  liveStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.success,
+  },
+
+  liveText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.success,
+  },
+
+  liveRefreshText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
 
   statisticsRow: {
@@ -1265,6 +1955,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
+  queueHeadingText: {
+    flex: 1,
+    marginRight: 12,
+  },
+
   queueTitle: {
     fontSize: 18,
     fontWeight: '800',
@@ -1276,16 +1971,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
   },
+
   activeQueueSubtitle: {
-  marginTop: 3,
-  fontSize: 11,
-  fontWeight: '700',
-  color: Colors.primary,
-},
+    marginTop: 3,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
 
   refreshButton: {
+    minWidth: 90,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
     paddingHorizontal: 11,
     paddingVertical: 8,
@@ -1388,6 +2086,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.danger,
   },
 
+  calledPatientCard: {
+    borderColor: Colors.warning,
+  },
+
+  consultationPatientCard: {
+    borderColor: Colors.info,
+  },
+
   nextPatientBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1418,6 +2124,44 @@ const styles = StyleSheet.create({
   nextPatientQueue: {
     fontSize: 11,
     fontWeight: '700',
+    color: Colors.white,
+  },
+
+  calledBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.warning,
+  },
+
+  calledBannerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    color: Colors.white,
+  },
+
+  consultationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.info,
+  },
+
+  consultationBannerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
     color: Colors.white,
   },
 
@@ -1453,6 +2197,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primaryLight,
+  },
+
+  activePositionBadge: {
+    backgroundColor: Colors.background,
   },
 
   positionText: {
@@ -1632,12 +2380,16 @@ const styles = StyleSheet.create({
   },
 
   queuePositionText: {
+    flexShrink: 1,
+    marginLeft: 10,
     fontSize: 11,
+    textAlign: 'right',
     color: Colors.textSecondary,
   },
 
   actionRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     gap: 9,
     marginTop: 15,
   },
@@ -1661,7 +2413,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
 
-  startConsultationButton: {
+  primaryActionButton: {
     flex: 1.25,
     minHeight: 44,
     flexDirection: 'row',
@@ -1672,35 +2424,55 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
 
-  startConsultationButtonSecondary: {
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
-  },
-
-  startConsultationButtonText: {
+  primaryActionButtonText: {
     fontSize: 12,
     fontWeight: '800',
     color: Colors.white,
   },
+
+  disabledButton: {
+    opacity: 0.45,
+  },
+
+  calledActionsContainer: {
+    flex: 1.7,
+    flexDirection: 'row',
+    gap: 7,
+  },
+
+  skipPatientButton: {
+    flex: 0.8,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderColor: Colors.warning,
+    borderRadius: 11,
+    backgroundColor: `${Colors.warning}10`,
+  },
+
+  skipPatientButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.warning,
+  },
+
   completeConsultationButton: {
-  flex: 1.25,
-  minHeight: 44,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
-  borderRadius: 11,
-  backgroundColor: Colors.success,
-},
+    flex: 1.25,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 11,
+    backgroundColor: Colors.success,
+  },
 
-completeConsultationButtonText: {
-  fontSize: 12,
-  fontWeight: '800',
-  color: Colors.white,
-},
-
-  startConsultationButtonTextSecondary: {
-    color: Colors.primary,
+  completeConsultationButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.white,
   },
 });

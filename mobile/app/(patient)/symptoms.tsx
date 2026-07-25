@@ -25,7 +25,7 @@ const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: string 
   MILD: { color: Colors.severityMild, bg: Colors.severityMildBg, icon: 'checkmark-circle-outline' },
   MODERATE: { color: Colors.severityModerate, bg: Colors.severityModerateBg, icon: 'alert-circle-outline' },
   SEVERE: { color: Colors.severitySevere, bg: Colors.severitySevereBg, icon: 'warning-outline' },
-  CRITICAL: { color: Colors.white, bg: Colors.severityCriticalBg, icon: 'nuclear-outline' },
+  EMERGENCY: { color: Colors.white, bg: Colors.severityCriticalBg, icon: 'nuclear-outline' },
 };
 
 const SAMPLE_SYMPTOMS = [
@@ -176,8 +176,9 @@ export default function SymptomsScreen() {
                     </Text>
                   </View>
                   <View style={[styles.scoreBadge, { backgroundColor: severityConfig?.color }]}>
-                    <Text style={styles.scoreText}>{result.severityScore}/10</Text>
-                  </View>
+<Text style={styles.scoreText}>
+  {result.severityScore}/4
+</Text>                  </View>
                 </View>
 
                 {/* Score Bar */}
@@ -186,7 +187,7 @@ export default function SymptomsScreen() {
                     style={[
                       styles.scoreBarFill,
                       {
-                        width: `${result.severityScore * 10}%` as any,
+                        width: `${(result.severityScore / 4) * 100}%`as any,
                         backgroundColor: severityConfig?.color,
                       }
                     ]}

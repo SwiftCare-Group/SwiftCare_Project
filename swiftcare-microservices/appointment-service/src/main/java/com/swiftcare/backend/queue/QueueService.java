@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,65 +21,97 @@ public class QueueService {
 
     private static final int DEFAULT_CONSULTATION_MINUTES = 15;
 
+    private static final List<QueueStatus> ACTIVE_QUEUE_STATUSES =
+            List.of(
+                    QueueStatus.WAITING,
+                    QueueStatus.CALLED,
+                    QueueStatus.IN_CONSULTATION
+            );
+
+    private static final List<QueueStatus> BUSY_STATUSES =
+            List.of(
+                    QueueStatus.CALLED,
+                    QueueStatus.IN_CONSULTATION
+            );
+
     private final QueueEntryRepository queueEntryRepository;
 
+    /*
+     * Returns the doctor's live queue.
+     */
     @Transactional(readOnly = true)
     public List<DoctorQueueResponse> getDepartmentQueue(
             UUID departmentId
     ) {
+        validateDepartmentId(departmentId);
+
         List<QueueEntry> entries =
                 queueEntryRepository
                         .findByDepartmentIdAndStatusInOrderBySeverityScoreDescPremiumDescScheduledTimeAsc(
                                 departmentId,
-                                List.of(
-                                        QueueStatus.WAITING,
-                                        QueueStatus.CALLED,
-                                        QueueStatus.IN_CONSULTATION
-                                )
+                                ACTIVE_QUEUE_STATUSES
                         );
 
-        /*
-         * Display patients in this order:
-         * 1. IN_CONSULTATION
-         * 2. CALLED
-         * 3. WAITING
-         */
-        entries.sort(
-                (first, second) ->
-                        Integer.compare(
-                                getStatusPriority(first.getStatus()),
-                                getStatusPriority(second.getStatus())
+        List<QueueEntry> activeEntries =
+                entries.stream()
+                        .filter(this::isBusy)
+                        .sorted(
+                                Comparator.comparingInt(
+                                        entry ->
+                                                getStatusPriority(
+                                                        entry.getStatus()
+                                                )
+                                )
                         )
-        );
+                        .toList();
+
+        List<QueueEntry> waitingEntries =
+                entries.stream()
+                        .filter(
+                                entry ->
+                                        entry.getStatus()
+                                                == QueueStatus.WAITING
+                        )
+                        .sorted(waitingQueueComparator())
+                        .toList();
 
         List<DoctorQueueResponse> responses =
                 new ArrayList<>();
 
-        int waitingPosition = 1;
+        /*
+         * Show IN_CONSULTATION and CALLED patients first.
+         */
+        for (QueueEntry entry : activeEntries) {
+            responses.add(
+                    mapToDoctorQueueResponse(
+                            entry,
+                            0,
+                            0
+                    )
+            );
+        }
 
-        for (QueueEntry entry : entries) {
-            boolean waiting =
-                    entry.getStatus() == QueueStatus.WAITING;
+        int activePatientCount =
+                activeEntries.isEmpty() ? 0 : 1;
 
-            int queuePosition;
+        for (int index = 0;
+             index < waitingEntries.size();
+             index++) {
 
-            if (waiting) {
-                queuePosition = waitingPosition;
-                waitingPosition++;
-            } else {
-                queuePosition = 0;
-            }
+            QueueEntry entry = waitingEntries.get(index);
+
+            int position = index + 1;
 
             int estimatedWaitMinutes =
-                    waiting
-                            ? (queuePosition - 1)
-                            * DEFAULT_CONSULTATION_MINUTES
-                            : 0;
+                    (
+                            index +
+                            activePatientCount
+                    ) * DEFAULT_CONSULTATION_MINUTES;
 
             responses.add(
                     mapToDoctorQueueResponse(
                             entry,
-                            queuePosition,
+                            position,
                             estimatedWaitMinutes
                     )
             );
@@ -91,18 +124,15 @@ public class QueueService {
     public QueueEntryResponse getQueueEntry(
             UUID queueEntryId
     ) {
-        QueueEntry queueEntry =
-                queueEntryRepository
-                        .findById(queueEntryId)
-                        .orElseThrow(
-                                () -> new ResourceNotFoundException(
-                                        "Queue entry not found"
-                                )
-                        );
-
-        return mapToResponse(queueEntry);
+        return mapToResponse(
+                findQueueEntry(queueEntryId)
+        );
     }
 
+    /*
+     * Creates a new waiting queue entry and recalculates
+     * everyone in the department.
+     */
     @Transactional
     public QueueEntry createQueueEntry(
             Appointment appointment,
@@ -118,6 +148,7 @@ public class QueueService {
             Boolean premium
     ) {
         validateSeverityScore(severityScore);
+        validateDepartmentId(departmentId);
 
         if (appointment == null) {
             throw new IllegalArgumentException(
@@ -125,9 +156,9 @@ public class QueueService {
             );
         }
 
-        if (departmentId == null) {
+        if (scheduledTime == null) {
             throw new IllegalArgumentException(
-                    "Department ID is required."
+                    "Scheduled time is required."
             );
         }
 
@@ -148,31 +179,108 @@ public class QueueService {
                 )
                 .scheduledTime(scheduledTime)
                 .currentPosition(0)
+                .estimatedCallTime(null)
                 .premium(Boolean.TRUE.equals(premium))
                 .emergency(severityScore >= 4)
                 .status(QueueStatus.WAITING)
+                .skipCount(0)
+                .lastSkippedAt(null)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
-        return queueEntryRepository.save(entry);
+        QueueEntry savedEntry =
+                queueEntryRepository.save(entry);
+
+        recalculateDepartmentQueue(departmentId);
+
+        return savedEntry;
     }
 
+    /*
+     * Calls a waiting patient.
+     *
+     * Only one patient may be CALLED or IN_CONSULTATION
+     * in a department at a time.
+     */
     @Transactional
     public QueueEntry callPatient(UUID queueEntryId) {
-        QueueEntry entry = findQueueEntry(queueEntryId);
+        QueueEntry selectedEntry =
+                findQueueEntry(queueEntryId);
+
+        UUID departmentId =
+                selectedEntry.getDepartmentId();
+
+        List<QueueEntry> lockedEntries =
+                lockDepartmentQueue(departmentId);
+
+        QueueEntry entry =
+                findEntryInsideLockedQueue(
+                        lockedEntries,
+                        queueEntryId
+                );
 
         ensurePatientIsWaiting(entry);
 
-        entry.setStatus(QueueStatus.CALLED);
-        entry.setUpdatedAt(LocalDateTime.now());
+        boolean anotherPatientIsActive =
+                lockedEntries.stream()
+                        .anyMatch(
+                                current ->
+                                        !current.getId()
+                                                .equals(entry.getId())
+                                        && isBusy(current)
+                        );
 
-        return queueEntryRepository.save(entry);
+        if (anotherPatientIsActive) {
+            throw new IllegalStateException(
+                    "Another patient is already called or in consultation in this department."
+            );
+        }
+
+        entry.setStatus(QueueStatus.CALLED);
+        entry.setCurrentPosition(0);
+        entry.setEstimatedCallTime(
+                LocalDateTime.now()
+        );
+
+        /*
+         * The skip marker is cleared once the skipped patient
+         * reaches the front and is called again.
+         */
+        entry.clearSkipMarker();
+
+        QueueEntry savedEntry =
+                queueEntryRepository.save(entry);
+
+        recalculateLockedQueue(
+                departmentId,
+                lockedEntries
+        );
+
+        return savedEntry;
     }
 
+    /*
+     * Starts consultation for the currently called patient.
+     */
     @Transactional
-    public QueueEntry startConsultation(UUID queueEntryId) {
-        QueueEntry entry = findQueueEntry(queueEntryId);
+    public QueueEntry startConsultation(
+            UUID queueEntryId
+    ) {
+        QueueEntry selectedEntry =
+                findQueueEntry(queueEntryId);
+
+        UUID departmentId =
+                selectedEntry.getDepartmentId();
+
+        List<QueueEntry> lockedEntries =
+                lockDepartmentQueue(departmentId);
+
+        QueueEntry entry =
+                findEntryInsideLockedQueue(
+                        lockedEntries,
+                        queueEntryId
+                );
 
         if (entry.getStatus() == QueueStatus.COMPLETED) {
             throw new IllegalStateException(
@@ -192,15 +300,63 @@ public class QueueService {
             );
         }
 
-        entry.setStatus(QueueStatus.IN_CONSULTATION);
-        entry.setUpdatedAt(LocalDateTime.now());
+        boolean anotherConsultationIsActive =
+                lockedEntries.stream()
+                        .anyMatch(
+                                current ->
+                                        !current.getId()
+                                                .equals(entry.getId())
+                                        && current.getStatus()
+                                                == QueueStatus.IN_CONSULTATION
+                        );
 
-        return queueEntryRepository.save(entry);
+        if (anotherConsultationIsActive) {
+            throw new IllegalStateException(
+                    "Another consultation is already in progress in this department."
+            );
+        }
+
+        entry.setStatus(
+                QueueStatus.IN_CONSULTATION
+        );
+
+        entry.setCurrentPosition(0);
+        entry.setEstimatedCallTime(
+                LocalDateTime.now()
+        );
+
+        QueueEntry savedEntry =
+                queueEntryRepository.save(entry);
+
+        recalculateLockedQueue(
+                departmentId,
+                lockedEntries
+        );
+
+        return savedEntry;
     }
 
+    /*
+     * Completes consultation and moves waiting patients up.
+     */
     @Transactional
-    public QueueEntry completeConsultation(UUID queueEntryId) {
-        QueueEntry entry = findQueueEntry(queueEntryId);
+    public QueueEntry completeConsultation(
+            UUID queueEntryId
+    ) {
+        QueueEntry selectedEntry =
+                findQueueEntry(queueEntryId);
+
+        UUID departmentId =
+                selectedEntry.getDepartmentId();
+
+        List<QueueEntry> lockedEntries =
+                lockDepartmentQueue(departmentId);
+
+        QueueEntry entry =
+                findEntryInsideLockedQueue(
+                        lockedEntries,
+                        queueEntryId
+                );
 
         if (entry.getStatus() == QueueStatus.COMPLETED) {
             throw new IllegalStateException(
@@ -216,15 +372,18 @@ public class QueueService {
 
         if (entry.getStatus()
                 != QueueStatus.IN_CONSULTATION) {
+
             throw new IllegalStateException(
                     "The consultation must be started before it can be completed."
             );
         }
 
         entry.setStatus(QueueStatus.COMPLETED);
-        entry.setUpdatedAt(LocalDateTime.now());
+        entry.setCurrentPosition(0);
+        entry.setEstimatedCallTime(null);
 
-        Appointment appointment = entry.getAppointment();
+        Appointment appointment =
+                entry.getAppointment();
 
         if (appointment != null) {
             appointment.setStatus(
@@ -232,12 +391,48 @@ public class QueueService {
             );
         }
 
-        return queueEntryRepository.save(entry);
+        QueueEntry savedEntry =
+                queueEntryRepository.save(entry);
+
+        /*
+         * Remove the completed entry from the active list
+         * before recalculation.
+         */
+        lockedEntries.removeIf(
+                current ->
+                        current.getId()
+                                .equals(entry.getId())
+        );
+
+        recalculateLockedQueue(
+                departmentId,
+                lockedEntries
+        );
+
+        return savedEntry;
     }
 
+    /*
+     * Cancels the selected queue entry and appointment.
+     */
     @Transactional
-    public QueueEntry cancelQueueEntry(UUID queueEntryId) {
-        QueueEntry entry = findQueueEntry(queueEntryId);
+    public QueueEntry cancelQueueEntry(
+            UUID queueEntryId
+    ) {
+        QueueEntry selectedEntry =
+                findQueueEntry(queueEntryId);
+
+        UUID departmentId =
+                selectedEntry.getDepartmentId();
+
+        List<QueueEntry> lockedEntries =
+                lockDepartmentQueue(departmentId);
+
+        QueueEntry entry =
+                findEntryInsideLockedQueue(
+                        lockedEntries,
+                        queueEntryId
+                );
 
         if (entry.getStatus() == QueueStatus.COMPLETED) {
             throw new IllegalStateException(
@@ -252,9 +447,11 @@ public class QueueService {
         }
 
         entry.setStatus(QueueStatus.CANCELLED);
-        entry.setUpdatedAt(LocalDateTime.now());
+        entry.setCurrentPosition(0);
+        entry.setEstimatedCallTime(null);
 
-        Appointment appointment = entry.getAppointment();
+        Appointment appointment =
+                entry.getAppointment();
 
         if (appointment != null) {
             appointment.setStatus(
@@ -262,18 +459,270 @@ public class QueueService {
             );
         }
 
-        return queueEntryRepository.save(entry);
+        QueueEntry savedEntry =
+                queueEntryRepository.save(entry);
+
+        lockedEntries.removeIf(
+                current ->
+                        current.getId()
+                                .equals(entry.getId())
+        );
+
+        recalculateLockedQueue(
+                departmentId,
+                lockedEntries
+        );
+
+        return savedEntry;
+    }
+
+    /*
+     * Returns a called patient to the end of the waiting queue.
+     */
+    @Transactional
+    public QueueEntry skipPatient(
+            UUID queueEntryId
+    ) {
+        QueueEntry selectedEntry =
+                findQueueEntry(queueEntryId);
+
+        UUID departmentId =
+                selectedEntry.getDepartmentId();
+
+        List<QueueEntry> lockedEntries =
+                lockDepartmentQueue(departmentId);
+
+        QueueEntry entry =
+                findEntryInsideLockedQueue(
+                        lockedEntries,
+                        queueEntryId
+                );
+
+        if (entry.getStatus() != QueueStatus.CALLED) {
+            throw new IllegalStateException(
+                    "Only a called patient can be skipped."
+            );
+        }
+
+        entry.markAsSkipped();
+
+        QueueEntry savedEntry =
+                queueEntryRepository.save(entry);
+
+        recalculateLockedQueue(
+                departmentId,
+                lockedEntries
+        );
+
+        return savedEntry;
     }
 
     @Transactional(readOnly = true)
-    public QueueEntry findQueueEntry(UUID queueEntryId) {
+    public QueueEntry findQueueEntry(
+            UUID queueEntryId
+    ) {
+        if (queueEntryId == null) {
+            throw new IllegalArgumentException(
+                    "Queue entry ID is required."
+            );
+        }
+
         return queueEntryRepository
                 .findById(queueEntryId)
                 .orElseThrow(
-                        () -> new ResourceNotFoundException(
-                                "Queue entry not found"
+                        () ->
+                                new ResourceNotFoundException(
+                                        "Queue entry not found"
+                                )
+                );
+    }
+
+    /*
+     * Recalculates positions after creating a new entry.
+     */
+    private void recalculateDepartmentQueue(
+            UUID departmentId
+    ) {
+        List<QueueEntry> lockedEntries =
+                lockDepartmentQueue(departmentId);
+
+        recalculateLockedQueue(
+                departmentId,
+                lockedEntries
+        );
+    }
+
+    /*
+     * Updates currentPosition and estimatedCallTime
+     * for all waiting patients.
+     */
+    private void recalculateLockedQueue(
+            UUID departmentId,
+            List<QueueEntry> lockedEntries
+    ) {
+        List<QueueEntry> waitingEntries =
+                lockedEntries.stream()
+                        .filter(
+                                entry ->
+                                        entry.getStatus()
+                                                == QueueStatus.WAITING
+                        )
+                        .sorted(waitingQueueComparator())
+                        .toList();
+
+        boolean hasActivePatient =
+                lockedEntries.stream()
+                        .anyMatch(this::isBusy);
+
+        int activeOffset =
+                hasActivePatient ? 1 : 0;
+
+        LocalDateTime calculationTime =
+                LocalDateTime.now();
+
+        for (int index = 0;
+             index < waitingEntries.size();
+             index++) {
+
+            QueueEntry entry =
+                    waitingEntries.get(index);
+
+            int position = index + 1;
+
+            int waitMinutes =
+                    (
+                            index +
+                            activeOffset
+                    ) * DEFAULT_CONSULTATION_MINUTES;
+
+            entry.setCurrentPosition(position);
+
+            entry.setEstimatedCallTime(
+                    calculationTime.plusMinutes(
+                            waitMinutes
+                    )
+            );
+        }
+
+        /*
+         * Active entries do not have a waiting position.
+         */
+        lockedEntries.stream()
+                .filter(this::isBusy)
+                .forEach(
+                        entry -> {
+                            entry.setCurrentPosition(0);
+
+                            if (entry.getEstimatedCallTime()
+                                    == null) {
+
+                                entry.setEstimatedCallTime(
+                                        calculationTime
+                                );
+                            }
+                        }
+                );
+
+        queueEntryRepository.saveAll(
+                lockedEntries
+        );
+    }
+
+    /*
+     * Pessimistically locks the active department queue so
+     * two doctors cannot call separate patients simultaneously.
+     */
+    private List<QueueEntry> lockDepartmentQueue(
+            UUID departmentId
+    ) {
+        validateDepartmentId(departmentId);
+
+        return new ArrayList<>(
+                queueEntryRepository
+                        .findAndLockDepartmentQueue(
+                                departmentId,
+                                ACTIVE_QUEUE_STATUSES
+                        )
+        );
+    }
+
+    private QueueEntry findEntryInsideLockedQueue(
+            List<QueueEntry> lockedEntries,
+            UUID queueEntryId
+    ) {
+        return lockedEntries.stream()
+                .filter(
+                        entry ->
+                                entry.getId()
+                                        .equals(queueEntryId)
+                )
+                .findFirst()
+                .orElseThrow(
+                        () ->
+                                new IllegalStateException(
+                                        "The queue entry is no longer active."
+                                )
+                );
+    }
+
+    /*
+     * Waiting queue order:
+     *
+     * 1. Patients who have not been skipped
+     * 2. Severity score
+     * 3. Emergency status
+     * 4. Premium status
+     * 5. Scheduled time
+     * 6. Creation time
+     * 7. Last skipped time
+     */
+    private Comparator<QueueEntry>
+    waitingQueueComparator() {
+
+        return Comparator
+                .comparing(
+                        (QueueEntry entry) ->
+                                entry.getLastSkippedAt()
+                                        != null
+                )
+                .thenComparing(
+                        QueueEntry::getSeverityScore,
+                        Comparator.nullsLast(
+                                Comparator.reverseOrder()
+                        )
+                )
+                .thenComparing(
+                        QueueEntry::isEmergency,
+                        Comparator.reverseOrder()
+                )
+                .thenComparing(
+                        QueueEntry::isPremium,
+                        Comparator.reverseOrder()
+                )
+                .thenComparing(
+                        QueueEntry::getScheduledTime,
+                        Comparator.nullsLast(
+                                Comparator.naturalOrder()
+                        )
+                )
+                .thenComparing(
+                        QueueEntry::getCreatedAt,
+                        Comparator.nullsLast(
+                                Comparator.naturalOrder()
+                        )
+                )
+                .thenComparing(
+                        QueueEntry::getLastSkippedAt,
+                        Comparator.nullsLast(
+                                Comparator.naturalOrder()
                         )
                 );
+    }
+
+    private boolean isBusy(QueueEntry entry) {
+        return BUSY_STATUSES.contains(
+                entry.getStatus()
+        );
     }
 
     private DoctorQueueResponse mapToDoctorQueueResponse(
@@ -293,10 +742,18 @@ public class QueueService {
                 .patientNumber(entry.getPatientNumber())
                 .age(entry.getAge())
                 .gender(entry.getGender())
-                .chiefComplaint(entry.getChiefComplaint())
-                .severityScore(entry.getSeverityScore())
-                .severityLabel(entry.getSeverityLabel())
-                .scheduledTime(entry.getScheduledTime())
+                .chiefComplaint(
+                        entry.getChiefComplaint()
+                )
+                .severityScore(
+                        entry.getSeverityScore()
+                )
+                .severityLabel(
+                        entry.getSeverityLabel()
+                )
+                .scheduledTime(
+                        entry.getScheduledTime()
+                )
                 .queuePosition(queuePosition)
                 .estimatedWaitMinutes(
                         estimatedWaitMinutes
@@ -316,7 +773,9 @@ public class QueueService {
                 .departmentId(
                         queueEntry.getDepartmentId()
                 )
-                .patientName(queueEntry.getPatientName())
+                .patientName(
+                        queueEntry.getPatientName()
+                )
                 .patientNumber(
                         queueEntry.getPatientNumber()
                 )
@@ -355,15 +814,32 @@ public class QueueService {
     private void ensurePatientIsWaiting(
             QueueEntry entry
     ) {
-        if (entry.getStatus() != QueueStatus.WAITING) {
+        if (entry.getStatus()
+                != QueueStatus.WAITING) {
+
             throw new IllegalStateException(
                     "Only a waiting patient can be called."
             );
         }
     }
 
-    private void validateSeverityScore(Integer score) {
-        if (score == null || score < 1 || score > 4) {
+    private void validateDepartmentId(
+            UUID departmentId
+    ) {
+        if (departmentId == null) {
+            throw new IllegalArgumentException(
+                    "Department ID is required."
+            );
+        }
+    }
+
+    private void validateSeverityScore(
+            Integer score
+    ) {
+        if (score == null ||
+                score < 1 ||
+                score > 4) {
+
             throw new IllegalArgumentException(
                     "Severity score must be between 1 and 4."
             );
@@ -384,11 +860,13 @@ public class QueueService {
     private int getStatusPriority(
             QueueStatus status
     ) {
-        if (status == QueueStatus.IN_CONSULTATION) {
+        if (status ==
+                QueueStatus.IN_CONSULTATION) {
             return 0;
         }
 
-        if (status == QueueStatus.CALLED) {
+        if (status ==
+                QueueStatus.CALLED) {
             return 1;
         }
 

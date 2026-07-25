@@ -40,6 +40,14 @@ public class QueueController {
         queueService.callPatient(queueEntryId);
         return ResponseEntity.noContent().build();
     }
+    @PatchMapping("/queue/{queueEntryId}/skip")
+public ResponseEntity<Void> skipPatient(
+        @PathVariable UUID queueEntryId
+) {
+    queueService.skipPatient(queueEntryId);
+    return ResponseEntity.noContent().build();
+}
+    
 
     @PatchMapping("/queue/{queueEntryId}/start")
     public ResponseEntity<Void> startConsultation(
