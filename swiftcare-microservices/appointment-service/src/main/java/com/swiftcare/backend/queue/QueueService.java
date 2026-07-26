@@ -7,6 +7,7 @@ import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.queue.dto.QueueEntryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.swiftcare.backend.notification.NotificationClient;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -18,7 +19,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class QueueService {
-
+    
     private static final int DEFAULT_CONSULTATION_MINUTES = 15;
 
     private static final List<QueueStatus> ACTIVE_QUEUE_STATUSES =
@@ -35,6 +36,7 @@ public class QueueService {
             );
 
     private final QueueEntryRepository queueEntryRepository;
+      private final NotificationClient notificationClient;  
 
     /*
      * Returns the doctor's live queue.
@@ -203,62 +205,75 @@ public class QueueService {
      * Only one patient may be CALLED or IN_CONSULTATION
      * in a department at a time.
      */
-    @Transactional
-    public QueueEntry callPatient(UUID queueEntryId) {
-        QueueEntry selectedEntry =
-                findQueueEntry(queueEntryId);
+ @Transactional
+public QueueEntry callPatient(UUID queueEntryId) {
+    QueueEntry selectedEntry =
+            findQueueEntry(queueEntryId);
 
-        UUID departmentId =
-                selectedEntry.getDepartmentId();
+    UUID departmentId =
+            selectedEntry.getDepartmentId();
 
-        List<QueueEntry> lockedEntries =
-                lockDepartmentQueue(departmentId);
+    List<QueueEntry> lockedEntries =
+            lockDepartmentQueue(departmentId);
 
-        QueueEntry entry =
-                findEntryInsideLockedQueue(
-                        lockedEntries,
-                        queueEntryId
-                );
-
-        ensurePatientIsWaiting(entry);
-
-        boolean anotherPatientIsActive =
-                lockedEntries.stream()
-                        .anyMatch(
-                                current ->
-                                        !current.getId()
-                                                .equals(entry.getId())
-                                        && isBusy(current)
-                        );
-
-        if (anotherPatientIsActive) {
-            throw new IllegalStateException(
-                    "Another patient is already called or in consultation in this department."
+    QueueEntry entry =
+            findEntryInsideLockedQueue(
+                    lockedEntries,
+                    queueEntryId
             );
-        }
 
-        entry.setStatus(QueueStatus.CALLED);
-        entry.setCurrentPosition(0);
-        entry.setEstimatedCallTime(
-                LocalDateTime.now()
+    ensurePatientIsWaiting(entry);
+
+    boolean anotherPatientIsActive =
+            lockedEntries.stream()
+                    .anyMatch(
+                            current ->
+                                    !current.getId()
+                                            .equals(entry.getId())
+                                    && isBusy(current)
+                    );
+
+    if (anotherPatientIsActive) {
+        throw new IllegalStateException(
+                "Another patient is already called or in consultation in this department."
         );
-
-        /*
-         * The skip marker is cleared once the skipped patient
-         * reaches the front and is called again.
-         */
-        entry.clearSkipMarker();
-
-        QueueEntry savedEntry =
-                queueEntryRepository.save(entry);
-
-        recalculateLockedQueue(
-                departmentId,
-                lockedEntries
-        );
-
-        return savedEntry;
     }
+
+    entry.setStatus(QueueStatus.CALLED);
+    entry.setCurrentPosition(0);
+    entry.setEstimatedCallTime(
+            LocalDateTime.now()
+    );
+
+    entry.clearSkipMarker();
+
+    QueueEntry savedEntry =
+            queueEntryRepository.save(entry);
+
+    recalculateLockedQueue(
+            departmentId,
+            lockedEntries
+    );
+
+    try {
+        notificationClient.notifyPatientCalled(
+                savedEntry.getPatientId(),
+                savedEntry.getDepartmentId(),
+                savedEntry.getCurrentPosition()
+        );
+    } catch (Exception exception) {
+        /*
+         * Do not fail the queue operation simply because the
+         * notification service or Expo is temporarily unavailable.
+         */
+        System.err.println(
+                "Patient was called, but the push notification failed: "
+                        + exception.getMessage()
+        );
+    }
+
+    return savedEntry;
+}
 
     /*
      * Starts consultation for the currently called patient.

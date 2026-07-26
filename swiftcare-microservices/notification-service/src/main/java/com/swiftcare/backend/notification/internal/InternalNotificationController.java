@@ -1,7 +1,6 @@
 package com.swiftcare.notification.internal;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,31 +13,30 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InternalNotificationController {
 
-    private final PushNotificationService pushNotificationService;
+    private final PushNotificationService
+            pushNotificationService;
 
     @PostMapping("/patient-called")
     public ResponseEntity<Void> patientCalled(
-            @Valid @RequestBody PatientCalledRequest request
+            @Valid @RequestBody
+            PatientCalledRequest request
     ) {
-
         pushNotificationService.notifyPatientCalled(
                 request.patientId(),
-                request.department(),
-                request.queueNumber()
+                request.departmentId()
         );
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     public record PatientCalledRequest(
 
-            @NotNull
+            @NotNull(message = "Patient ID is required")
             UUID patientId,
 
-            @NotBlank
-            String department,
+            @NotNull(message = "Department ID is required")
+            UUID departmentId,
 
-            @NotNull
             Integer queueNumber
     ) {
     }
