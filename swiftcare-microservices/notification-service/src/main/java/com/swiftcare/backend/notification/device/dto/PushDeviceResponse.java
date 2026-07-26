@@ -1,7 +1,5 @@
-package com.swiftcare.notification.device.dto;
-
-import com.swiftcare.notification.device.DevicePlatform;
-
+package com.swiftcare.backend.notification.device.dto;
+import com.swiftcare.backend.notification.device.DevicePlatform;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 

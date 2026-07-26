@@ -1,6 +1,5 @@
-package com.swiftcare.notification.config;
-
-import com.swiftcare.notification.device.PushDeviceNotFoundException;
+package com.swiftcare.backend.notification.config;
+import com.swiftcare.backend.notification.device.PushDeviceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

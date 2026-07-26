@@ -1,4 +1,4 @@
-package com.swiftcare.notification.device;
+package com.swiftcare.backend.notification.device;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -6,18 +6,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface PushDeviceRepository
-        extends JpaRepository<PushDevice, UUID> {
+public interface PushDeviceRepository extends JpaRepository<PushDevice, UUID> {
 
-    Optional<PushDevice> findByExpoPushToken(
-            String expoPushToken
-    );
+    Optional<PushDevice> findByExpoPushToken(String expoPushToken);
 
-    List<PushDevice> findAllByPatientIdAndActiveTrue(
-            UUID patientId
-    );
+    List<PushDevice> findAllByPatientId(UUID patientId);
 
-    boolean existsByExpoPushToken(
-            String expoPushToken
-    );
+    List<PushDevice> findAllByPatientIdAndActiveTrue(UUID patientId);
 }

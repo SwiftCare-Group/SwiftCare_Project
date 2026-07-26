@@ -1,6 +1,8 @@
 spring:
   application:
     name: notification-service
+  config:
+    import: optional:classpath:application-secrets.yml
 
   datasource:
     url: ${DB_URL}
@@ -35,8 +37,10 @@ server:
   servlet:
     context-path: /api/v1
 
-jwt:
-  secret: ${JWT_SECRET}
+app:
+  jwt:
+    secret: ${JWT_SECRET:ThisIsALocalDevelopmentJwtSecretKeyThatIsAtLeast32CharactersLong123!}
+    expiry-ms: ${JWT_EXPIRY_MS:86400000}
 
 firebase:
   credentials-path: ${FIREBASE_CREDENTIALS_PATH:firebase-service-account.json}
@@ -48,7 +52,7 @@ expo:
     access-token: ${EXPO_ACCESS_TOKEN:}
 
 internal:
-  service-key: ${INTERNAL_SERVICE_KEY}
+  service-key: ${INTERNAL_SERVICE_KEY:swiftcare-internal-dev-key}
 
 management:
   endpoints:

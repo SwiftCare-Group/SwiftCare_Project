@@ -1,16 +1,16 @@
-package com.swiftcare.notification.device;
+package com.swiftcare.backend.notification.device;
 
-import com.swiftcare.notification.device.dto.PushDeviceResponse;
-import com.swiftcare.notification.device.dto.RegisterPushDeviceRequest;
-import jakarta.transaction.Transactional;
+import com.swiftcare.backend.notification.device.dto.PushDeviceResponse;
+import com.swiftcare.backend.notification.device.dto.RegisterPushDeviceRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-
 @Service
 @RequiredArgsConstructor
 public class PushDeviceService {
@@ -103,4 +103,34 @@ public class PushDeviceService {
                 device.getLastRegisteredAt()
         );
     }
+
+    @Transactional(readOnly = true)
+public List<PushDeviceResponse> getDevices(UUID patientId) {
+    return pushDeviceRepository
+            .findAllByPatientId(patientId)
+            .stream()
+            .map(this::toResponse)
+            .toList();
+}
+@Transactional
+public void deactivateDevice(UUID patientId, UUID deviceId) {
+    PushDevice device = pushDeviceRepository
+            .findById(deviceId)
+            .orElseThrow(() ->
+                    new PushDeviceNotFoundException(
+                            "Push device not found: " + deviceId
+                    )
+            );
+
+    if (!device.getPatientId().equals(patientId)) {
+        throw new PushDeviceNotFoundException(
+                "Push device not found for authenticated patient"
+        );
+    }
+
+    device.setActive(false);
+    device.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+
+    pushDeviceRepository.save(device);
+}
 }

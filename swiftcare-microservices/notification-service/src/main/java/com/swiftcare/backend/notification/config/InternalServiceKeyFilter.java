@@ -1,5 +1,4 @@
-package com.swiftcare.notification.config;
-
+package com.swiftcare.backend.notification.config;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

@@ -1,40 +1,32 @@
-package com.swiftcare.notification.device;
+package com.swiftcare.backend.notification.device;
 
-import com.swiftcare.notification.device.dto.PushDeviceResponse;
-import com.swiftcare.notification.device.dto.RegisterPushDeviceRequest;
-import com.swiftcare.notification.security.AuthenticatedPatientResolver;
+import com.swiftcare.backend.notification.device.dto.PushDeviceResponse;
+import com.swiftcare.backend.notification.device.dto.RegisterPushDeviceRequest;
+import com.swiftcare.backend.notification.security.AuthenticatedPatientResolver;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/notifications/devices")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('PATIENT')")
 public class PushDeviceController {
 
     private final PushDeviceService pushDeviceService;
-
-    private final AuthenticatedPatientResolver
-            authenticatedPatientResolver;
+    private final AuthenticatedPatientResolver patientResolver;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PushDeviceResponse registerDevice(
-            @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody
-            RegisterPushDeviceRequest request
+            @AuthenticationPrincipal String email,
+            @Valid @RequestBody RegisterPushDeviceRequest request
     ) {
-        UUID patientId =
-                authenticatedPatientResolver.resolvePatientId(jwt);
+        UUID patientId = patientResolver.resolvePatientId(email);
 
         return pushDeviceService.registerDevice(
                 patientId,
@@ -42,39 +34,26 @@ public class PushDeviceController {
         );
     }
 
-    @DeleteMapping
+    @GetMapping
+    public List<PushDeviceResponse> getDevices(
+            @AuthenticationPrincipal String email
+    ) {
+        UUID patientId = patientResolver.resolvePatientId(email);
+
+        return pushDeviceService.getDevices(patientId);
+    }
+
+    @DeleteMapping("/{deviceId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deactivateDevice(
-            @AuthenticationPrincipal Jwt jwt,
-            @RequestBody DeactivatePushDeviceRequest request
+            @PathVariable UUID deviceId,
+            @AuthenticationPrincipal String email
     ) {
-        UUID patientId =
-                authenticatedPatientResolver.resolvePatientId(jwt);
+        UUID patientId = patientResolver.resolvePatientId(email);
 
         pushDeviceService.deactivateDevice(
                 patientId,
-                request.token()
+                deviceId
         );
-    }
-
-    @DeleteMapping("/all")
-    public Map<String, String> deactivateAllDevices(
-            @AuthenticationPrincipal Jwt jwt
-    ) {
-        UUID patientId =
-                authenticatedPatientResolver.resolvePatientId(jwt);
-
-        pushDeviceService.deactivateAllDevices(patientId);
-
-        return Map.of(
-                "message",
-                "All push devices were deactivated successfully."
-        );
-    }
-
-    public record DeactivatePushDeviceRequest(
-            @NotBlank(message = "Expo push token is required")
-            String token
-    ) {
     }
 }

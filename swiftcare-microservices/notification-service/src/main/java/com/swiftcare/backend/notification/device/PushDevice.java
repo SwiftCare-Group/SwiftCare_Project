@@ -1,5 +1,4 @@
-package com.swiftcare.notification.device;
-
+package com.swiftcare.backend.notification.device;
 import jakarta.persistence.*;
 import lombok.*;
 

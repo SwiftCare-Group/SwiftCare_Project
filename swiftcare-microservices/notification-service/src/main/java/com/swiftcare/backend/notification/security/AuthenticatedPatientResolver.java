@@ -1,56 +1,28 @@
-package com.swiftcare.notification.security;
+package com.swiftcare.backend.notification.security;
 
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Component
 public class AuthenticatedPatientResolver {
 
-    private static final List<String> PATIENT_ID_CLAIMS =
-            List.of(
-                    "patientId",
-                    "patient_id",
-                    "userId",
-                    "user_id"
-            );
-
-    public UUID resolvePatientId(Jwt jwt) {
-        for (String claimName : PATIENT_ID_CLAIMS) {
-            String claimValue = jwt.getClaimAsString(claimName);
-
-            UUID patientId = parseUuid(claimValue);
-
-            if (patientId != null) {
-                return patientId;
-            }
+    public UUID resolvePatientId(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Authenticated user email is missing");
         }
 
         /*
-         * Many JWT implementations place the user's UUID in "sub".
+         * Temporary deterministic UUID generated from the authenticated email.
+         *
+         * This only works correctly if the other services use the same method
+         * to derive the patient's UUID from their email.
          */
-        UUID subjectId = parseUuid(jwt.getSubject());
-
-        if (subjectId != null) {
-            return subjectId;
-        }
-
-        throw new IllegalStateException(
-                "The access token does not contain a valid patient UUID."
+        return UUID.nameUUIDFromBytes(
+                email.trim()
+                        .toLowerCase()
+                        .getBytes(StandardCharsets.UTF_8)
         );
-    }
-
-    private UUID parseUuid(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
     }
 }

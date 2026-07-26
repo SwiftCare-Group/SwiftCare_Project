@@ -1,5 +1,5 @@
-package com.swiftcare.notification.internal;
-
+package com.swiftcare.backend.notification.internal;
+import com.swiftcare.backend.notification.push.PushNotificationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
