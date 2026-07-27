@@ -1,9 +1,10 @@
 package com.swiftcare.backend.queue;
 
+import com.swiftcare.backend.queue.dto.QueueEntryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.swiftcare.backend.queue.dto.QueueEntryResponse;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -18,10 +19,9 @@ public class QueueController {
     public ResponseEntity<List<DoctorQueueResponse>> getDepartmentQueue(
             @PathVariable UUID departmentId
     ) {
-        List<DoctorQueueResponse> queue =
-                queueService.getDepartmentQueue(departmentId);
-
-        return ResponseEntity.ok(queue);
+        return ResponseEntity.ok(
+                queueService.getDepartmentQueue(departmentId)
+        );
     }
 
     @GetMapping("/queue/{queueEntryId}")
@@ -38,6 +38,14 @@ public class QueueController {
             @PathVariable UUID queueEntryId
     ) {
         queueService.callPatient(queueEntryId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/queue/{queueEntryId}/skip")
+    public ResponseEntity<Void> skipPatient(
+            @PathVariable UUID queueEntryId
+    ) {
+        queueService.skipPatient(queueEntryId);
         return ResponseEntity.noContent().build();
     }
 

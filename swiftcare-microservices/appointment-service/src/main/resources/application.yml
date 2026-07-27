@@ -50,3 +50,10 @@ management:
     health:
       probes:
         enabled: true
+
+services:
+  notification:
+    url: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
+
+internal:
+  service-key: ${INTERNAL_SERVICE_KEY:swiftcare-internal-development-key}
