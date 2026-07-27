@@ -9,7 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,39 +24,79 @@ public class AppointmentController {
     private final PatientRepository patientRepository;
 
     @PostMapping
-    public ResponseEntity<AppointmentResponse> book(
-            @AuthenticationPrincipal String email,
-            @Valid @RequestBody AppointmentRequest request) {
-        UUID patientId = getPatientId(email);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(appointmentService.bookAppointment(patientId, request));
+    public ResponseEntity<AppointmentResponse> bookAppointment(
+            Authentication authentication,
+            @Valid @RequestBody AppointmentRequest request
+    ) {
+        UUID patientId = getAuthenticatedPatientId(authentication);
+
+        AppointmentResponse response =
+                appointmentService.bookAppointment(patientId, request);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<AppointmentResponse>> getAll(
-            @AuthenticationPrincipal String email) {
-        UUID patientId = getPatientId(email);
-        return ResponseEntity.ok(appointmentService.getPatientAppointments(patientId));
+    public ResponseEntity<List<AppointmentResponse>> getMyAppointments(
+            Authentication authentication
+    ) {
+        UUID patientId = getAuthenticatedPatientId(authentication);
+
+        return ResponseEntity.ok(
+                appointmentService.getPatientAppointments(patientId)
+        );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AppointmentResponse> getOne(@PathVariable UUID id) {
-        return ResponseEntity.ok(appointmentService.getAppointment(id));
+    public ResponseEntity<AppointmentResponse> getAppointment(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(
+                appointmentService.getAppointment(id)
+        );
     }
 
     @GetMapping("/{id}/queue")
-    public ResponseEntity<QueueStatusResponse> getQueueStatus(@PathVariable UUID id) {
-        return ResponseEntity.ok(appointmentService.getQueueStatus(id));
+    public ResponseEntity<QueueStatusResponse> getQueueStatus(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(
+                appointmentService.getQueueStatus(id)
+        );
     }
 
     @PutMapping("/{id}/cancel")
-    public ResponseEntity<AppointmentResponse> cancel(@PathVariable UUID id) {
-        return ResponseEntity.ok(appointmentService.cancelAppointment(id));
+    public ResponseEntity<AppointmentResponse> cancelAppointment(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(
+                appointmentService.cancelAppointment(id)
+        );
     }
 
-    private UUID getPatientId(String email) {
+    private UUID getAuthenticatedPatientId(
+            Authentication authentication
+    ) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getName() == null
+                || authentication.getName().isBlank()) {
+
+            throw new IllegalStateException(
+                    "Authenticated patient email is unavailable"
+            );
+        }
+
+        String email = authentication.getName();
+
         return patientRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"))
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Patient not found for email: " + email
+                        )
+                )
                 .getId();
     }
 }
