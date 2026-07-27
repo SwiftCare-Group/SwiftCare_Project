@@ -164,29 +164,52 @@ if (slotTaken) {
         return mapToResponse(appointment);
     }
 
-    @Transactional(readOnly = true)
-    public QueueStatusResponse getQueueStatus(UUID appointmentId) {
-        QueueEntry entry = queueEntryRepository
-                .findByAppointmentId(appointmentId)
-                .orElseThrow(
-                        () -> new ResourceNotFoundException(
-                                "Queue entry not found"
-                        )
-                );
+@Transactional(readOnly = true)
+public QueueStatusResponse getQueueStatus(UUID appointmentId) {
+    long startTime = System.currentTimeMillis();
 
-        String queueStatus = entry.getStatus() != null
-                ? entry.getStatus().name()
-                : QueueStatus.WAITING.name();
+    System.out.println(
+            "Starting queue lookup for appointment: "
+                    + appointmentId
+    );
 
-        return QueueStatusResponse.builder()
-                .appointmentId(appointmentId)
-                .currentPosition(entry.getCurrentPosition())
-                .estimatedCallTime(entry.getEstimatedCallTime())
-                .isEmergency(entry.isEmergency())
-                .status(queueStatus)
-                .build();
-    }
+    QueueEntry entry = queueEntryRepository
+            .findByAppointmentId(appointmentId)
+            .orElseThrow(
+                    () -> new ResourceNotFoundException(
+                            "Queue entry not found"
+                    )
+            );
 
+    long databaseCompleted = System.currentTimeMillis();
+
+    System.out.println(
+            "Queue database lookup completed in "
+                    + (databaseCompleted - startTime)
+                    + " ms"
+    );
+
+    String queueStatus = entry.getStatus() != null
+            ? entry.getStatus().name()
+            : QueueStatus.WAITING.name();
+
+    QueueStatusResponse response =
+            QueueStatusResponse.builder()
+                    .appointmentId(appointmentId)
+                    .currentPosition(entry.getCurrentPosition())
+                    .estimatedCallTime(entry.getEstimatedCallTime())
+                    .isEmergency(entry.isEmergency())
+                    .status(queueStatus)
+                    .build();
+
+    System.out.println(
+            "Queue request completed in "
+                    + (System.currentTimeMillis() - startTime)
+                    + " ms"
+    );
+
+    return response;
+}
     @Transactional
     public AppointmentResponse cancelAppointment(UUID appointmentId) {
         Appointment appointment = appointmentRepository

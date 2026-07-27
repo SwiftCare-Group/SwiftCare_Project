@@ -103,25 +103,27 @@ const saveLastNotifiedPositions = async (
 
       const statuses: Record<string, QueueStatus | null> = {};
 
-      await Promise.all(
-        pendingAppointments.map(async (appointment: Appointment) => {
-          try {
-            const queueResponse = await api.get(
-              `/appointments/${appointment.id}/queue`
-            );
-
-            statuses[appointment.id] = queueResponse.data;
-          } catch (error) {
-            console.error(
-              `Failed to fetch queue for appointment ${appointment.id}:`,
-              error
-            );
-
-            statuses[appointment.id] = null;
-          }
-        })
+await Promise.allSettled(
+  pendingAppointments.map(async appointment => {
+    try {
+      const queueResponse = await api.get(
+        `/appointments/${appointment.id}/queue`,
+        {
+          timeout: 10000,
+        }
       );
 
+      statuses[appointment.id] = queueResponse.data;
+    } catch (error) {
+      console.error(
+        `Failed to fetch queue for appointment ${appointment.id}:`,
+        error
+      );
+
+      statuses[appointment.id] = null;
+    }
+  })
+);
       for (const appointment of pendingAppointments) {
   const queue = statuses[appointment.id];
   const currentPosition = queue?.currentPosition;

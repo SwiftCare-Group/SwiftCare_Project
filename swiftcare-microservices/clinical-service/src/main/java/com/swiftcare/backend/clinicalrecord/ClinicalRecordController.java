@@ -19,6 +19,35 @@ public class ClinicalRecordController {
 
     private final ClinicalRecordService clinicalRecordService;
 
+    /**
+     * Saves the clinical record and completes the queue entry
+     * in one transaction.
+     */
+    @PostMapping("/complete")
+    public ResponseEntity<ClinicalRecordResponse>
+    createAndCompleteClinicalRecord(
+            Principal principal,
+            @Valid @RequestBody
+            CreateClinicalRecordRequest request
+    ) {
+        ClinicalRecordResponse response =
+                clinicalRecordService
+                        .createAndCompleteClinicalRecord(
+                                principal.getName(),
+                                request
+                        );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+
+    /**
+     * Optional compatibility endpoint.
+     *
+     * This can remain temporarily if older frontend code still
+     * posts to /clinical-records.
+     */
     @PostMapping
     public ResponseEntity<ClinicalRecordResponse>
     createClinicalRecord(
@@ -27,10 +56,11 @@ public class ClinicalRecordController {
             CreateClinicalRecordRequest request
     ) {
         ClinicalRecordResponse response =
-                clinicalRecordService.createClinicalRecord(
-                        principal.getName(),
-                        request
-                );
+                clinicalRecordService
+                        .createClinicalRecord(
+                                principal.getName(),
+                                request
+                        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -69,6 +99,18 @@ public class ClinicalRecordController {
         return ResponseEntity.ok(
                 clinicalRecordService.getPatientRecords(
                         patientId
+                )
+        );
+    }
+
+    @GetMapping("/doctor/me")
+    public ResponseEntity<List<ClinicalRecordResponse>>
+    getAuthenticatedDoctorRecords(
+            Principal principal
+    ) {
+        return ResponseEntity.ok(
+                clinicalRecordService.getDoctorRecords(
+                        principal.getName()
                 )
         );
     }

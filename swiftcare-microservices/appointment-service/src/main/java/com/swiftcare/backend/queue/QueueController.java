@@ -9,14 +9,14 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping
 @RequiredArgsConstructor
 public class QueueController {
 
     private final QueueService queueService;
 
     @GetMapping("/departments/{departmentId}/queue")
-    public ResponseEntity<List<DoctorQueueResponse>> getDepartmentQueue(
+    public ResponseEntity<List<DoctorQueueResponse>>
+    getDepartmentQueue(
             @PathVariable UUID departmentId
     ) {
         return ResponseEntity.ok(
@@ -25,7 +25,8 @@ public class QueueController {
     }
 
     @GetMapping("/queue/{queueEntryId}")
-    public ResponseEntity<QueueEntryResponse> getQueueEntry(
+    public ResponseEntity<QueueEntryResponse>
+    getQueueEntry(
             @PathVariable UUID queueEntryId
     ) {
         return ResponseEntity.ok(

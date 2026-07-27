@@ -3,6 +3,7 @@ package com.swiftcare.backend.clinicalrecord;
 import com.swiftcare.backend.appointment.Appointment;
 import com.swiftcare.backend.clinicalrecord.dto.ClinicalRecordResponse;
 import com.swiftcare.backend.clinicalrecord.dto.CreateClinicalRecordRequest;
+import com.swiftcare.backend.common.enums.AppointmentStatus;
 import com.swiftcare.backend.common.enums.QueueStatus;
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.common.exception.UnauthorizedException;
@@ -15,9 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,23 +29,13 @@ public class ClinicalRecordService {
     private final DoctorRepository doctorRepository;
 
     @Transactional
-    public ClinicalRecordResponse createClinicalRecord(
+    public ClinicalRecordResponse createAndCompleteClinicalRecord(
             String doctorEmail,
             CreateClinicalRecordRequest request
     ) {
-        Doctor doctor = doctorRepository
-                .findByEmail(doctorEmail)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Authenticated doctor account not found"
-                        )
-                );
+        validateRequest(doctorEmail, request);
 
-        if (doctor.isDeleted()) {
-            throw new UnauthorizedException(
-                    "This doctor account is inactive"
-            );
-        }
+        Doctor doctor = findActiveDoctor(doctorEmail);
 
         QueueEntry queueEntry = queueEntryRepository
                 .findById(request.getQueueEntryId())
@@ -54,20 +45,8 @@ public class ClinicalRecordService {
                         )
                 );
 
-        if (queueEntry.getStatus()
-                != QueueStatus.IN_CONSULTATION) {
-            throw new IllegalStateException(
-                    "The patient must be in consultation before a clinical record can be saved"
-            );
-        }
-
-        if (clinicalRecordRepository.existsByQueueEntryId(
-                queueEntry.getId()
-        )) {
-            throw new IllegalStateException(
-                    "A clinical record already exists for this queue entry"
-            );
-        }
+        validateQueueEntry(queueEntry);
+        validateNoExistingRecord(queueEntry.getId());
 
         Appointment appointment = queueEntry.getAppointment();
 
@@ -85,47 +64,12 @@ public class ClinicalRecordService {
             );
         }
 
-        if (appointment.getDepartment() == null) {
-            throw new ResourceNotFoundException(
-                    "Department linked to this appointment was not found"
-            );
-        }
+        validateDoctorDepartment(
+                doctor,
+                appointment
+        );
 
-        if (doctor.getDepartment() == null) {
-            throw new UnauthorizedException(
-                    "The doctor is not assigned to a department"
-            );
-        }
-
-UUID appointmentDepartmentId =
-        appointment.getDepartment().getId();
-
-UUID doctorDepartmentId =
-        doctor.getDepartment().getId();
-
-System.out.println(
-        "DOCTOR EMAIL: " + doctorEmail
-);
-
-System.out.println(
-        "DOCTOR DEPARTMENT ID: " +
-                doctorDepartmentId
-);
-
-System.out.println(
-        "APPOINTMENT DEPARTMENT ID: " +
-                appointmentDepartmentId
-);
-
-// TEMPORARILY DISABLED FOR DEMO
-// TODO: Re-enable department authorization before production.
-//
-// if (!appointmentDepartmentId.equals(doctorDepartmentId)) {
-//     throw new UnauthorizedException(
-//             "You cannot complete a consultation for another department"
-//     );
-// } 
-      ClinicalRecord clinicalRecord =
+        ClinicalRecord clinicalRecord =
                 ClinicalRecord.builder()
                         .queueEntry(queueEntry)
                         .appointment(appointment)
@@ -151,16 +95,40 @@ System.out.println(
                         )
                         .build();
 
-        ClinicalRecord saved =
-                clinicalRecordRepository.save(clinicalRecord);
+        ClinicalRecord savedRecord =
+                clinicalRecordRepository.saveAndFlush(
+                        clinicalRecord
+                );
 
-        return mapToResponse(saved);
+        completeQueueEntry(
+                queueEntry,
+                appointment
+        );
+
+        return mapToResponse(savedRecord);
+    }
+
+    @Transactional
+    public ClinicalRecordResponse createClinicalRecord(
+            String doctorEmail,
+            CreateClinicalRecordRequest request
+    ) {
+        return createAndCompleteClinicalRecord(
+                doctorEmail,
+                request
+        );
     }
 
     @Transactional(readOnly = true)
     public ClinicalRecordResponse getClinicalRecord(
             UUID clinicalRecordId
     ) {
+        if (clinicalRecordId == null) {
+            throw new IllegalArgumentException(
+                    "Clinical record ID is required"
+            );
+        }
+
         ClinicalRecord record = clinicalRecordRepository
                 .findById(clinicalRecordId)
                 .orElseThrow(() ->
@@ -176,6 +144,12 @@ System.out.println(
     public ClinicalRecordResponse getByQueueEntry(
             UUID queueEntryId
     ) {
+        if (queueEntryId == null) {
+            throw new IllegalArgumentException(
+                    "Queue entry ID is required"
+            );
+        }
+
         ClinicalRecord record = clinicalRecordRepository
                 .findByQueueEntryId(queueEntryId)
                 .orElseThrow(() ->
@@ -191,13 +165,203 @@ System.out.println(
     public List<ClinicalRecordResponse> getPatientRecords(
             UUID patientId
     ) {
+        if (patientId == null) {
+            throw new IllegalArgumentException(
+                    "Patient ID is required"
+            );
+        }
+
         return clinicalRecordRepository
                 .findAllByPatientIdOrderByCreatedAtDesc(
                         patientId
                 )
                 .stream()
                 .map(this::mapToResponse)
-                .collect(Collectors.toList());
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClinicalRecordResponse> getDoctorRecords(
+            String doctorEmail
+    ) {
+        Doctor doctor = findActiveDoctor(doctorEmail);
+
+        return clinicalRecordRepository
+                .findAllByDoctorIdOrderByCreatedAtDesc(
+                        doctor.getId()
+                )
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    private void completeQueueEntry(
+            QueueEntry queueEntry,
+            Appointment appointment
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        queueEntry.setStatus(
+                QueueStatus.COMPLETED
+        );
+
+        queueEntry.setCurrentPosition(0);
+        queueEntry.setEstimatedCallTime(null);
+        queueEntry.setUpdatedAt(now);
+
+        appointment.setStatus(
+                AppointmentStatus.COMPLETED
+        );
+
+        queueEntryRepository.save(queueEntry);
+    }
+
+    private Doctor findActiveDoctor(
+            String doctorEmail
+    ) {
+        if (doctorEmail == null ||
+                doctorEmail.isBlank()) {
+
+            throw new UnauthorizedException(
+                    "Authenticated doctor email is required"
+            );
+        }
+
+        Doctor doctor = doctorRepository
+                .findByEmail(doctorEmail.trim())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Authenticated doctor account not found"
+                        )
+                );
+
+        if (doctor.isDeleted()) {
+            throw new UnauthorizedException(
+                    "This doctor account is inactive"
+            );
+        }
+
+        return doctor;
+    }
+
+    private void validateRequest(
+            String doctorEmail,
+            CreateClinicalRecordRequest request
+    ) {
+        if (doctorEmail == null ||
+                doctorEmail.isBlank()) {
+
+            throw new UnauthorizedException(
+                    "Authenticated doctor email is required"
+            );
+        }
+
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Clinical record request is required"
+            );
+        }
+
+        if (request.getQueueEntryId() == null) {
+            throw new IllegalArgumentException(
+                    "Queue entry ID is required"
+            );
+        }
+
+        if (request.getDiagnosis() == null ||
+                request.getDiagnosis().isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "Diagnosis is required"
+            );
+        }
+
+        if (request.getDiagnosis().trim().length() > 500) {
+            throw new IllegalArgumentException(
+                    "Diagnosis cannot exceed 500 characters"
+            );
+        }
+    }
+
+    private void validateQueueEntry(
+            QueueEntry queueEntry
+    ) {
+        if (queueEntry.getStatus()
+                == QueueStatus.COMPLETED) {
+
+            throw new IllegalStateException(
+                    "This consultation has already been completed"
+            );
+        }
+
+        if (queueEntry.getStatus()
+                == QueueStatus.CANCELLED) {
+
+            throw new IllegalStateException(
+                    "A cancelled queue entry cannot be completed"
+            );
+        }
+
+        if (queueEntry.getStatus()
+                != QueueStatus.IN_CONSULTATION) {
+
+            throw new IllegalStateException(
+                    "The patient must be in consultation before the clinical record can be saved"
+            );
+        }
+    }
+
+    private void validateNoExistingRecord(
+            UUID queueEntryId
+    ) {
+        if (clinicalRecordRepository
+                .existsByQueueEntryId(queueEntryId)) {
+
+            throw new IllegalStateException(
+                    "A clinical record already exists for this queue entry"
+            );
+        }
+    }
+
+    private void validateDoctorDepartment(
+            Doctor doctor,
+            Appointment appointment
+    ) {
+        if (appointment.getDepartment() == null) {
+            throw new ResourceNotFoundException(
+                    "Department linked to this appointment was not found"
+            );
+        }
+
+        if (doctor.getDepartment() == null) {
+            throw new UnauthorizedException(
+                    "The doctor is not assigned to a department"
+            );
+        }
+
+        UUID appointmentDepartmentId =
+                appointment.getDepartment().getId();
+
+        UUID doctorDepartmentId =
+                doctor.getDepartment().getId();
+
+        System.out.println(
+                "DOCTOR DEPARTMENT ID: " +
+                        doctorDepartmentId
+        );
+
+        System.out.println(
+                "APPOINTMENT DEPARTMENT ID: " +
+                        appointmentDepartmentId
+        );
+
+        if (!appointmentDepartmentId.equals(
+                doctorDepartmentId
+        )) {
+            throw new UnauthorizedException(
+                    "You cannot complete a consultation for another department"
+            );
+        }
     }
 
     private ClinicalRecordResponse mapToResponse(
@@ -237,14 +401,20 @@ System.out.println(
                 .consultationNotes(
                         record.getConsultationNotes()
                 )
-                .prescription(record.getPrescription())
-                .labRequest(record.getLabRequest())
+                .prescription(
+                        record.getPrescription()
+                )
+                .labRequest(
+                        record.getLabRequest()
+                )
                 .createdAt(record.getCreatedAt())
                 .updatedAt(record.getUpdatedAt())
                 .build();
     }
 
-    private String cleanText(String value) {
+    private String cleanText(
+            String value
+    ) {
         if (value == null || value.isBlank()) {
             return null;
         }

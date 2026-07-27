@@ -18,6 +18,24 @@ import java.util.UUID;
                         name = "uk_clinical_record_queue_entry",
                         columnNames = "queue_entry_id"
                 )
+        },
+        indexes = {
+                @Index(
+                        name = "idx_clinical_record_patient",
+                        columnList = "patient_id"
+                ),
+                @Index(
+                        name = "idx_clinical_record_doctor",
+                        columnList = "doctor_id"
+                ),
+                @Index(
+                        name = "idx_clinical_record_appointment",
+                        columnList = "appointment_id"
+                ),
+                @Index(
+                        name = "idx_clinical_record_created_at",
+                        columnList = "created_at"
+                )
         }
 )
 @Getter
@@ -40,33 +58,58 @@ public class ClinicalRecord {
     private QueueEntry queueEntry;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "appointment_id", nullable = false)
+    @JoinColumn(
+            name = "appointment_id",
+            nullable = false
+    )
     private Appointment appointment;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "patient_id", nullable = false)
+    @JoinColumn(
+            name = "patient_id",
+            nullable = false
+    )
     private Patient patient;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "doctor_id", nullable = false)
+    @JoinColumn(
+            name = "doctor_id",
+            nullable = false
+    )
     private Doctor doctor;
 
-    @Column(nullable = false, length = 500)
+    @Column(
+            nullable = false,
+            length = 500
+    )
     private String diagnosis;
 
-    @Column(name = "consultation_notes", columnDefinition = "TEXT")
+    @Column(
+            name = "consultation_notes",
+            columnDefinition = "TEXT"
+    )
     private String consultationNotes;
 
     @Column(columnDefinition = "TEXT")
     private String prescription;
 
-    @Column(name = "lab_request", columnDefinition = "TEXT")
+    @Column(
+            name = "lab_request",
+            columnDefinition = "TEXT"
+    )
     private String labRequest;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(
+            name = "created_at",
+            nullable = false,
+            updatable = false
+    )
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(
+            name = "updated_at",
+            nullable = false
+    )
     private LocalDateTime updatedAt;
 
     @PrePersist

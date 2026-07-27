@@ -16,8 +16,13 @@ import java.util.UUID;
 public interface QueueEntryRepository
         extends JpaRepository<QueueEntry, UUID> {
 
+    @Query("""
+        SELECT q
+        FROM QueueEntry q
+        WHERE q.appointment.id = :appointmentId
+        """)
     Optional<QueueEntry> findByAppointmentId(
-            UUID appointmentId
+            @Param("appointmentId") UUID appointmentId
     );
 
     List<QueueEntry>
@@ -48,12 +53,12 @@ public interface QueueEntryRepository
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-   @Query("""
-    SELECT q
-    FROM QueueEntry q
-    WHERE q.departmentId = :departmentId
-      AND q.status IN :statuses
-    """)
+    @Query("""
+        SELECT q
+        FROM QueueEntry q
+        WHERE q.departmentId = :departmentId
+          AND q.status IN :statuses
+        """)
     List<QueueEntry> findAndLockDepartmentQueue(
             @Param("departmentId") UUID departmentId,
             @Param("statuses") List<QueueStatus> statuses
