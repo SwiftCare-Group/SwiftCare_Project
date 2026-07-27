@@ -247,23 +247,37 @@ export default function AppointmentsScreen() {
           'lastSeverityScore'
         );
 
-      const parsedSeverity = savedScore
-        ? Number.parseInt(savedScore, 10)
-        : 3;
+const parsedSeverity = savedScore
+  ? Number.parseInt(savedScore, 10)
+  : 5;
 
-      const severityScore = Number.isNaN(
-        parsedSeverity
-      )
+const rawSeverity = Number.isNaN(parsedSeverity)
+  ? 5
+  : parsedSeverity;
+
+// Convert the app's 1–10 score to the backend's 1–4 scale.
+const severityScore =
+  rawSeverity <= 2
+    ? 1
+    : rawSeverity <= 5
+      ? 2
+      : rawSeverity <= 8
         ? 3
-        : parsedSeverity;
+        : 4;
+const payload = {
+  departmentId: selectedDept,
+  scheduledTime: scheduledTime
+    .toISOString()
+    .slice(0, 19),
+  severityScore,
+};
 
-      await api.post('/appointments', {
-        departmentId: selectedDept,
-        scheduledTime: scheduledTime
-          .toISOString()
-          .slice(0, 19),
-        severityScore,
-      });
+console.log(
+  'BOOKING PAYLOAD:',
+  JSON.stringify(payload, null, 2)
+);
+
+await api.post('/appointments', payload);
       const selectedDepartment =
   departments.find(
     department =>
@@ -302,13 +316,30 @@ await addNotification({
       setSelectedTime('09:00');
 
       await fetchAppointments();
-    } catch (error: any) {
+        } catch (error: any) {
       errorNotification();
+
+      console.log(
+        'BOOKING ERROR STATUS:',
+        error.response?.status
+      );
+
+      console.log(
+        'BOOKING ERROR DATA:',
+        JSON.stringify(
+          error.response?.data,
+          null,
+          2
+        )
+      );
 
       Alert.alert(
         'Booking Failed',
-        error.response?.data?.message ||
-          'Failed to book appointment.'
+        JSON.stringify(
+          error.response?.data,
+          null,
+          2
+        ) || 'Failed to book appointment.'
       );
     } finally {
       setBooking(false);

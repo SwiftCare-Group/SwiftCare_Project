@@ -1,6 +1,7 @@
 package com.swiftcare.backend.prescription;
 
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
+import com.swiftcare.backend.patient.Patient;
 import com.swiftcare.backend.patient.PatientRepository;
 import com.swiftcare.backend.pharmacy.dto.DispensationRecordResponse;
 import com.swiftcare.backend.pharmacy.dto.DispenseRequest;
@@ -9,7 +10,6 @@ import com.swiftcare.backend.prescription.dto.PrescriptionResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,73 +25,99 @@ public class PrescriptionController {
     private final PrescriptionService prescriptionService;
     private final PatientRepository patientRepository;
 
+    /**
+     * Issues a prescription for a consultation.
+     * Restricted to authenticated doctors by SecurityConfig.
+     */
     @PostMapping
-    public ResponseEntity<PrescriptionResponse> issuePrescription(
+    @ResponseStatus(HttpStatus.CREATED)
+    public PrescriptionResponse issuePrescription(
             @Valid @RequestBody PrescriptionRequest request
-    ) throws Exception {
-
-        PrescriptionResponse response =
-                prescriptionService.issuePrescription(request);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<PrescriptionResponse> getPrescription(
-            @PathVariable UUID id
     ) {
-        return ResponseEntity.ok(
-                prescriptionService.getPrescription(id)
-        );
+        return prescriptionService.issuePrescription(request);
     }
 
-    @GetMapping("/{id}/qr")
-    public ResponseEntity<Map<String, String>> getQrCode(
-            @PathVariable UUID id
-    ) {
-        String qrCode = prescriptionService.getQrCode(id);
-
-        return ResponseEntity.ok(
-                Map.of("qrCode", qrCode)
-        );
-    }
-
-    @PutMapping("/{id}/dispense")
-    public ResponseEntity<DispensationRecordResponse> dispenseDrug(
-            @PathVariable UUID id,
-            @Valid @RequestBody DispenseRequest request
-    ) {
-        return ResponseEntity.ok(
-                prescriptionService.dispense(id, request)
-        );
-    }
-
-    @GetMapping("/{id}/remaining")
-    public ResponseEntity<List<DispensationRecordResponse>> getRemainingDrugs(
-            @PathVariable UUID id
-    ) {
-        return ResponseEntity.ok(
-                prescriptionService.getRemainingDrugs(id)
-        );
-    }
-
+    /**
+     * Returns prescriptions belonging to the authenticated patient.
+     */
     @GetMapping("/my")
-    public ResponseEntity<List<PrescriptionResponse>> getMyPrescriptions(
+    public List<PrescriptionResponse> getMyPrescriptions(
             @AuthenticationPrincipal String email
     ) {
-        UUID patientId = patientRepository
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException(
+                    "Authenticated patient email is unavailable"
+            );
+        }
+
+        Patient patient = patientRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Authenticated patient not found"
                         )
-                )
-                .getId();
+                );
 
-        return ResponseEntity.ok(
-                prescriptionService.getPatientPrescriptions(patientId)
+        return prescriptionService.getPatientPrescriptions(
+                patient.getId()
+        );
+    }
+
+    /**
+     * Returns one prescription by its ID.
+     */
+    @GetMapping("/{prescriptionId}")
+    public PrescriptionResponse getPrescription(
+            @PathVariable UUID prescriptionId
+    ) {
+        return prescriptionService.getPrescription(
+                prescriptionId
+        );
+    }
+
+    /**
+     * Returns the Base64-encoded QR image for a prescription.
+     */
+    @GetMapping("/{prescriptionId}/qr")
+    public Map<String, String> getQrCode(
+            @PathVariable UUID prescriptionId
+    ) {
+        String qrCode = prescriptionService.getQrCode(
+                prescriptionId
+        );
+
+        return Map.of(
+                "prescriptionId",
+                prescriptionId.toString(),
+                "qrCode",
+                qrCode
+        );
+    }
+
+    /**
+     * Updates the dispensation status of one prescribed drug.
+     * Restricted to pharmacists by SecurityConfig.
+     */
+    @PatchMapping("/{prescriptionId}/dispense")
+    public DispensationRecordResponse dispenseDrug(
+            @PathVariable UUID prescriptionId,
+            @Valid @RequestBody DispenseRequest request
+    ) {
+        return prescriptionService.dispense(
+                prescriptionId,
+                request
+        );
+    }
+
+    /**
+     * Returns all drugs that have not yet been dispensed.
+     */
+    @GetMapping("/{prescriptionId}/remaining")
+    public List<DispensationRecordResponse> getRemainingDrugs(
+            @PathVariable UUID prescriptionId
+    ) {
+        return prescriptionService.getRemainingDrugs(
+                prescriptionId
         );
     }
 }
