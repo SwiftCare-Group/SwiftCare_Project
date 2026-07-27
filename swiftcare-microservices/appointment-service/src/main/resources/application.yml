@@ -38,7 +38,7 @@ server:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:change-this-development-secret-key-minimum-32-characters}
+    secret: ${JWT_SECRET:ThisIsALocalDevelopmentJwtSecretKeyThatIsAtLeast32CharactersLong123!}
     expiry-ms: ${JWT_EXPIRY_MS:86400000}
 
 management:

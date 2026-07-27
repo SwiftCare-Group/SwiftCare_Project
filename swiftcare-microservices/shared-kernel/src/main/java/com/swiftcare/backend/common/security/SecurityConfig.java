@@ -22,28 +22,26 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
         return http
                 .csrf(AbstractHttpConfigurer::disable)
+
                 .cors(cors -> {
                 })
+
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
+
                 .authorizeHttpRequests(auth -> auth
 
-                        /*
-                         * Public monitoring endpoints
-                         */
                         .requestMatchers(
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
 
-                        /*
-                         * Public authentication endpoints
-                         */
                         .requestMatchers(
                                 "/auth/register",
                                 "/auth/login",
@@ -54,24 +52,14 @@ public class SecurityConfig {
                                 "/auth/reset-password"
                         ).permitAll()
 
-                        /*
-                         * Public webhook endpoint
-                         */
-                        .requestMatchers("/subscriptions/webhook")
-                        .permitAll()
+                        .requestMatchers(
+                                "/subscriptions/webhook"
+                        ).permitAll()
 
-                        /*
-                         * Internal microservice endpoints
-                         *
-                         * These should also be protected with an internal
-                         * service key inside the controller or a separate filter.
-                         */
-                        .requestMatchers("/internal/**")
-                        .permitAll()
+                        .requestMatchers(
+                                "/internal/**"
+                        ).permitAll()
 
-                        /*
-                         * Public department endpoints
-                         */
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/departments/**"
@@ -81,31 +69,26 @@ public class SecurityConfig {
                          * Consultation permissions
                          */
 
-                        // Patients can book consultations.
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/consultations"
                         ).hasRole("PATIENT")
 
-                        // Patients can retrieve their own consultations.
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/consultations"
                         ).hasRole("PATIENT")
 
-                        // Doctors can retrieve their assigned consultations.
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/consultations/doctor/**"
-                        ).hasRole("DOCTOR")
-
-                         // Authenticated users may view available doctors.
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/consultations/doctors"
                         ).authenticated()
 
-                        // All relevant authenticated roles can retrieve one consultation.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/consultations/doctor/**"
+                        ).hasRole("DOCTOR")
+
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/consultations/*"
@@ -115,7 +98,6 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
-                        // Doctors can join, complete, or cancel consultations.
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/consultations/*/join",
@@ -123,31 +105,25 @@ public class SecurityConfig {
                                 "/consultations/*/cancel"
                         ).hasRole("DOCTOR")
 
-                    
-
                         /*
                          * Prescription permissions
                          */
 
-                        // Only doctors can issue prescriptions.
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/prescriptions"
                         ).hasRole("DOCTOR")
 
-                        // Only pharmacists can dispense prescribed drugs.
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/prescriptions/*/dispense"
                         ).hasRole("PHARMACIST")
 
-                        // Patients can retrieve their own prescriptions.
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/prescriptions/my"
                         ).hasRole("PATIENT")
 
-                        // Doctors and pharmacists can check pending drugs.
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/prescriptions/*/remaining"
@@ -156,7 +132,6 @@ public class SecurityConfig {
                                 "PHARMACIST"
                         )
 
-                        // Relevant users can retrieve prescription QR codes.
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/prescriptions/*/qr"
@@ -166,7 +141,6 @@ public class SecurityConfig {
                                 "PHARMACIST"
                         )
 
-                        // Relevant users can retrieve a prescription by ID.
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/prescriptions/*"
@@ -177,21 +151,80 @@ public class SecurityConfig {
                         )
 
                         /*
-                         * Admin permissions
+                         * Laboratory permissions
                          */
-                        .requestMatchers("/admin/**")
-                        .hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/lab-orders"
+                        ).hasRole("DOCTOR")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/lab-orders/doctor/me"
+                        ).hasRole("DOCTOR")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/lab-orders/patient/me"
+                        ).hasRole("PATIENT")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/lab-orders/pending"
+                        ).hasAnyRole(
+                                "ADMIN",
+                                "LAB_TECHNICIAN"
+                        )
+
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/lab-orders/*/start"
+                        ).hasAnyRole(
+                                "ADMIN",
+                                "LAB_TECHNICIAN"
+                        )
+
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/lab-orders/*/result"
+                        ).hasAnyRole(
+                                "ADMIN",
+                                "LAB_TECHNICIAN"
+                        )
+
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/lab-orders/*/cancel"
+                        ).hasRole("DOCTOR")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/lab-orders/*"
+                        ).hasAnyRole(
+                                "PATIENT",
+                                "DOCTOR",
+                                "ADMIN",
+                                "LAB_TECHNICIAN"
+                        )
 
                         /*
-                         * All remaining endpoints require authentication.
+                         * Admin permissions
                          */
+
+                        .requestMatchers(
+                                "/admin/**"
+                        ).hasRole("ADMIN")
+
                         .anyRequest()
                         .authenticated()
                 )
+
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
+
                 .build();
     }
 

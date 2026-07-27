@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -15,7 +16,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";import { SafeAreaView } from "react-native-safe-area-context";
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors } from "../../constants/colors";
 import { useHaptics } from "../../hooks/useHaptics";
@@ -29,17 +31,31 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const { mediumTap, successNotification, errorNotification } =
-    useHaptics();
+  const {
+    mediumTap,
+    successNotification,
+    errorNotification,
+  } = useHaptics();
 
   const handleLogin = async () => {
+    // Prevent repeated requests when the button is tapped quickly.
+    if (loading) {
+      return;
+    }
+
     mediumTap();
 
     const cleanEmail = email.trim().toLowerCase();
 
-    if (!cleanEmail || !password) {
+    // Validate before enabling the loading indicator.
+    if (!cleanEmail || !password.trim()) {
       errorNotification();
-      Alert.alert("Missing details", "Email and password are required.");
+
+      Alert.alert(
+        "Missing details",
+        "Email and password are required.",
+      );
+
       return;
     }
 
@@ -51,49 +67,135 @@ export default function LoginScreen() {
         password,
       });
 
-      const { accessToken, role } = response.data;
+      const {
+        accessToken,
+        refreshToken,
+        role,
+      } = response.data ?? {};
 
       if (!accessToken) {
-        throw new Error("No access token was returned by the server.");
+        throw new Error(
+          "No access token was returned by the server.",
+        );
       }
 
-      await AsyncStorage.setItem("accessToken", accessToken);
+      const storageEntries: [string, string][] = [
+        ["accessToken", accessToken],
+      ];
+
+      if (refreshToken) {
+        storageEntries.push([
+          "refreshToken",
+          refreshToken,
+        ]);
+      }
+
+      if (role) {
+        storageEntries.push([
+          "userRole",
+          String(role),
+        ]);
+      } else {
+        storageEntries.push([
+          "userRole",
+          "PATIENT",
+        ]);
+      }
+
+      await AsyncStorage.multiSet(storageEntries);
 
       successNotification();
 
-      if (role === "ADMIN") {
-        router.replace("/(admin)/dashboard");
-      } else if (role === "DOCTOR") {
-        router.replace("/(doctor)/queue");
-      } else if (role === "PHARMACIST") {
-        router.replace("/(pharmacist)/dispense");
-      } else {
-        router.replace("/(patient)/home");
-      }
-    }catch (error: any) {
-  console.log('Login error details:', {
-    message: error.message,
-    code: error.code,
-    baseURL: error.config?.baseURL,
-    url: error.config?.url,
-    method: error.config?.method,
-    fullURL: `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`,
-    status: error.response?.status,
-    responseData: error.response?.data,
-  });
+      switch (role) {
+        case "ADMIN":
+          router.replace("/(admin)/dashboard");
+          break;
 
-  Alert.alert(
-    'Login Failed',
-    error.response?.data?.message ||
-      error.response?.data?.error ||
-      error.message ||
-      'Unable to connect to the server.'
-  );
-}
+        case "DOCTOR":
+          router.replace("/(doctor)/queue");
+          break;
+
+        case "PHARMACIST":
+          router.replace("/(pharmacist)/dispense");
+          break;
+
+        case "LAB_TECHNICIAN":
+          router.replace("/(lab)/dashboard");
+          break;
+
+        default:
+          router.replace("/(patient)/home");
+          break;
+      }
+    } catch (error: unknown) {
+      errorNotification();
+
+      let alertMessage =
+        "Unable to sign in. Please try again.";
+
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const responseData = error.response?.data;
+
+        console.log("Login error details:", {
+          message: error.message,
+          code: error.code,
+          baseURL: error.config?.baseURL,
+          url: error.config?.url,
+          method: error.config?.method,
+          fullURL:
+            `${error.config?.baseURL ?? ""}` +
+            `${error.config?.url ?? ""}`,
+          status,
+          responseData,
+        });
+
+        if (status === 400) {
+          alertMessage =
+            responseData?.message ||
+            responseData?.error ||
+            "Please check the information you entered.";
+        } else if (status === 401 || status === 403) {
+          alertMessage =
+            "Invalid email or password.";
+        } else if (status === 404) {
+          alertMessage =
+            "The login service could not be found.";
+        } else if (status && status >= 500) {
+          alertMessage =
+            "The server encountered an error. Please try again later.";
+        } else if (error.code === "ECONNABORTED") {
+          alertMessage =
+            "The request timed out. Check your connection and try again.";
+        } else if (!error.response) {
+          alertMessage =
+            "Unable to connect to the server. Check your network connection.";
+        } else {
+          alertMessage =
+            responseData?.message ||
+            responseData?.error ||
+            error.message ||
+            alertMessage;
+        }
+      } else if (error instanceof Error) {
+        console.log("Login error:", error.message);
+        alertMessage = error.message;
+      } else {
+        console.log("Unknown login error:", error);
+      }
+
+      Alert.alert("Login Failed", alertMessage);
+    } finally {
+      // This always runs, whether login succeeds or fails.
+      setLoading(false);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={["top"]}
+    >
       <LinearGradient
         colors={[
           Colors.headerGradientStart,
@@ -108,7 +210,9 @@ export default function LoginScreen() {
             resizeMode="cover"
           />
 
-          <Text style={styles.appName}>SwiftCare</Text>
+          <Text style={styles.appName}>
+            SwiftCare
+          </Text>
 
           <Text style={styles.appTagline}>
             Smart Hospital Queue & Consultation
@@ -118,7 +222,11 @@ export default function LoginScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : "height"
+        }
       >
         <ScrollView
           contentContainerStyle={styles.container}
@@ -126,13 +234,17 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.formContainer}>
-            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.title}>
+              Welcome Back
+            </Text>
 
             <Text style={styles.subtitle}>
               Sign in to your patient account
             </Text>
 
-            <Text style={styles.label}>Email Address</Text>
+            <Text style={styles.label}>
+              Email Address
+            </Text>
 
             <View style={styles.inputContainer}>
               <Ionicons
@@ -145,7 +257,9 @@ export default function LoginScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Enter your email"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={
+                  Colors.textDisabled
+                }
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -156,7 +270,9 @@ export default function LoginScreen() {
               />
             </View>
 
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>
+              Password
+            </Text>
 
             <View style={styles.inputContainer}>
               <Ionicons
@@ -169,7 +285,9 @@ export default function LoginScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={
+                  Colors.textDisabled
+                }
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -182,10 +300,16 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 style={styles.eyeButton}
-                onPress={() => setShowPassword((current) => !current)}
+                onPress={() =>
+                  setShowPassword(
+                    current => !current,
+                  )
+                }
                 disabled={loading}
                 accessibilityLabel={
-                  showPassword ? "Hide password" : "Show password"
+                  showPassword
+                    ? "Hide password"
+                    : "Show password"
                 }
               >
                 <Ionicons
@@ -203,11 +327,15 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.forgotPasswordButton}
               onPress={() =>
-                router.push("/(auth)/forgot-password")
+                router.push(
+                  "/(auth)/forgot-password",
+                )
               }
               disabled={loading}
             >
-              <Text style={styles.forgotPasswordText}>
+              <Text
+                style={styles.forgotPasswordText}
+              >
                 Forgot password?
               </Text>
             </TouchableOpacity>
@@ -227,20 +355,28 @@ export default function LoginScreen() {
                   color={Colors.white}
                 />
               ) : (
-                <Text style={styles.loginButtonText}>Sign In</Text>
+                <Text
+                  style={styles.loginButtonText}
+                >
+                  Sign In
+                </Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.linkButton}
               onPress={() =>
-                router.replace("/(auth)/register")
+                router.replace(
+                  "/(auth)/register",
+                )
               }
               disabled={loading}
             >
               <Text style={styles.linkText}>
                 Don&apos;t have an account?{" "}
-                <Text style={styles.linkTextBold}>
+                <Text
+                  style={styles.linkTextBold}
+                >
                   Create one
                 </Text>
               </Text>
@@ -249,7 +385,9 @@ export default function LoginScreen() {
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
 
-              <Text style={styles.dividerText}>OR</Text>
+              <Text style={styles.dividerText}>
+                OR
+              </Text>
 
               <View style={styles.dividerLine} />
             </View>
@@ -257,7 +395,9 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.staffButton}
               onPress={() =>
-                router.push("/(auth)/staff-login")
+                router.push(
+                  "/(auth)/staff-login",
+                )
               }
               disabled={loading}
               activeOpacity={0.85}
@@ -282,7 +422,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor:
+      Colors.headerGradientStart,
   },
 
   keyboardView: {

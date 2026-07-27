@@ -19,36 +19,84 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
+
     private final JwtUtil jwtUtil;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
+
+        String authorizationHeader =
+                request.getHeader("Authorization");
+
+        if (authorizationHeader == null
+                || !authorizationHeader.startsWith("Bearer ")) {
+
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7);
-        if (!jwtUtil.isTokenValid(token)) {
+        String token = authorizationHeader.substring(7).trim();
+
+        if (token.isBlank() || !jwtUtil.isTokenValid(token)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         String email = jwtUtil.extractEmail(token);
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+
+        if (email != null
+                && !email.isBlank()
+                && SecurityContextHolder
+                        .getContext()
+                        .getAuthentication() == null) {
+
+            List<SimpleGrantedAuthority> authorities =
+                    new ArrayList<>();
+
             String role = jwtUtil.extractRole(token);
             String tier = jwtUtil.extractTier(token);
-            if (role != null) authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
-            if (tier != null) authorities.add(new SimpleGrantedAuthority("TIER_" + tier));
+
+            if (role != null && !role.isBlank()) {
+                String roleAuthority = role.startsWith("ROLE_")
+                        ? role
+                        : "ROLE_" + role;
+
+                authorities.add(
+                        new SimpleGrantedAuthority(roleAuthority)
+                );
+            }
+
+            if (tier != null && !tier.isBlank()) {
+                String tierAuthority = tier.startsWith("TIER_")
+                        ? tier
+                        : "TIER_" + tier;
+
+                authorities.add(
+                        new SimpleGrantedAuthority(tierAuthority)
+                );
+            }
 
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(email, null, authorities);
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                    new UsernamePasswordAuthenticationToken(
+                            email,
+                            null,
+                            authorities
+                    );
+
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource()
+                            .buildDetails(request)
+            );
+
+            SecurityContextHolder
+                    .getContext()
+                    .setAuthentication(authentication);
         }
+
         filterChain.doFilter(request, response);
     }
 }

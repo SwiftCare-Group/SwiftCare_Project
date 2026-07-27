@@ -54,6 +54,20 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<Map<String, Object>> handleSecurityException(
+            SecurityException exception
+    ) {
+        Map<String, Object> response = new HashMap<>();
+
+        response.put("message", exception.getMessage());
+        response.put("status", HttpStatus.FORBIDDEN.value());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(response);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationErrors(
             MethodArgumentNotValidException exception
