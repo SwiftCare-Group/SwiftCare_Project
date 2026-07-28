@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -90,11 +89,9 @@ const handleRegister = async () => {
           <Ionicons name="arrow-back-outline" size={22} color={Colors.white} />
         </TouchableOpacity>
 <View style={styles.logoContainer}>
-  <Image
-    source={require("../../assets/icon.png")}
-    style={styles.headerLogo}
-    resizeMode="cover"
-  />          <Text style={styles.appName}>Create Account</Text>
+  <View style={styles.headerLogo}>
+    <Ionicons name="medical-outline" size={52} color={Colors.primary} />
+  </View>          <Text style={styles.appName}>Create Account</Text>
           <Text style={styles.appTagline}>Join SwiftCare to manage your healthcare</Text>
         </View>
       </LinearGradient>
@@ -229,11 +226,14 @@ const styles = StyleSheet.create({
   registerButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   buttonDisabled: { opacity: 0.6 },
   headerLogo: {
-  width: 104,
-  height: 104,
-  borderRadius: 26,
-  marginBottom: 14,
-},
+    width: 104,
+    height: 104,
+    borderRadius: 26,
+    marginBottom: 14,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   linkButton: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },
   linkText: { fontSize: 14, color: Colors.textSecondary },
   linkTextBold: { color: Colors.primary, fontWeight: '700' },

@@ -13,6 +13,8 @@ import {
 import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
+import api from "../../services/api";
+
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,15 +30,9 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
 
     try {
-      /*
-       * Connect this to the backend forgot-password endpoint later.
-       *
-       * Example:
-       *
-       * await api.post("/auth/forgot-password", {
-       *   email: cleanedEmail,
-       * });
-       */
+      await api.post("/auth/forgot-password", {
+        email: cleanedEmail.toLowerCase(),
+      });
 
       Alert.alert(
         "Request received",

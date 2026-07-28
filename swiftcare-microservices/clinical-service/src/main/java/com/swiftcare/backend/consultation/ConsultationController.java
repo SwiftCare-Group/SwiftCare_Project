@@ -2,6 +2,8 @@ package com.swiftcare.backend.consultation;
 
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.common.security.PremiumRequired;
+import com.swiftcare.backend.consultation.dto.CompleteConsultationRequest;
+import com.swiftcare.backend.consultation.dto.ConsultationCompletionResponse;
 import com.swiftcare.backend.consultation.dto.ConsultationRequest;
 import com.swiftcare.backend.consultation.dto.ConsultationResponse;
 import com.swiftcare.backend.consultation.dto.DoctorResponse;
@@ -10,7 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.UUID;
 public class ConsultationController {
 
     private final ConsultationService consultationService;
+    private final ConsultationWorkflowService consultationWorkflowService;
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
 
@@ -36,61 +39,70 @@ public class ConsultationController {
     @PostMapping
     @PremiumRequired
     public ResponseEntity<ConsultationResponse> bookConsultation(
-            @AuthenticationPrincipal String email,
+            Authentication authentication,
             @Valid @RequestBody ConsultationRequest request
     ) {
-        UUID patientId = getPatientId(email);
-
-        ConsultationResponse response =
-                consultationService.bookConsultation(
-                        patientId,
-                        request
-                );
+        UUID patientId = getPatientId(authentication);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(response);
+                .body(consultationService.bookConsultation(patientId, request));
     }
 
     @GetMapping
-    public ResponseEntity<List<ConsultationResponse>>
-    getPatientConsultations(
-            @AuthenticationPrincipal String email
+    public ResponseEntity<List<ConsultationResponse>> getPatientConsultations(
+            Authentication authentication
     ) {
-        UUID patientId = getPatientId(email);
-
         return ResponseEntity.ok(
-                consultationService
-                        .getPatientConsultations(patientId)
+                consultationService.getPatientConsultations(
+                        getPatientId(authentication)
+                )
         );
     }
 
     @GetMapping("/doctor/me")
-    public ResponseEntity<List<ConsultationResponse>>
-    getDoctorConsultations(
-            @AuthenticationPrincipal String email
+    public ResponseEntity<List<ConsultationResponse>> getDoctorConsultations(
+            Authentication authentication
     ) {
-        UUID doctorId = getDoctorId(email);
-
         return ResponseEntity.ok(
-                consultationService
-                        .getDoctorConsultations(doctorId)
+                consultationService.getDoctorConsultations(
+                        getDoctorId(authentication)
+                )
+        );
+    }
+
+
+    @PostMapping("/complete-workflow")
+    public ResponseEntity<ConsultationCompletionResponse> completeWorkflow(
+            Authentication authentication,
+            @Valid @RequestBody CompleteConsultationRequest request
+    ) {
+        return ResponseEntity.ok(
+                consultationWorkflowService.completeConsultation(
+                        getAuthenticatedEmail(authentication),
+                        request
+                )
         );
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ConsultationResponse> getConsultation(
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(
-                consultationService.getConsultation(id)
-        );
+        ConsultationResponse response = consultationService.getConsultation(id);
+        ensureCanAccess(response, authentication);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}/join")
     public ResponseEntity<ConsultationResponse> joinConsultation(
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            Authentication authentication
     ) {
+        ConsultationResponse current = consultationService.getConsultation(id);
+        ensureCanAccess(current, authentication);
+
         return ResponseEntity.ok(
                 consultationService.joinSession(id)
         );
@@ -99,59 +111,122 @@ public class ConsultationController {
     @PutMapping("/{id}/complete")
     public ResponseEntity<ConsultationResponse> completeConsultation(
             @PathVariable UUID id,
-            @RequestBody(required = false)
-            Map<String, String> body
+            @RequestBody(required = false) Map<String, String> body,
+            Authentication authentication
     ) {
+        ConsultationResponse current = consultationService.getConsultation(id);
+        ensureAssignedDoctorOrAdmin(current, authentication);
+
         String notes = body == null
                 ? ""
                 : body.getOrDefault("notes", "");
 
         return ResponseEntity.ok(
-                consultationService.completeSession(
-                        id,
-                        notes
-                )
+                consultationService.completeSession(id, notes)
         );
     }
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<ConsultationResponse> cancelConsultation(
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            Authentication authentication
     ) {
+        ConsultationResponse current = consultationService.getConsultation(id);
+
+        if (hasRole(authentication, "PATIENT")) {
+            if (!getPatientId(authentication).equals(current.getPatientId())) {
+                throw new SecurityException(
+                        "You cannot cancel another patient's consultation"
+                );
+            }
+            if (current.getStatus()
+                    != com.swiftcare.backend.common.enums.ConsultationStatus.SCHEDULED) {
+                throw new IllegalStateException(
+                        "Only a scheduled consultation can be cancelled by the patient"
+                );
+            }
+        } else {
+            ensureAssignedDoctorOrAdmin(current, authentication);
+        }
+
         return ResponseEntity.ok(
                 consultationService.cancelConsultation(id)
         );
     }
 
-    private UUID getPatientId(String email) {
-        validateAuthenticatedEmail(email);
+    private void ensureCanAccess(
+            ConsultationResponse consultation,
+            Authentication authentication
+    ) {
+        if (hasRole(authentication, "ADMIN")) {
+            return;
+        }
 
-        return patientRepository.findByEmail(email)
-                .orElseThrow(
-                        () -> new ResourceNotFoundException(
-                                "Patient account not found"
-                        )
-                )
+        if (hasRole(authentication, "PATIENT")) {
+            if (!getPatientId(authentication).equals(consultation.getPatientId())) {
+                throw new SecurityException(
+                        "You cannot access another patient's consultation"
+                );
+            }
+            return;
+        }
+
+        ensureAssignedDoctorOrAdmin(consultation, authentication);
+    }
+
+    private void ensureAssignedDoctorOrAdmin(
+            ConsultationResponse consultation,
+            Authentication authentication
+    ) {
+        if (hasRole(authentication, "ADMIN")) {
+            return;
+        }
+
+        if (!hasRole(authentication, "DOCTOR")
+                || !getDoctorId(authentication).equals(consultation.getDoctorId())) {
+            throw new SecurityException(
+                    "Only the assigned doctor can update this consultation"
+            );
+        }
+    }
+
+    private UUID getPatientId(Authentication authentication) {
+        String email = getAuthenticatedEmail(authentication);
+
+        return patientRepository
+                .findByEmailIgnoreCaseAndIsDeletedFalse(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Patient account not found"
+                ))
                 .getId();
     }
 
-    private UUID getDoctorId(String email) {
-        validateAuthenticatedEmail(email);
+    private UUID getDoctorId(Authentication authentication) {
+        String email = getAuthenticatedEmail(authentication);
 
-        return doctorRepository.findByEmail(email)
-                .orElseThrow(
-                        () -> new ResourceNotFoundException(
-                                "Doctor account not found"
-                        )
-                )
+        return doctorRepository
+                .findByEmailIgnoreCaseAndIsDeletedFalse(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Doctor account not found"
+                ))
                 .getId();
     }
 
-    private void validateAuthenticatedEmail(String email) {
-        if (email == null || email.isBlank()) {
+    private String getAuthenticatedEmail(Authentication authentication) {
+        if (authentication == null
+                || authentication.getName() == null
+                || authentication.getName().isBlank()) {
             throw new IllegalStateException(
                     "Authenticated user email is unavailable"
             );
         }
+
+        return authentication.getName().trim();
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }
 }

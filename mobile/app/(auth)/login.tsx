@@ -7,7 +7,6 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -137,19 +136,6 @@ export default function LoginScreen() {
         const status = error.response?.status;
         const responseData = error.response?.data;
 
-        console.log("Login error details:", {
-          message: error.message,
-          code: error.code,
-          baseURL: error.config?.baseURL,
-          url: error.config?.url,
-          method: error.config?.method,
-          fullURL:
-            `${error.config?.baseURL ?? ""}` +
-            `${error.config?.url ?? ""}`,
-          status,
-          responseData,
-        });
-
         if (status === 400) {
           alertMessage =
             responseData?.message ||
@@ -178,10 +164,7 @@ export default function LoginScreen() {
             alertMessage;
         }
       } else if (error instanceof Error) {
-        console.log("Login error:", error.message);
         alertMessage = error.message;
-      } else {
-        console.log("Unknown login error:", error);
       }
 
       Alert.alert("Login Failed", alertMessage);
@@ -204,11 +187,9 @@ export default function LoginScreen() {
         style={styles.headerGradient}
       >
         <View style={styles.brandContainer}>
-          <Image
-            source={require("../../assets/icon.png")}
-            style={styles.headerLogo}
-            resizeMode="cover"
-          />
+          <View style={styles.headerLogo}>
+            <Ionicons name="medical-outline" size={52} color={Colors.primary} />
+          </View>
 
           <Text style={styles.appName}>
             SwiftCare
@@ -451,6 +432,9 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 26,
     marginBottom: 14,
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   appName: {

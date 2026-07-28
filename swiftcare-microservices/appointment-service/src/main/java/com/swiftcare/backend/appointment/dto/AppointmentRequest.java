@@ -3,6 +3,7 @@ package com.swiftcare.backend.appointment.dto;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Future;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ public class AppointmentRequest {
     private UUID departmentId;
 
     @NotNull(message = "Scheduled time is required")
+    @Future(message = "Scheduled time must be in the future")
     private LocalDateTime scheduledTime;
 
     @NotNull(message = "Severity score is required")

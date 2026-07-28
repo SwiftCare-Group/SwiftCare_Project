@@ -8,52 +8,101 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 
+type Department = {
+  id: string;
+  name: string;
+  hospitalName?: string;
+  operatingHours: string;
+  queueCapacity: number;
+  isActive: boolean;
+};
+
+const getErrorMessage = (error: any, fallback: string) =>
+  error?.response?.data?.message || fallback;
+
 export default function DepartmentsScreen() {
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [operatingHours, setOperatingHours] = useState('');
   const [queueCapacity, setQueueCapacity] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { fetchDepartments(); }, []);
+  useEffect(() => {
+    void fetchDepartments();
+  }, []);
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setRefreshing(true);
+    }
+
     try {
-      const response = await api.get('/departments');
-      setDepartments(response.data);
+      const response = await api.get<Department[]>('/departments');
+      setDepartments(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error('Failed to fetch departments');
+      Alert.alert(
+        'Unable to load departments',
+        getErrorMessage(error, 'Check your connection and try again.'),
+      );
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  const resetForm = () => {
+    setName('');
+    setOperatingHours('');
+    setQueueCapacity('');
+  };
+
   const handleCreate = async () => {
-    if (!name || !operatingHours || !queueCapacity) {
-      Alert.alert('Error', 'All fields are required');
+    const normalizedName = name.trim();
+    const normalizedHours = operatingHours.trim();
+    const parsedCapacity = Number.parseInt(queueCapacity, 10);
+    const hoursPattern = /^(?:[01]\d|2[0-3]):[0-5]\d\s*-\s*(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+    if (!normalizedName || !normalizedHours || !queueCapacity.trim()) {
+      Alert.alert('Missing information', 'Complete every field before creating the department.');
       return;
     }
+
+    if (!hoursPattern.test(normalizedHours)) {
+      Alert.alert('Invalid operating hours', 'Use the format HH:mm - HH:mm, for example 08:00 - 17:00.');
+      return;
+    }
+
+    if (!Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 10000) {
+      Alert.alert('Invalid queue capacity', 'Enter a whole number between 1 and 10,000.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await api.post('/admin/departments', {
-        name, operatingHours,
-        queueCapacity: parseInt(queueCapacity),
+        name: normalizedName,
+        operatingHours: normalizedHours,
+        queueCapacity: parsedCapacity,
       });
-      Alert.alert('Success', 'Department created');
+      Alert.alert('Department created', `${normalizedName} is now available for appointments.`);
       setShowForm(false);
-      setName(''); setOperatingHours(''); setQueueCapacity('');
-      fetchDepartments();
-    } catch {
-      Alert.alert('Error', 'Failed to create department');
+      resetForm();
+      await fetchDepartments();
+    } catch (error) {
+      Alert.alert(
+        'Unable to create department',
+        getErrorMessage(error, 'Review the details and try again.'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -74,38 +123,73 @@ export default function DepartmentsScreen() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Departments</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setShowForm(!showForm)}
-          >
-            <Ionicons name={showForm ? 'close' : 'add'} size={20} color={Colors.primary} />
-          </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>Departments</Text>
+            <Text style={styles.headerSubtitle}>{departments.length} active departments</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => void fetchDepartments(true)}
+              disabled={refreshing}
+              accessibilityLabel="Refresh departments"
+            >
+              {refreshing ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Ionicons name="refresh" size={18} color={Colors.primary} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowForm(current => !current)}
+              accessibilityLabel={showForm ? 'Close department form' : 'Add department'}
+            >
+              <Ionicons name={showForm ? 'close' : 'add'} size={20} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text style={styles.headerSubtitle}>{departments.length} departments configured</Text>
       </LinearGradient>
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {showForm && (
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>New Department</Text>
-            {[
-              { label: 'Department Name', value: name, setter: setName, placeholder: 'e.g. Cardiology' },
-              { label: 'Operating Hours', value: operatingHours, setter: setOperatingHours, placeholder: 'e.g. 08:00 - 17:00' },
-              { label: 'Queue Capacity', value: queueCapacity, setter: setQueueCapacity, placeholder: 'e.g. 100', keyboard: 'number-pad' as any },
-            ].map(field => (
-              <View key={field.label}>
-                <Text style={styles.fieldLabel}>{field.label}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={field.placeholder}
-                  placeholderTextColor={Colors.textDisabled}
-                  value={field.value}
-                  onChangeText={field.setter}
-                  keyboardType={field.keyboard || 'default'}
-                />
-              </View>
-            ))}
+
+            <Text style={styles.fieldLabel}>Department Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Cardiology"
+              placeholderTextColor={Colors.textDisabled}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+            />
+
+            <Text style={styles.fieldLabel}>Operating Hours</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 08:00 - 17:00"
+              placeholderTextColor={Colors.textDisabled}
+              value={operatingHours}
+              onChangeText={setOperatingHours}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.fieldLabel}>Daily Queue Capacity</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 100"
+              placeholderTextColor={Colors.textDisabled}
+              value={queueCapacity}
+              onChangeText={setQueueCapacity}
+              keyboardType="number-pad"
+            />
+
             <TouchableOpacity
               style={[styles.createButton, submitting && styles.buttonDisabled]}
               onPress={handleCreate}
@@ -120,40 +204,40 @@ export default function DepartmentsScreen() {
           </View>
         )}
 
-        {departments.map(dept => (
-          <View key={dept.id} style={styles.deptCard}>
-            <View style={styles.deptHeader}>
-              <View style={styles.deptIcon}>
-                <Ionicons name="business-outline" size={20} color={Colors.primary} />
-              </View>
-              <View style={styles.deptInfo}>
-                <Text style={styles.deptName}>{dept.name}</Text>
-                <Text style={styles.deptHospital}>{dept.hospitalName}</Text>
-              </View>
-              <View style={[
-                styles.activeBadge,
-                { backgroundColor: dept.isActive ? Colors.successLight : Colors.dangerLight }
-              ]}>
-                <Text style={[
-                  styles.activeText,
-                  { color: dept.isActive ? Colors.success : Colors.danger }
-                ]}>
-                  {dept.isActive ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.deptMeta}>
-              <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={13} color={Colors.textDisabled} />
-                <Text style={styles.metaText}>{dept.operatingHours}</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <Ionicons name="people-outline" size={13} color={Colors.textDisabled} />
-                <Text style={styles.metaText}>Cap: {dept.queueCapacity}</Text>
-              </View>
-            </View>
+        {departments.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="business-outline" size={34} color={Colors.primary} />
+            <Text style={styles.emptyTitle}>No active departments</Text>
+            <Text style={styles.emptyText}>Tap + to configure the first department.</Text>
           </View>
-        ))}
+        ) : (
+          departments.map(department => (
+            <View key={department.id} style={styles.deptCard}>
+              <View style={styles.deptHeader}>
+                <View style={styles.deptIcon}>
+                  <Ionicons name="business-outline" size={20} color={Colors.primary} />
+                </View>
+                <View style={styles.deptInfo}>
+                  <Text style={styles.deptName}>{department.name}</Text>
+                  <Text style={styles.deptHospital}>{department.hospitalName || 'SwiftCare Hospital'}</Text>
+                </View>
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeText}>Active</Text>
+                </View>
+              </View>
+              <View style={styles.deptMeta}>
+                <View style={styles.metaItem}>
+                  <Ionicons name="time-outline" size={13} color={Colors.textDisabled} />
+                  <Text style={styles.metaText}>{department.operatingHours}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Ionicons name="people-outline" size={13} color={Colors.textDisabled} />
+                  <Text style={styles.metaText}>Daily capacity: {department.queueCapacity}</Text>
+                </View>
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -165,12 +249,13 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerActions: { flexDirection: 'row', gap: 10 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
-  headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)' },
+  headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
   addButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   formCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: Colors.border },
-  formTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 16 },
+  formTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
   fieldLabel: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 6, marginTop: 12 },
   input: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
   createButton: { backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
@@ -182,9 +267,12 @@ const styles = StyleSheet.create({
   deptInfo: { flex: 1 },
   deptName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
   deptHospital: { fontSize: 12, color: Colors.textDisabled, marginTop: 2 },
-  activeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  activeText: { fontSize: 12, fontWeight: '600' },
-  deptMeta: { flexDirection: 'row', gap: 16 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  activeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: Colors.successLight },
+  activeText: { fontSize: 12, fontWeight: '600', color: Colors.success },
+  deptMeta: { gap: 7 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaText: { fontSize: 12, color: Colors.textDisabled },
+  emptyState: { alignItems: 'center', paddingVertical: 70 },
+  emptyTitle: { marginTop: 12, fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  emptyText: { marginTop: 4, fontSize: 13, color: Colors.textSecondary },
 });

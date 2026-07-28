@@ -54,11 +54,6 @@ export async function getNotifications(): Promise<
 
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    console.error(
-      'Failed to read notifications:',
-      error
-    );
-
     return [];
   }
 }
@@ -74,10 +69,6 @@ export async function addNotification(
   );
 
   if (!enabled) {
-    console.log(
-      `${notification.type} notification skipped because it is disabled`
-    );
-
     return null;
   }
 
@@ -141,11 +132,6 @@ async function notificationTypeIsEnabled(
         return true;
     }
   } catch (error) {
-    console.error(
-      'Failed to check notification preferences:',
-      error
-    );
-
     return true;
   }
 }
@@ -224,11 +210,6 @@ export async function getSettings(): Promise<SwiftCareSettings> {
     };
 
   } catch (error) {
-    console.error(
-      'Failed to load settings:',
-      error
-    );
-
     return DEFAULT_SETTINGS;
   }
 }
@@ -244,10 +225,7 @@ export async function saveSettings(
     );
 
   } catch (error) {
-    console.error(
-      'Failed to save settings:',
-      error
-    );
+    throw new Error('Unable to save notification settings');
   }
 }
 

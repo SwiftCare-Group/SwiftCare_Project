@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,11 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import api from '../../services/api';
+import api, { logoutSession, refreshSessionTokens } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -31,6 +30,12 @@ type SubscriptionData = {
   expiresAt?: string;
 };
 
+type SubscriptionPlanData = {
+  plan: 'MONTHLY' | 'YEARLY';
+  displayName?: string;
+  formattedPrice?: string;
+};
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -40,19 +45,29 @@ export default function ProfileScreen() {
     useState<SubscriptionData | null>(null);
 
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [loadingUpgrade, setLoadingUpgrade] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [plans, setPlans] = useState<SubscriptionPlanData[]>([]);
 
   useEffect(() => {
-    fetchProfile();
-    fetchSubscription();
+    void fetchPlans();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      void fetchProfile();
+      void fetchSubscription();
+    }, [])
+  );
+
   const fetchProfile = async () => {
+    setProfileError(null);
     try {
       const response = await api.get('/patients/me');
       setProfile(response.data);
-    } catch (error) {
-      console.error('Failed to fetch profile:', error);
+    } catch (error: any) {
+      setProfileError(error?.response?.data?.message || 'Your profile could not be loaded.');
     } finally {
       setLoadingProfile(false);
     }
@@ -67,58 +82,89 @@ export default function ProfileScreen() {
     }
   };
 
+  const fetchPlans = async () => {
+    try {
+      const response = await api.get('/subscriptions/plans');
+      setPlans(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      setPlans([]);
+    }
+  };
+
+  const planPrice = (plan: 'MONTHLY' | 'YEARLY', fallback: string) =>
+    plans.find(item => item.plan === plan)?.formattedPrice || fallback;
+
   const handleUpgrade = async (
     plan: 'MONTHLY' | 'YEARLY'
   ) => {
     setLoadingUpgrade(true);
 
     try {
-      const response = await api.post(
-        '/subscriptions/upgrade',
-        { plan }
-      );
+      const response = await api.post('/subscriptions/upgrade', { plan });
+      const { paymentUrl, reference } = response.data ?? {};
 
-      const { paymentUrl } = response.data;
+      if (
+        typeof paymentUrl !== 'string' ||
+        !paymentUrl.startsWith('https://') ||
+        typeof reference !== 'string' ||
+        !reference.trim()
+      ) {
+        throw new Error('The payment provider returned an invalid checkout session.');
+      }
 
-      Alert.alert(
-        'Complete Payment',
-        `Open this link to complete your upgrade:\n\n${paymentUrl}`,
-        [{ text: 'OK' }]
-      );
+      router.push({
+        pathname: '/(patient)/subscription-checkout',
+        params: { paymentUrl, reference },
+      });
     } catch (error: any) {
       Alert.alert(
-        'Error',
+        'Subscription unavailable',
         error.response?.data?.message ||
-          'Failed to initiate upgrade.'
+          error.message ||
+          'Failed to initiate the subscription payment.'
       );
     } finally {
       setLoadingUpgrade(false);
     }
   };
 
-const handleLogout = async () => {
-  try {
-
-    await AsyncStorage.multiRemove([
-      'accessToken',
-      'swiftcareSettings',
-      'swiftcareNotifications',
-      'swiftcarePrivacySettings',
-    ]);
-
-
-    router.replace('/(auth)/login');
-
-
-  } catch (error) {
-
-    console.error(
-      'Logout failed:',
-      error
+  const handleCancelSubscription = () => {
+    Alert.alert(
+      'Cancel Premium?',
+      'Premium access will be removed from this account.',
+      [
+        { text: 'Keep Premium', style: 'cancel' },
+        {
+          text: 'Cancel subscription',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelling(true);
+            try {
+              await api.put('/subscriptions/cancel');
+              await refreshSessionTokens();
+              await fetchProfile();
+              await fetchSubscription();
+              Alert.alert('Subscription cancelled', 'Your account is now on the free plan.');
+            } catch (error: any) {
+              Alert.alert(
+                'Unable to cancel',
+                error.response?.data?.message || 'The subscription could not be cancelled.'
+              );
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ]
     );
+  };
 
-  }
-};  if (loadingProfile) {
+const handleLogout = async () => {
+  await logoutSession();
+  router.replace('/(auth)/login');
+};
+
+  if (loadingProfile) {
     return (
       <View
         style={[
@@ -130,6 +176,28 @@ const handleLogout = async () => {
           size="large"
           color={colors.primary}
         />
+      </View>
+    );
+  }
+
+  if (profileError && !profile) {
+    return (
+      <View style={[styles.centered, { backgroundColor: colors.background, paddingHorizontal: 28 }]}> 
+        <Ionicons name="cloud-offline-outline" size={44} color={colors.textDisabled} />
+        <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Unable to load profile</Text>
+        <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{profileError}</Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            setLoadingProfile(true);
+            void fetchProfile();
+          }}
+        >
+          <Text style={[styles.retryButtonText, { color: colors.white }]}>Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.errorLogoutButton} onPress={handleLogout}>
+          <Text style={[styles.errorLogoutText, { color: colors.danger }]}>Return to Login</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -358,8 +426,24 @@ const handleLogout = async () => {
                 </Text>
               </View>
             ))}
+
+            {subscription.status === 'ACTIVE' ? (
+              <TouchableOpacity
+                style={styles.cancelSubscriptionButton}
+                onPress={handleCancelSubscription}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator size="small" color={colors.danger} />
+                ) : (
+                  <Text style={[styles.cancelSubscriptionText, { color: colors.danger }]}>Cancel subscription</Text>
+                )}
+              </TouchableOpacity>
+            ) : null}
           </View>
-        ) : !isPremium ? (
+        ) : null}
+
+        {!isPremium && subscription?.status !== 'ACTIVE' ? (
           <View style={styles.upgradeCard}>
             <LinearGradient
               colors={[
@@ -397,7 +481,7 @@ const handleLogout = async () => {
                   </Text>
 
                   <Text style={styles.planButtonPrice}>
-                    GHS 100
+                    {planPrice('MONTHLY', 'GHS 100.00')}
                   </Text>
                 </TouchableOpacity>
 
@@ -435,7 +519,7 @@ const handleLogout = async () => {
                       { color: colors.primary },
                     ]}
                   >
-                    GHS 1,000
+                    {planPrice('YEARLY', 'GHS 1,000.00')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -630,6 +714,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  errorTitle: { marginTop: 14, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  errorMessage: { marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  retryButton: { marginTop: 18, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12 },
+  retryButtonText: { fontSize: 14, fontWeight: '700' },
+  errorLogoutButton: { marginTop: 14, padding: 8 },
+  errorLogoutText: { fontSize: 14, fontWeight: '600' },
 
   profileHeader: {
     paddingHorizontal: 20,
@@ -872,4 +963,16 @@ const styles = StyleSheet.create({
   marginVertical: 8,
   marginLeft: 44,
 },
+  cancelSubscriptionButton: {
+    marginTop: 14,
+    paddingVertical: 11,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+  },
+  cancelSubscriptionText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

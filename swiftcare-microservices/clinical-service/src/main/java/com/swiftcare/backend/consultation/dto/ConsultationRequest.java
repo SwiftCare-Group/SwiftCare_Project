@@ -13,7 +13,6 @@ public class ConsultationRequest {
     @NotNull(message = "Doctor ID is required")
     private UUID doctorId;
 
-    @NotNull(message = "Queue entry ID is required")
     private UUID queueEntryId;
 
     @NotNull(message = "Scheduled time is required")

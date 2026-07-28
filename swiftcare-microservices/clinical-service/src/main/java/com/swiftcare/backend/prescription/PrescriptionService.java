@@ -9,6 +9,8 @@ import com.swiftcare.backend.common.enums.DispensationStatus;
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.consultation.Consultation;
 import com.swiftcare.backend.consultation.ConsultationRepository;
+import com.swiftcare.backend.consultation.Doctor;
+import com.swiftcare.backend.consultation.DoctorRepository;
 import com.swiftcare.backend.pharmacy.DispensationRecord;
 import com.swiftcare.backend.pharmacy.DispensationRecordRepository;
 import com.swiftcare.backend.pharmacy.dto.DispensationRecordResponse;
@@ -41,6 +43,7 @@ public class PrescriptionService {
 
     private final PrescriptionRepository prescriptionRepository;
     private final ConsultationRepository consultationRepository;
+    private final DoctorRepository doctorRepository;
     private final DispensationRecordRepository dispensationRecordRepository;
 
     /**
@@ -48,7 +51,8 @@ public class PrescriptionService {
      */
     @Transactional
     public PrescriptionResponse issuePrescription(
-            PrescriptionRequest request
+            PrescriptionRequest request,
+            String authenticatedDoctorEmail
     ) {
         if (request == null) {
             throw new IllegalArgumentException(
@@ -69,6 +73,25 @@ public class PrescriptionService {
                                 "Consultation not found"
                         )
                 );
+
+        Doctor authenticatedDoctor = doctorRepository
+                .findByEmailIgnoreCaseAndIsDeletedFalse(
+                        authenticatedDoctorEmail == null
+                                ? ""
+                                : authenticatedDoctorEmail.trim()
+                )
+                .orElseThrow(() -> new SecurityException(
+                        "Authenticated doctor account was not found"
+                ));
+
+        if (consultation.getDoctor() == null
+                || !authenticatedDoctor.getId().equals(
+                        consultation.getDoctor().getId()
+                )) {
+            throw new SecurityException(
+                    "Only the assigned doctor can issue this prescription"
+            );
+        }
 
         if (prescriptionRepository.existsByConsultationId(
                 consultation.getId()
@@ -161,82 +184,106 @@ public class PrescriptionService {
     @Transactional
     public DispensationRecordResponse dispense(
             UUID prescriptionId,
-            DispenseRequest request
+            DispenseRequest request,
+            String authenticatedPharmacistEmail
     ) {
         if (prescriptionId == null) {
-            throw new IllegalArgumentException(
-                    "Prescription ID is required"
-            );
+            throw new IllegalArgumentException("Prescription ID is required");
         }
-
         if (request == null) {
-            throw new IllegalArgumentException(
-                    "Dispensation request is required"
-            );
+            throw new IllegalArgumentException("Dispensation request is required");
         }
 
         findPrescriptionById(prescriptionId);
+        Doctor pharmacist = doctorRepository
+                .findByEmailIgnoreCaseAndIsDeletedFalse(
+                        authenticatedPharmacistEmail == null
+                                ? ""
+                                : authenticatedPharmacistEmail.trim()
+                )
+                .filter(staff -> staff.getRole() == com.swiftcare.backend.common.enums.Role.PHARMACIST)
+                .orElseThrow(() -> new SecurityException(
+                        "Authenticated pharmacist account was not found"
+                ));
 
-        String drugName = validateAndNormalizeDrugName(
-                request.getDrugName()
-        );
-
-        if (request.getStatus() == null) {
+        String drugName = validateAndNormalizeDrugName(request.getDrugName());
+        DispensationStatus requestedStatus = request.getStatus();
+        if (requestedStatus != DispensationStatus.DISPENSED
+                && requestedStatus != DispensationStatus.UNAVAILABLE) {
             throw new IllegalArgumentException(
-                    "Dispensation status is required"
+                    "Medication can only be marked as dispensed or unavailable"
             );
         }
 
-        DispensationRecord record =
-                dispensationRecordRepository
-                        .findByPrescriptionIdAndDrugNameIgnoreCase(
-                                prescriptionId,
-                                drugName
-                        )
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Drug not found in prescription"
-                                )
-                        );
+        DispensationRecord record = dispensationRecordRepository
+                .findByPrescriptionIdAndDrugNameIgnoreCase(prescriptionId, drugName)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Drug not found in prescription"
+                ));
 
-        record.setStatus(request.getStatus());
-
-        if (request.getPharmacyName() != null) {
-            String pharmacyName =
-                    request.getPharmacyName().trim();
-
-            record.setPharmacyName(
-                    pharmacyName.isBlank()
-                            ? null
-                            : pharmacyName
-            );
-        }
-
-        if (request.getStatus()
-                == DispensationStatus.DISPENSED) {
-
-            if (record.getDispensedAt() == null) {
-                record.setDispensedAt(
-                        LocalDateTime.now()
-                );
+        if (record.getStatus() != DispensationStatus.PENDING) {
+            if (record.getStatus() == requestedStatus) {
+                return mapToDispensationResponse(record);
             }
-
-        } else {
-            record.setDispensedAt(null);
+            throw new IllegalStateException(
+                    "This medication has already received a final dispensation status"
+            );
         }
 
-        DispensationRecord savedRecord =
-                dispensationRecordRepository.save(record);
+        String pharmacyName = request.getPharmacyName() == null
+                ? ""
+                : request.getPharmacyName().trim();
+        if (pharmacyName.isBlank()) {
+            throw new IllegalArgumentException("Pharmacy name is required");
+        }
 
+        LocalDateTime now = LocalDateTime.now();
+        record.setStatus(requestedStatus);
+        record.setPharmacyName(pharmacyName);
+        record.setPharmacistId(pharmacist.getId());
+        record.setPharmacistName(pharmacist.getName());
+        record.setQuantityDispensed(cleanOptionalText(request.getQuantityDispensed()));
+        record.setNotes(cleanOptionalText(request.getNotes()));
+        record.setDispensedAt(now);
+
+        DispensationRecord savedRecord = dispensationRecordRepository.save(record);
         log.info(
-                "Dispensation record {} for prescription {} " +
-                        "updated to {}",
-                savedRecord.getId(),
+                "Prescription {} medication {} set to {} by pharmacist {}",
                 prescriptionId,
-                savedRecord.getStatus()
+                savedRecord.getDrugName(),
+                savedRecord.getStatus(),
+                pharmacist.getId()
         );
-
         return mapToDispensationResponse(savedRecord);
+    }
+
+    @Transactional(readOnly = true)
+    public PrescriptionResponse lookupByQrCode(String scannedCode) {
+        if (scannedCode == null || scannedCode.isBlank()) {
+            throw new IllegalArgumentException("Scanned QR data is required");
+        }
+
+        String normalized = scannedCode.trim();
+        if (!normalized.startsWith("SWIFTCARE|")) {
+            throw new IllegalArgumentException("This is not a valid SwiftCare prescription QR code");
+        }
+
+        Prescription prescription = prescriptionRepository
+                .findByQrCodeHash(hashQrData(normalized))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Prescription was not found or the QR code is invalid"
+                ));
+        return mapToResponse(prescription);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DispensationRecordResponse> getDispensationRecords(UUID prescriptionId) {
+        findPrescriptionById(prescriptionId);
+        return dispensationRecordRepository
+                .findAllByPrescriptionId(prescriptionId)
+                .stream()
+                .map(this::mapToDispensationResponse)
+                .toList();
     }
 
     /**
@@ -356,6 +403,13 @@ public class PrescriptionService {
         return drugs;
     }
 
+    private String cleanOptionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
     private String validateAndNormalizeDrugName(
             String drugName
     ) {
@@ -398,6 +452,10 @@ public class PrescriptionService {
                 .drugName(record.getDrugName())
                 .status(record.getStatus())
                 .pharmacyName(record.getPharmacyName())
+                .pharmacistId(record.getPharmacistId())
+                .pharmacistName(record.getPharmacistName())
+                .quantityDispensed(record.getQuantityDispensed())
+                .notes(record.getNotes())
                 .dispensedAt(record.getDispensedAt())
                 .build();
     }
@@ -426,6 +484,13 @@ public class PrescriptionService {
             )
             .qrCodeData(
                     prescription.getQrCodeData()
+            )
+            .dispensationRecords(
+                    dispensationRecordRepository
+                            .findAllByPrescriptionId(prescription.getId())
+                            .stream()
+                            .map(this::mapToDispensationResponse)
+                            .toList()
             )
             .issuedAt(
                     prescription.getIssuedAt()

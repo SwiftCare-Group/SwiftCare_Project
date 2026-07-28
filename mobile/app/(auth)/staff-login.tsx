@@ -103,6 +103,7 @@ export default function StaffLoginScreen() {
         response.data?.token;
 
       const role = response.data?.role;
+      const refreshToken = response.data?.refreshToken;
 
       if (!accessToken) {
         throw new Error(
@@ -112,45 +113,47 @@ export default function StaffLoginScreen() {
 
       if (
         role !== 'DOCTOR' &&
-        role !== 'PHARMACIST'
+        role !== 'PHARMACIST' &&
+        role !== 'ADMIN' &&
+        role !== 'LAB_TECHNICIAN'
       ) {
         throw new Error(
           'This account is not authorized for staff access.'
         );
       }
 
-      await AsyncStorage.setItem(
-        'accessToken',
-        accessToken
-      );
+      const storageEntries: [string, string][] = [
+        ['accessToken', accessToken],
+        ['userRole', role],
+      ];
 
-      await AsyncStorage.setItem(
-        'userRole',
-        role
-      );
+      if (typeof refreshToken === 'string' && refreshToken) {
+        storageEntries.push(['refreshToken', refreshToken]);
+      }
+
+      await AsyncStorage.multiSet(storageEntries);
 
       if (role === 'DOCTOR') {
-        router.replace(
-          '/(doctor)/queue' as any
-        );
+        router.replace('/(doctor)/queue' as any);
         return;
       }
 
-      router.replace(
-        '/(pharmacist)/dispense' as any
-      );
-    } catch (error: any) {
-      console.log('STAFF LOGIN ERROR:', {
-        status: error?.response?.status,
-        data: error?.response?.data,
-        message: error?.message,
-        code: error?.code,
-        url: error?.config?.url,
-      });
+      if (role === 'PHARMACIST') {
+        router.replace('/(pharmacist)/dispense' as any);
+        return;
+      }
 
+      if (role === 'ADMIN') {
+        router.replace('/(admin)/dashboard' as any);
+        return;
+      }
+
+      router.replace('/(lab)/dashboard' as any);
+    } catch (error: any) {
       await AsyncStorage.multiRemove([
         'accessToken',
         'userRole',
+        'refreshToken',
       ]);
 
       Alert.alert(
@@ -201,7 +204,7 @@ export default function StaffLoginScreen() {
           </Text>
 
           <Text style={styles.appTagline}>
-            For doctors and pharmacists only
+            For authorized hospital staff
           </Text>
         </View>
       </LinearGradient>

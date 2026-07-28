@@ -6,6 +6,7 @@ import com.swiftcare.backend.common.enums.QueueStatus;
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.queue.dto.QueueEntryResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import com.swiftcare.backend.notification.NotificationClient;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class QueueService {
     
     private static final int DEFAULT_CONSULTATION_MINUTES = 15;
@@ -266,9 +268,8 @@ public QueueEntry callPatient(UUID queueEntryId) {
          * Do not fail the queue operation simply because the
          * notification service or Expo is temporarily unavailable.
          */
-        System.err.println(
-                "Patient was called, but the push notification failed: "
-                        + exception.getMessage()
+        log.warn(
+                "Patient was called, but push notification delivery failed"
         );
     }
 

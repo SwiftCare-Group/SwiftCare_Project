@@ -18,11 +18,7 @@ export async function registerForPushNotifications(): Promise<
   string | null
 > {
   try {
-    if (!Device.isDevice) {
-      console.log(
-        'Push notifications require a physical device.'
-      );
-      return null;
+    if (!Device.isDevice) {      return null;
     }
 
     const currentPermissions =
@@ -37,22 +33,14 @@ export async function registerForPushNotifications(): Promise<
       finalStatus = requestedPermissions.status;
     }
 
-    if (finalStatus !== 'granted') {
-      console.log(
-        'Push notification permission was not granted.'
-      );
-      return null;
+    if (finalStatus !== 'granted') {      return null;
     }
 
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ??
       Constants.easConfig?.projectId;
 
-    if (!projectId) {
-      console.error(
-        'Expo project ID is missing. Check app.json and EAS configuration.'
-      );
-      return null;
+    if (!projectId) {      return null;
     }
 
     const tokenResponse =
@@ -62,27 +50,15 @@ export async function registerForPushNotifications(): Promise<
 
     const expoPushToken = tokenResponse.data;
 
-    console.log('Expo push token:', expoPushToken);
-
     await api.post('/notifications/devices', {
       token: expoPushToken,
       platform: Platform.OS.toUpperCase(),
       deviceName: Device.deviceName ?? undefined,
     });
 
-    console.log(
-      'Push token registered successfully with SwiftCare.'
-    );
 
     return expoPushToken;
   } catch (error: any) {
-    console.error(
-      'Push notification registration failed:',
-      error?.response?.data ??
-        error?.message ??
-        error
-    );
-
     return null;
   }
 }

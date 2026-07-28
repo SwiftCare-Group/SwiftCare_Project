@@ -18,12 +18,21 @@ import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
 
 
+const SCHEDULE_OPTIONS = [
+  { label: 'In 1 hour', minutes: 60 },
+  { label: 'In 2 hours', minutes: 120 },
+  { label: 'Tomorrow', minutes: 1440 },
+] as const;
+
 export default function ConsultationScreen() {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [consultations, setConsultations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
+  const [selectedOffsetMinutes, setSelectedOffsetMinutes] = useState(60);
   const [showBooking, setShowBooking] = useState(false);
   const [sessionUrl, setSessionUrl] = useState<string | null>(null);
   const [showSession, setShowSession] = useState(false);
@@ -32,6 +41,7 @@ export default function ConsultationScreen() {
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
+    setLoadError(null);
     try {
       const [doctorsRes, consultationsRes] = await Promise.all([
         api.get('/consultations/doctors'),
@@ -39,8 +49,8 @@ export default function ConsultationScreen() {
       ]);
       setDoctors(doctorsRes.data);
       setConsultations(consultationsRes.data);
-    } catch (error) {
-      console.error('Failed to fetch consultation data');
+    } catch (error: any) {
+      setLoadError(error?.response?.data?.message || 'Consultations could not be loaded. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -55,8 +65,9 @@ export default function ConsultationScreen() {
     setBooking(true);
     try {
       successNotification();
-      const scheduledAt = new Date();
-      scheduledAt.setHours(scheduledAt.getHours() + 1);
+      const scheduledAt = new Date(
+        Date.now() + selectedOffsetMinutes * 60_000
+      );
       await api.post('/consultations', {
         doctorId: selectedDoctor,
         scheduledAt: scheduledAt.toISOString().slice(0, 19),
@@ -64,11 +75,12 @@ export default function ConsultationScreen() {
       Alert.alert('Success', 'Consultation booked successfully');
       setShowBooking(false);
       setSelectedDoctor(null);
+      setSelectedOffsetMinutes(60);
       fetchData();
     } catch (error: any) {
       errorNotification();
       const message = error.response?.data?.message || 'Failed to book consultation';
-      if (message.includes('Premium') || error.response?.status === 401) {
+      if (message.includes('Premium') || error.response?.status === 401 || error.response?.status === 403) {
         Alert.alert('Premium Required', 'Online consultations are available for Premium subscribers only. Upgrade in your profile to access this feature.');
       } else {
         Alert.alert('Error', message);
@@ -76,6 +88,35 @@ export default function ConsultationScreen() {
     } finally {
       setBooking(false);
     }
+  };
+
+  const handleCancel = (consultationId: string) => {
+    Alert.alert(
+      'Cancel consultation?',
+      'This scheduled consultation will be cancelled.',
+      [
+        { text: 'Keep Booking', style: 'cancel' },
+        {
+          text: 'Cancel Consultation',
+          style: 'destructive',
+          onPress: async () => {
+            setCancellingId(consultationId);
+            try {
+              await api.put(`/consultations/${consultationId}/cancel`);
+              await fetchData();
+              Alert.alert('Consultation cancelled', 'The booking has been cancelled.');
+            } catch (error: any) {
+              Alert.alert(
+                'Unable to cancel',
+                error?.response?.data?.message || 'The consultation could not be cancelled.'
+              );
+            } finally {
+              setCancellingId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleJoin = async (consultationId: string) => {
@@ -100,6 +141,25 @@ export default function ConsultationScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  if (loadError && doctors.length === 0 && consultations.length === 0) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="cloud-offline-outline" size={44} color={Colors.textDisabled} />
+        <Text style={styles.loadErrorTitle}>Unable to load consultations</Text>
+        <Text style={styles.loadErrorText}>{loadError}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            setLoading(true);
+            void fetchData();
+          }}
+        >
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -168,6 +228,30 @@ export default function ConsultationScreen() {
                 ))
               )}
 
+              <Text style={styles.scheduleLabel}>Preferred time</Text>
+              <View style={styles.scheduleOptions}>
+                {SCHEDULE_OPTIONS.map(option => (
+                  <TouchableOpacity
+                    key={option.minutes}
+                    style={[
+                      styles.scheduleOption,
+                      selectedOffsetMinutes === option.minutes && styles.scheduleOptionSelected,
+                    ]}
+                    onPress={() => setSelectedOffsetMinutes(option.minutes)}
+                    disabled={booking}
+                  >
+                    <Text
+                      style={[
+                        styles.scheduleOptionText,
+                        selectedOffsetMinutes === option.minutes && styles.scheduleOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <TouchableOpacity
                 style={[styles.confirmButton, booking && styles.buttonDisabled]}
                 onPress={handleBook}
@@ -232,22 +316,38 @@ export default function ConsultationScreen() {
                 ) : null}
 
                 {(con.status === 'SCHEDULED' || con.status === 'IN_PROGRESS') && (
-                  <TouchableOpacity
-                    style={styles.joinButton}
-                    onPress={() => handleJoin(con.id)}
-                  >
-                    <LinearGradient
-                      colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
-                      style={styles.joinButtonGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
+                  <View style={styles.consultationActions}>
+                    <TouchableOpacity
+                      style={styles.joinButton}
+                      onPress={() => handleJoin(con.id)}
                     >
-                      <Ionicons name="videocam-outline" size={16} color={Colors.white} />
-                      <Text style={styles.joinButtonText}>
-                        {con.status === 'IN_PROGRESS' ? 'Rejoin Session' : 'Join Session'}
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                      <LinearGradient
+                        colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+                        style={styles.joinButtonGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                      >
+                        <Ionicons name="videocam-outline" size={16} color={Colors.white} />
+                        <Text style={styles.joinButtonText}>
+                          {con.status === 'IN_PROGRESS' ? 'Rejoin Session' : 'Join Session'}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    {con.status === 'SCHEDULED' ? (
+                      <TouchableOpacity
+                        style={styles.cancelConsultationButton}
+                        onPress={() => handleCancel(con.id)}
+                        disabled={cancellingId === con.id}
+                      >
+                        {cancellingId === con.id ? (
+                          <ActivityIndicator size="small" color={Colors.danger} />
+                        ) : (
+                          <Text style={styles.cancelConsultationText}>Cancel</Text>
+                        )}
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 )}
               </View>
             ))
@@ -284,7 +384,11 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.headerGradientStart },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, paddingHorizontal: 28 },
+  loadErrorTitle: { marginTop: 14, fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
+  loadErrorText: { marginTop: 8, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  retryButton: { marginTop: 18, backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12 },
+  retryButtonText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
@@ -305,6 +409,12 @@ const styles = StyleSheet.create({
   doctorNameSelected: { color: Colors.primary },
   doctorDept: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   availableDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.success },
+  scheduleLabel: { marginTop: 10, marginBottom: 8, fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
+  scheduleOptions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  scheduleOption: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: Colors.background },
+  scheduleOptionSelected: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  scheduleOptionText: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
+  scheduleOptionTextSelected: { color: Colors.primary },
   confirmButton: { borderRadius: 12, overflow: 'hidden', marginTop: 12 },
   confirmButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
   confirmButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
@@ -323,7 +433,10 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 12, fontWeight: '600' },
   conNotes: { fontSize: 13, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 12 },
+  consultationActions: { gap: 8 },
   joinButton: { borderRadius: 12, overflow: 'hidden' },
+  cancelConsultationButton: { borderRadius: 12, borderWidth: 1, borderColor: Colors.danger, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  cancelConsultationText: { color: Colors.danger, fontSize: 13, fontWeight: '700' },
   joinButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
   joinButtonText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
   sessionContainer: { flex: 1, backgroundColor: Colors.black },

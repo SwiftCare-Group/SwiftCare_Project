@@ -65,13 +65,6 @@ public class JwtUtil {
             return expiration != null
                     && expiration.after(new Date());
         } catch (Exception exception) {
-            System.out.println(
-                    "JWT validation failed: "
-                            + exception.getClass().getSimpleName()
-                            + " - "
-                            + exception.getMessage()
-            );
-
             return false;
         }
     }

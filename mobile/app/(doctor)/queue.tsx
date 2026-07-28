@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
@@ -22,7 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../../constants/colors';
-import api from '../../services/api';
+import api, { logoutSession } from '../../services/api';
 
 type Department = {
   id: string;
@@ -332,14 +331,6 @@ export default function DoctorQueueScreen() {
           setErrorMessage('');
         }
       } catch (error: any) {
-        console.error('FAILED TO FETCH DOCTOR QUEUE:', {
-          status: error?.response?.status,
-          data: error?.response?.data,
-          message: error?.message,
-          code: error?.code,
-          url: error?.config?.url,
-        });
-
         if (isMountedRef.current) {
           setErrorMessage(
             getBackendErrorMessage(
@@ -398,16 +389,6 @@ export default function DoctorQueueScreen() {
           return departmentData[0].id;
         });
       } catch (error: any) {
-        console.error(
-          'FAILED TO FETCH DEPARTMENTS:',
-          {
-            status: error?.response?.status,
-            data: error?.response?.data,
-            message: error?.message,
-            url: error?.config?.url,
-          }
-        );
-
         setErrorMessage(
           getBackendErrorMessage(
             error,
@@ -499,13 +480,8 @@ export default function DoctorQueueScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.multiRemove([
-                'accessToken',
-                'refreshToken',
-                'userRole',
-              ]);
-
-              router.replace('/(auth)/login');
+              await logoutSession();
+              router.replace('/(auth)/staff-login');
             } catch {
               Alert.alert(
                 'Logout failed',
@@ -537,13 +513,6 @@ export default function DoctorQueueScreen() {
         } has been called.`
       );
     } catch (error: any) {
-      console.error('CALL PATIENT ERROR:', {
-        status: error?.response?.status,
-        data: error?.response?.data,
-        message: error?.message,
-        url: error?.config?.url,
-      });
-
       Alert.alert(
         'Unable to call patient',
         getBackendErrorMessage(
@@ -591,17 +560,6 @@ export default function DoctorQueueScreen() {
                 } has been moved to the end of the queue.`
               );
             } catch (error: any) {
-              console.error(
-                'SKIP PATIENT ERROR:',
-                {
-                  status:
-                    error?.response?.status,
-                  data: error?.response?.data,
-                  message: error?.message,
-                  url: error?.config?.url,
-                }
-              );
-
               Alert.alert(
                 'Unable to skip patient',
                 getBackendErrorMessage(
@@ -651,17 +609,6 @@ export default function DoctorQueueScreen() {
         },
       });
     } catch (error: any) {
-      console.error(
-        'START CONSULTATION ERROR:',
-        {
-          queueEntryId: patient.id,
-          status: error?.response?.status,
-          data: error?.response?.data,
-          message: error?.message,
-          url: error?.config?.url,
-        }
-      );
-
       Alert.alert(
         'Unable to start consultation',
         getBackendErrorMessage(
@@ -706,17 +653,6 @@ export default function DoctorQueueScreen() {
                 'The patient has been removed from the active queue and the remaining positions have been updated.'
               );
             } catch (error: any) {
-              console.error(
-                'COMPLETE CONSULTATION ERROR:',
-                {
-                  status:
-                    error?.response?.status,
-                  data: error?.response?.data,
-                  message: error?.message,
-                  url: error?.config?.url,
-                }
-              );
-
               Alert.alert(
                 'Unable to complete consultation',
                 getBackendErrorMessage(

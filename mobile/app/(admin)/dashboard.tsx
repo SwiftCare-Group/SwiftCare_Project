@@ -12,8 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../../services/api';
+import api, { logoutSession } from '../../services/api';
 import { Colors } from '../../constants/colors';
 
 export default function AdminDashboard() {
@@ -24,20 +23,15 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const [deptRes, aptRes] = await Promise.all([
-        api.get('/departments'),
-        api.get('/appointments').catch(() => ({ data: [] })),
-      ]);
-      const departments = deptRes.data;
-      const appointments = aptRes.data;
+      const response = await api.get('/admin/stats');
+      setStats(response.data);
+    } catch {
       setStats({
-        totalDepartments: departments.length,
-        activeDepartments: departments.filter((d: any) => d.isActive).length,
-        pendingAppointments: appointments.filter((a: any) => a.status === 'PENDING').length,
-        completedAppointments: appointments.filter((a: any) => a.status === 'COMPLETED').length,
+        totalDepartments: 0,
+        activeDepartments: 0,
+        pendingAppointments: 0,
+        completedAppointments: 0,
       });
-    } catch (error) {
-      console.error('Failed to fetch stats');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -52,8 +46,8 @@ export default function AdminDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('accessToken');
-    router.replace('/(auth)/login');
+    await logoutSession();
+    router.replace('/(auth)/staff-login');
   };
 
   if (loading) {

@@ -2,7 +2,6 @@ package com.swiftcare.backend.notification.push;
 import com.swiftcare.backend.notification.device.PushDevice;
 import com.swiftcare.backend.notification.device.PushDeviceRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -11,7 +10,6 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class PushNotificationService {
 
     private final PushDeviceRepository pushDeviceRepository;
@@ -34,11 +32,6 @@ public class PushNotificationService {
                         );
 
         if (activeDevices.isEmpty()) {
-            log.info(
-                    "No active push devices found for patient {}. Notification skipped.",
-                    patientId
-            );
-
             return;
         }
 
@@ -52,34 +45,21 @@ public class PushNotificationService {
                         .map(device ->
                                 createPatientCalledMessage(
                                         device,
-                                        patientId,
                                         departmentId
                                 )
                         )
                         .toList();
 
         if (messages.isEmpty()) {
-            log.warn(
-                    "Patient {} has device records, but none contains a valid Expo push token.",
-                    patientId
-            );
-
             return;
         }
 
         expoPushClient.sendNotifications(messages);
-
-        log.info(
-                "Patient-called notification sent to {} device(s) for patient {}.",
-                messages.size(),
-                patientId
-        );
     }
 
     private ExpoPushClient.ExpoPushMessage
     createPatientCalledMessage(
             PushDevice device,
-            UUID patientId,
             UUID departmentId
     ) {
         Map<String, Object> notificationData =
@@ -87,7 +67,6 @@ public class PushNotificationService {
                         "type", "PATIENT_CALLED",
                         "screen", "queue",
                         "route", "/(patient)/queue",
-                        "patientId", patientId.toString(),
                         "departmentId",
                         departmentId != null
                                 ? departmentId.toString()

@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -96,22 +95,19 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadUnreadNotifications = useCallback(async () => {
     try {
       const count = await getUnreadNotificationCount();
       setUnreadCount(Number(count) || 0);
     } catch (error) {
-      console.error(
-        "Failed to load unread notifications:",
-        error
-      );
-
       setUnreadCount(0);
     }
   }, []);
 
   const fetchData = useCallback(async () => {
+    setLoadError(null);
     try {
       const [
         patientResponse,
@@ -160,7 +156,7 @@ export default function HomeScreen() {
 
       try {
         const prescriptionResponse =
-          await api.get("/prescriptions");
+          await api.get("/prescriptions/my");
 
         const prescriptions = Array.isArray(
           prescriptionResponse.data
@@ -206,10 +202,7 @@ export default function HomeScreen() {
 
       setUpcomingConsultation(upcoming ?? null);
     } catch (error: any) {
-      console.error(
-        "Failed to fetch home data:",
-        error?.response?.data ?? error?.message ?? error
-      );
+      setLoadError(error?.response?.data?.message || 'Your dashboard could not be loaded. Check your connection and try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -313,6 +306,25 @@ export default function HomeScreen() {
     );
   }
 
+  if (loadError && !patient) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background, paddingHorizontal: 28 }]}> 
+        <Ionicons name="cloud-offline-outline" size={46} color={colors.textDisabled} />
+        <Text style={[styles.loadErrorTitle, { color: colors.textPrimary }]}>Unable to load dashboard</Text>
+        <Text style={[styles.loadErrorText, { color: colors.textSecondary }]}>{loadError}</Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            setLoading(true);
+            void fetchData();
+          }}
+        >
+          <Text style={[styles.retryButtonText, { color: colors.white }]}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView
       style={[
@@ -351,11 +363,9 @@ export default function HomeScreen() {
         >
           <View style={styles.headerTop}>
             <View style={styles.brandGreetingRow}>
-              <Image
-                source={require("../../assets/icon.png")}
-                style={styles.headerLogo}
-                resizeMode="contain"
-              />
+              <View style={styles.headerLogo}>
+                <Ionicons name="medical-outline" size={28} color={colors.primary} />
+              </View>
 
               <View style={styles.greetingContainer}>
                 <Text style={styles.brandName}>
@@ -1422,6 +1432,35 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 
+  loadErrorTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    marginTop: 14,
+    textAlign: "center",
+  },
+
+  loadErrorText: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: "center",
+  },
+
+  retryButton: {
+    minHeight: 48,
+    minWidth: 140,
+    borderRadius: 14,
+    marginTop: 18,
+    paddingHorizontal: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -1448,6 +1487,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: Colors.white,
     marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   greetingContainer: {

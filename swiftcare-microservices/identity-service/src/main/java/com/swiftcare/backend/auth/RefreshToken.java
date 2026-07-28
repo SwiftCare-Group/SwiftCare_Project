@@ -1,5 +1,6 @@
 package com.swiftcare.backend.auth;
 
+import com.swiftcare.backend.consultation.Doctor;
 import com.swiftcare.backend.patient.Patient;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -22,9 +23,13 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @OneToOne
-    @JoinColumn(name = "patient_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id")
     private Patient patient;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "doctor_id")
+    private Doctor doctor;
 
     @Column(nullable = false, unique = true)
     private String token;
@@ -37,7 +42,22 @@ public class RefreshToken {
 
     @PrePersist
     protected void onCreate() {
-        this.revoked = false;
-        this.expiresAt = LocalDateTime.now().plusDays(30);
+        if (patient == null && doctor == null) {
+            throw new IllegalStateException(
+                    "Refresh token must belong to a patient or staff account"
+            );
+        }
+
+        if (patient != null && doctor != null) {
+            throw new IllegalStateException(
+                    "Refresh token cannot have multiple owners"
+            );
+        }
+
+        revoked = false;
+
+        if (expiresAt == null) {
+            expiresAt = LocalDateTime.now().plusDays(30);
+        }
     }
 }

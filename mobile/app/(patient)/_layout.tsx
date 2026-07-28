@@ -181,6 +181,20 @@ export default function PatientLayout() {
           href: null,
         }}
       />
+
+      <Tabs.Screen
+        name="lab-results"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="subscription-checkout"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

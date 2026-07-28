@@ -97,6 +97,13 @@ public class QueueEntry {
     @Column(nullable = false)
     private QueueStatus status = QueueStatus.WAITING;
 
+    @Column(name = "last_skipped_at")
+    private LocalDateTime lastSkippedAt;
+
+    @Builder.Default
+    @Column(name = "skip_count", nullable = false)
+    private Integer skipCount = 0;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -131,6 +138,10 @@ public class QueueEntry {
             currentPosition = 0;
         }
 
+        if (skipCount == null) {
+            skipCount = 0;
+        }
+
         if (status == null) {
             status = QueueStatus.WAITING;
         }
@@ -146,6 +157,10 @@ public class QueueEntry {
 
         if (severityScore != null && severityScore >= 4) {
             emergency = true;
+        }
+
+        if (skipCount == null) {
+            skipCount = 0;
         }
     }
 

@@ -17,8 +17,12 @@ import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useTheme } from '../../context/ThemeContext';
 
-type RemainingDrug = {
+type DispensationRecord = {
   drugName?: string;
+  status?: 'PENDING' | 'DISPENSED' | 'UNAVAILABLE';
+  pharmacyName?: string | null;
+  pharmacistName?: string | null;
+  dispensedAt?: string | null;
 };
 
 type Prescription = {
@@ -26,6 +30,7 @@ type Prescription = {
   issuedAt?: string;
   drugs?: string[];
   qrCodeData?: string;
+  dispensationRecords?: DispensationRecord[];
 };
 
 export default function PrescriptionScreen() {
@@ -34,10 +39,6 @@ export default function PrescriptionScreen() {
   const [prescriptions, setPrescriptions] = useState<
     Prescription[]
   >([]);
-
-  const [remaining, setRemaining] = useState<
-    Record<string, RemainingDrug[]>
-  >({});
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,46 +62,8 @@ export default function PrescriptionScreen() {
         : [];
 
       setPrescriptions(prescriptionList);
-
-      const remainingMap: Record<
-        string,
-        RemainingDrug[]
-      > = {};
-
-      await Promise.all(
-        prescriptionList.map(
-          async (prescription: Prescription) => {
-            try {
-              const remainingResponse =
-                await api.get(
-                  `/prescriptions/${prescription.id}/remaining`
-                );
-
-              remainingMap[prescription.id] =
-                Array.isArray(remainingResponse.data)
-                  ? remainingResponse.data
-                  : [];
-            } catch (error) {
-              console.error(
-                `Failed to fetch remaining drugs for prescription ${prescription.id}:`,
-                error
-              );
-
-              remainingMap[prescription.id] = [];
-            }
-          }
-        )
-      );
-
-      setRemaining(remainingMap);
     } catch (error) {
-      console.error(
-        'Failed to fetch prescriptions:',
-        error
-      );
-
       setPrescriptions([]);
-      setRemaining({});
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -265,11 +228,23 @@ export default function PrescriptionScreen() {
           </View>
         ) : (
           prescriptions.map(prescription => {
-            const remainingDrugs =
-              remaining[prescription.id] || [];
+            const dispensationRecords = Array.isArray(
+              prescription.dispensationRecords
+            )
+              ? prescription.dispensationRecords
+              : [];
 
+            const pendingDrugs = dispensationRecords.filter(
+              record => record.status === 'PENDING'
+            );
+            const unavailableDrugs = dispensationRecords.filter(
+              record => record.status === 'UNAVAILABLE'
+            );
             const allDispensed =
-              remainingDrugs.length === 0;
+              dispensationRecords.length > 0 &&
+              pendingDrugs.length === 0 &&
+              unavailableDrugs.length === 0;
+            const hasUnavailable = unavailableDrugs.length > 0;
 
             const drugs = Array.isArray(
               prescription.drugs
@@ -351,7 +326,9 @@ export default function PrescriptionScreen() {
                       {
                         backgroundColor: allDispensed
                           ? colors.successLight
-                          : colors.warningLight,
+                          : hasUnavailable
+                            ? colors.dangerLight
+                            : colors.warningLight,
                       },
                     ]}
                   >
@@ -361,13 +338,17 @@ export default function PrescriptionScreen() {
                         {
                           color: allDispensed
                             ? colors.success
-                            : colors.warning,
+                            : hasUnavailable
+                              ? colors.danger
+                              : colors.warning,
                         },
                       ]}
                     >
                       {allDispensed
                         ? 'Complete'
-                        : 'Pending'}
+                        : hasUnavailable
+                          ? 'Attention'
+                          : 'Pending'}
                     </Text>
                   </View>
                 </View>
@@ -408,12 +389,12 @@ export default function PrescriptionScreen() {
                     </Text>
                   ) : (
                     drugs.map((drug, index) => {
-                      const isRemaining =
-                        remainingDrugs.some(
-                          remainingDrug =>
-                            remainingDrug.drugName ===
-                            drug
-                        );
+                      const record = dispensationRecords.find(
+                        item => item.drugName?.toLowerCase() === drug.toLowerCase()
+                      );
+                      const status = record?.status ?? 'PENDING';
+                      const isPending = status === 'PENDING';
+                      const isUnavailable = status === 'UNAVAILABLE';
 
                       return (
                         <View
@@ -431,15 +412,19 @@ export default function PrescriptionScreen() {
                           >
                             <Ionicons
                               name={
-                                isRemaining
+                                isPending
                                   ? 'ellipse-outline'
-                                  : 'checkmark-circle'
+                                  : isUnavailable
+                                    ? 'close-circle'
+                                    : 'checkmark-circle'
                               }
                               size={19}
                               color={
-                                isRemaining
+                                isPending
                                   ? colors.textDisabled
-                                  : colors.success
+                                  : isUnavailable
+                                    ? colors.danger
+                                    : colors.success
                               }
                             />
 
@@ -461,9 +446,11 @@ export default function PrescriptionScreen() {
                               styles.drugBadge,
                               {
                                 backgroundColor:
-                                  isRemaining
+                                  isPending
                                     ? colors.warningLight
-                                    : colors.successLight,
+                                    : isUnavailable
+                                      ? colors.dangerLight
+                                      : colors.successLight,
                               },
                             ]}
                           >
@@ -471,15 +458,19 @@ export default function PrescriptionScreen() {
                               style={[
                                 styles.drugBadgeText,
                                 {
-                                  color: isRemaining
+                                  color: isPending
                                     ? colors.warning
-                                    : colors.success,
+                                    : isUnavailable
+                                      ? colors.danger
+                                      : colors.success,
                                 },
                               ]}
                             >
-                              {isRemaining
+                              {isPending
                                 ? 'Pending'
-                                : 'Dispensed'}
+                                : isUnavailable
+                                  ? 'Unavailable'
+                                  : 'Dispensed'}
                             </Text>
                           </View>
                         </View>
@@ -587,7 +578,7 @@ export default function PrescriptionScreen() {
                         medication.
                       </Text>
 
-                      {remainingDrugs.length > 0 ? (
+                      {pendingDrugs.length > 0 ? (
                         <View
                           style={[
                             styles.remainingHint,
@@ -612,9 +603,9 @@ export default function PrescriptionScreen() {
                               },
                             ]}
                           >
-                            {remainingDrugs.length}{' '}
+                            {pendingDrugs.length}{' '}
                             drug
-                            {remainingDrugs.length ===
+                            {pendingDrugs.length ===
                             1
                               ? ''
                               : 's'}{' '}
@@ -646,8 +637,9 @@ export default function PrescriptionScreen() {
                               },
                             ]}
                           >
-                            All medication has been
-                            dispensed.
+                            {hasUnavailable
+                              ? 'Some medication was unavailable. Contact the pharmacy or your doctor.'
+                              : 'All medication has been dispensed.'}
                           </Text>
                         </View>
                       )}

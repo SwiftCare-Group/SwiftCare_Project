@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final InternalServiceKeyFilter internalServiceKeyFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
@@ -22,40 +23,41 @@ public class SecurityConfig {
 
         return http
                 .csrf(csrf -> csrf.disable())
-
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
-
-.authorizeHttpRequests(auth -> auth
-        .requestMatchers(
-                "/actuator/health",
-                "/actuator/info"
-        ).permitAll()
-
-        .requestMatchers(
-                HttpMethod.POST,
-                "/notifications/devices"
-        ).authenticated()
-
-        .requestMatchers(
-                HttpMethod.GET,
-                "/notifications/devices"
-        ).authenticated()
-
-        .requestMatchers(
-                HttpMethod.DELETE,
-                "/notifications/devices/**"
-        ).authenticated()
-
-        .anyRequest().authenticated()
-)                .addFilterBefore(
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/info"
+                        ).permitAll()
+                        // Internal requests are authenticated by InternalServiceKeyFilter.
+                        .requestMatchers("/internal/**").permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/notifications/devices"
+                        ).hasRole("PATIENT")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/notifications/devices"
+                        ).hasRole("PATIENT")
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/notifications/devices/**"
+                        ).hasRole("PATIENT")
+                        .anyRequest().authenticated()
+                )
+                // Register JwtFilter first so Spring Security knows its order.
+                .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
-
+                .addFilterBefore(
+                        internalServiceKeyFilter,
+                        JwtFilter.class
+                )
                 .build();
     }
 }

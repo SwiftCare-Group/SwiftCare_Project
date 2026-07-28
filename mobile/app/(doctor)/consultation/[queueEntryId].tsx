@@ -90,6 +90,27 @@ const getBackendMessage = (
   return fallbackMessage;
 };
 
+
+const splitEntries = (value: string): string[] =>
+  Array.from(
+    new Set(
+      value
+        .split(/[\n,;]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    )
+  );
+
+const toNullableNumber = (value: string): number | null => {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export default function ConsultationScreen() {
   const router = useRouter();
 
@@ -123,6 +144,15 @@ export default function ConsultationScreen() {
   const [labRequest, setLabRequest] =
     useState('');
 
+  const [temperature, setTemperature] = useState('');
+  const [bloodPressure, setBloodPressure] = useState('');
+  const [pulseRate, setPulseRate] = useState('');
+  const [respiratoryRate, setRespiratoryRate] = useState('');
+  const [oxygenSaturation, setOxygenSaturation] = useState('');
+  const [weight, setWeight] = useState('');
+  const [followUpInstructions, setFollowUpInstructions] = useState('');
+  const [referralNotes, setReferralNotes] = useState('');
+
   const [loading, setLoading] =
     useState(true);
 
@@ -137,15 +167,6 @@ export default function ConsultationScreen() {
       try {
         setLoading(true);
         setLoadFailed(false);
-
-        console.log(
-          'FETCHING QUEUE ENTRY:',
-          {
-            queueEntryId: id,
-            url: `/queue/${id}`,
-          }
-        );
-
         const response = await api.get(
           `/queue/${id}`,
           {
@@ -157,19 +178,6 @@ export default function ConsultationScreen() {
       } catch (error: any) {
         setPatient(null);
         setLoadFailed(true);
-
-        console.error(
-          'CONSULTATION LOAD ERROR:',
-          {
-            queueEntryId: id,
-            url: error?.config?.url,
-            method: error?.config?.method,
-            status: error?.response?.status,
-            data: error?.response?.data,
-            message: error?.message,
-          }
-        );
-
         Alert.alert(
           'Unable to load consultation',
           getBackendMessage(
@@ -186,15 +194,6 @@ export default function ConsultationScreen() {
 
   useEffect(() => {
     if (!isValidRouteId(queueEntryId)) {
-      console.error(
-        'INVALID OR MISSING CONSULTATION PARAMETERS:',
-        {
-          queueEntryId,
-          patientId: routePatientId,
-          params,
-        }
-      );
-
       setLoading(false);
       setLoadFailed(true);
 
@@ -258,27 +257,32 @@ export default function ConsultationScreen() {
     try {
       setCompleting(true);
 
-      const clinicalRecordPayload = {
-        queueEntryId,
-        diagnosis: cleanedDiagnosis,
-        consultationNotes:
-          consultationNotes.trim() || null,
-        prescription:
-          prescription.trim() || null,
-        labRequest:
-          labRequest.trim() || null,
-      };
-
-      console.log(
-        'CREATING AND COMPLETING CLINICAL RECORD:',
-        clinicalRecordPayload
-      );
+      const drugs = splitEntries(prescription);
+      const labOrders = splitEntries(labRequest).map((testName) => ({
+        testName,
+        clinicalReason: cleanedDiagnosis,
+        instructions: null,
+      }));
 
       await api.post(
-        '/clinical-records/complete',
-        clinicalRecordPayload,
+        '/consultations/complete-workflow',
         {
-          timeout: 20000,
+          queueEntryId,
+          diagnosis: cleanedDiagnosis,
+          consultationNotes: consultationNotes.trim() || null,
+          temperatureCelsius: toNullableNumber(temperature),
+          bloodPressure: bloodPressure.trim() || null,
+          pulseRate: toNullableNumber(pulseRate),
+          respiratoryRate: toNullableNumber(respiratoryRate),
+          oxygenSaturation: toNullableNumber(oxygenSaturation),
+          weightKg: toNullableNumber(weight),
+          followUpInstructions: followUpInstructions.trim() || null,
+          referralNotes: referralNotes.trim() || null,
+          drugs,
+          labOrders,
+        },
+        {
+          timeout: 30000,
         }
       );
 
@@ -297,18 +301,6 @@ export default function ConsultationScreen() {
         ]
       );
     } catch (error: any) {
-      console.error(
-        'COMPLETE CONSULTATION ERROR:',
-        {
-          queueEntryId,
-          status: error?.response?.status,
-          data: error?.response?.data,
-          message: error?.message,
-          url: error?.config?.url,
-          method: error?.config?.method,
-        }
-      );
-
       Alert.alert(
         'Unable to complete consultation',
         getBackendMessage(
@@ -642,6 +634,69 @@ export default function ConsultationScreen() {
         </View>
 
         <View style={styles.formSection}>
+          <Text style={styles.fieldLabel}>Vital signs</Text>
+          <Text style={styles.fieldHint}>
+            Enter the available measurements. Leave unknown values blank.
+          </Text>
+
+          <View style={styles.vitalsGrid}>
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={temperature}
+              onChangeText={setTemperature}
+              placeholder="Temperature °C"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="decimal-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={bloodPressure}
+              onChangeText={setBloodPressure}
+              placeholder="Blood pressure 120/80"
+              placeholderTextColor={Colors.textDisabled}
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={pulseRate}
+              onChangeText={setPulseRate}
+              placeholder="Pulse bpm"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="number-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={respiratoryRate}
+              onChangeText={setRespiratoryRate}
+              placeholder="Respiratory rate"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="number-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={oxygenSaturation}
+              onChangeText={setOxygenSaturation}
+              placeholder="SpO₂ %"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="number-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={weight}
+              onChangeText={setWeight}
+              placeholder="Weight kg"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="decimal-pad"
+              editable={!completing}
+            />
+          </View>
+        </View>
+
+        <View style={styles.formSection}>
           <Text style={styles.fieldLabel}>
             Prescription
           </Text>
@@ -679,6 +734,34 @@ export default function ConsultationScreen() {
             placeholderTextColor={
               Colors.textDisabled
             }
+            multiline
+            textAlignVertical="top"
+            editable={!completing}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.fieldLabel}>Follow-up instructions</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={followUpInstructions}
+            onChangeText={setFollowUpInstructions}
+            placeholder="Review date, home care and warning signs"
+            placeholderTextColor={Colors.textDisabled}
+            multiline
+            textAlignVertical="top"
+            editable={!completing}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.fieldLabel}>Referral notes</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={referralNotes}
+            onChangeText={setReferralNotes}
+            placeholder="Optional referral destination and reason"
+            placeholderTextColor={Colors.textDisabled}
             multiline
             textAlignVertical="top"
             editable={!completing}
@@ -882,6 +965,25 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontWeight: '600',
     color: Colors.textPrimary,
+  },
+
+  fieldHint: {
+    marginTop: -4,
+    marginBottom: 10,
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+
+  vitalsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+
+  vitalInput: {
+    width: '48%',
+    marginBottom: 0,
   },
 
   formSection: {

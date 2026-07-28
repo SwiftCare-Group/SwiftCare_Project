@@ -8,18 +8,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface ClinicalRecordRepository
-        extends JpaRepository<ClinicalRecord, UUID> {
+public interface ClinicalRecordRepository extends JpaRepository<ClinicalRecord, UUID> {
 
     boolean existsByQueueEntryId(UUID queueEntryId);
 
     Optional<ClinicalRecord> findByQueueEntryId(UUID queueEntryId);
 
-    List<ClinicalRecord> findAllByPatientIdOrderByCreatedAtDesc(
-            UUID patientId
-    );
+    boolean existsByConsultationId(UUID consultationId);
 
-    List<ClinicalRecord> findAllByDoctorIdOrderByCreatedAtDesc(
-            UUID doctorId
-    );
+    Optional<ClinicalRecord> findByConsultationId(UUID consultationId);
+
+    List<ClinicalRecord> findAllByPatientIdOrderByCreatedAtDesc(UUID patientId);
+
+    List<ClinicalRecord> findAllByDoctorIdOrderByCreatedAtDesc(UUID doctorId);
 }

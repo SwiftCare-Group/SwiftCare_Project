@@ -12,7 +12,4 @@ public class LabResultRequest {
     private String interpretation;
 
     private String notes;
-
-    @NotBlank(message = "Performed by is required")
-    private String performedBy;
 }

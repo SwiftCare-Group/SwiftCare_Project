@@ -57,20 +57,12 @@ export default function DoctorLayout() {
         }}
       />
 
-<Tabs.Screen
-  name="consultation/[queueEntryId]"
-  options={{
-    title: "Current Patient",
-    tabBarLabel: "Current Patient",
-    tabBarIcon: ({ color, size, focused }) => (
-      <Ionicons
-        name={focused ? "medical" : "medical-outline"}
-        size={size}
-        color={color}
+      <Tabs.Screen
+        name="consultation/[queueEntryId]"
+        options={{
+          href: null,
+        }}
       />
-    ),
-  }}
-/>
       <Tabs.Screen
         name="consultation-video"
         options={{

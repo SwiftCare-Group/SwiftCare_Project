@@ -93,8 +93,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       if (savedTheme === 'light' || savedTheme === 'dark') {
         setThemeState(savedTheme);
       }
-    } catch (error) {
-      console.error('Failed to load theme:', error);
+    } catch {
+      // Keep the default theme when stored preferences cannot be read.
     }
   };
 
@@ -106,8 +106,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         THEME_STORAGE_KEY,
         newTheme
       );
-    } catch (error) {
-      console.error('Failed to save theme:', error);
+    } catch {
+      // The in-memory theme still applies if persistence is unavailable.
     }
   };
 

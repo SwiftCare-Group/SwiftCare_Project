@@ -1,6 +1,10 @@
 package com.swiftcare.backend.queue;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -38,4 +42,16 @@ findByDepartmentIdAndStatusInOrderBySeverityScoreDescPremiumDescScheduledTimeAsc
         UUID departmentId,
         List<QueueStatus> statuses
 );
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT entry
+        FROM QueueEntry entry
+        WHERE entry.departmentId = :departmentId
+          AND entry.status IN :statuses
+        """)
+    List<QueueEntry> findAndLockDepartmentQueue(
+            @Param("departmentId") UUID departmentId,
+            @Param("statuses") List<QueueStatus> statuses
+    );
+
 }

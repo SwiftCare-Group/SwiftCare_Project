@@ -1,6 +1,7 @@
 package com.swiftcare.backend.consultation;
 
 import com.swiftcare.backend.common.enums.ConsultationStatus;
+import com.swiftcare.backend.common.enums.Role;
 import com.swiftcare.backend.common.exception.ResourceNotFoundException;
 import com.swiftcare.backend.common.exception.UnauthorizedException;
 import com.swiftcare.backend.consultation.dto.ConsultationRequest;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class ConsultationService {
@@ -29,7 +31,7 @@ public class ConsultationService {
     @Transactional(readOnly = true)
     public List<DoctorResponse> getAvailableDoctors() {
         return doctorRepository
-                .findAllByIsAvailableOnlineTrueAndIsDeletedFalse()
+                .findAllByRoleAndIsAvailableOnlineTrueAndIsDeletedFalse(Role.DOCTOR)
                 .stream()
                 .map(this::mapDoctorToResponse)
                 .toList();
@@ -40,34 +42,77 @@ public class ConsultationService {
             UUID patientId,
             ConsultationRequest request
     ) {
+        if (request == null || request.getDoctorId() == null) {
+            throw new IllegalArgumentException("A doctor is required");
+        }
+        if (request.getScheduledAt() == null
+                || !request.getScheduledAt().isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException(
+                    "Consultation time must be in the future"
+            );
+        }
+
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Patient not found")
                 );
 
-        Doctor doctor = doctorRepository.findById(request.getDoctorId())
+        Doctor doctor = doctorRepository.findForOnlineBooking(request.getDoctorId())
+                .filter(current -> current.getRole() == Role.DOCTOR)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Doctor not found")
                 );
 
-        QueueEntry queueEntry = queueEntryRepository
-                .findById(request.getQueueEntryId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Queue entry not found")
-                );
-
-        validateQueueEntryOwnership(queueEntry, patientId);
-
-        if (consultationRepository.existsByQueueEntryId(queueEntry.getId())) {
+        if (!doctor.isAvailableOnline()) {
             throw new IllegalStateException(
-                    "A consultation already exists for this queue entry"
+                    "The selected doctor is not currently available online"
             );
         }
 
-        if (request.getScheduledAt().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException(
-                    "Consultation time must be in the future"
+        LocalDateTime windowStart = request.getScheduledAt().minusMinutes(30);
+        LocalDateTime windowEnd = request.getScheduledAt().plusMinutes(30);
+        List<ConsultationStatus> blockingStatuses = List.of(
+                ConsultationStatus.SCHEDULED,
+                ConsultationStatus.IN_PROGRESS
+        );
+
+        if (consultationRepository.countDoctorConflicts(
+                doctor.getId(),
+                blockingStatuses,
+                windowStart,
+                windowEnd
+        ) > 0) {
+            throw new IllegalStateException(
+                    "The selected doctor already has a consultation near this time"
             );
+        }
+
+        if (consultationRepository.countPatientConflicts(
+                patient.getId(),
+                blockingStatuses,
+                windowStart,
+                windowEnd
+        ) > 0) {
+            throw new IllegalStateException(
+                    "You already have a consultation near this time"
+            );
+        }
+
+        QueueEntry queueEntry = null;
+        if (request.getQueueEntryId() != null) {
+            queueEntry = queueEntryRepository
+                    .findById(request.getQueueEntryId())
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException("Queue entry not found")
+                    );
+
+            validateQueueEntryOwnership(queueEntry, patientId);
+
+            if (consultationRepository.existsByQueueEntryId(queueEntry.getId())) {
+                throw new IllegalStateException(
+                        "A consultation already exists for this queue entry"
+                );
+            }
         }
 
         Consultation consultation = Consultation.builder()
@@ -78,15 +123,12 @@ public class ConsultationService {
                 .status(ConsultationStatus.SCHEDULED)
                 .build();
 
-        Consultation saved = consultationRepository.save(consultation);
-
-        return mapToResponse(saved);
+        return mapToResponse(consultationRepository.save(consultation));
     }
 
     @Transactional(readOnly = true)
     public ConsultationResponse getConsultation(UUID consultationId) {
-        Consultation consultation = findConsultation(consultationId);
-        return mapToResponse(consultation);
+        return mapToResponse(findConsultation(consultationId));
     }
 
     @Transactional
@@ -98,7 +140,6 @@ public class ConsultationService {
                     "A completed consultation cannot be joined"
             );
         }
-
         if (consultation.getStatus() == ConsultationStatus.CANCELLED) {
             throw new IllegalStateException(
                     "A cancelled consultation cannot be joined"
@@ -107,21 +148,16 @@ public class ConsultationService {
 
         if (consultation.getSessionUrl() == null
                 || consultation.getSessionUrl().isBlank()) {
-
             consultation.setSessionUrl(
                     "https://meet.jit.si/swiftcare-" + consultation.getId()
             );
         }
-
         if (consultation.getStartedAt() == null) {
             consultation.setStartedAt(LocalDateTime.now());
         }
-
         consultation.setStatus(ConsultationStatus.IN_PROGRESS);
 
-        Consultation updated = consultationRepository.save(consultation);
-
-        return mapToResponse(updated);
+        return mapToResponse(consultationRepository.save(consultation));
     }
 
     @Transactional
@@ -136,7 +172,6 @@ public class ConsultationService {
                     "A cancelled consultation cannot be completed"
             );
         }
-
         if (consultation.getStatus() == ConsultationStatus.COMPLETED) {
             throw new IllegalStateException(
                     "Consultation has already been completed"
@@ -147,9 +182,7 @@ public class ConsultationService {
         consultation.setEndedAt(LocalDateTime.now());
         consultation.setNotes(cleanNullableText(notes));
 
-        Consultation updated = consultationRepository.save(consultation);
-
-        return mapToResponse(updated);
+        return mapToResponse(consultationRepository.save(consultation));
     }
 
     @Transactional
@@ -157,11 +190,10 @@ public class ConsultationService {
         Consultation consultation = findConsultation(consultationId);
 
         if (consultation.getStatus() == ConsultationStatus.COMPLETED) {
-            throw new UnauthorizedException(
+            throw new IllegalStateException(
                     "Cannot cancel a completed consultation"
             );
         }
-
         if (consultation.getStatus() == ConsultationStatus.CANCELLED) {
             throw new IllegalStateException(
                     "Consultation has already been cancelled"
@@ -169,10 +201,7 @@ public class ConsultationService {
         }
 
         consultation.setStatus(ConsultationStatus.CANCELLED);
-
-        Consultation updated = consultationRepository.save(consultation);
-
-        return mapToResponse(updated);
+        return mapToResponse(consultationRepository.save(consultation));
     }
 
     @Transactional(readOnly = true)
@@ -190,12 +219,15 @@ public class ConsultationService {
 
     @Transactional(readOnly = true)
     public List<ConsultationResponse> getDoctorConsultations(UUID doctorId) {
-        if (!doctorRepository.existsById(doctorId)) {
-            throw new ResourceNotFoundException("Doctor not found");
-        }
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .filter(current -> !current.isDeleted())
+                .filter(current -> current.getRole() == Role.DOCTOR)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Doctor not found")
+                );
 
         return consultationRepository
-                .findAllByDoctorIdOrderByScheduledAtDesc(doctorId)
+                .findAllByDoctorIdOrderByScheduledAtDesc(doctor.getId())
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -204,38 +236,30 @@ public class ConsultationService {
     private Consultation findConsultation(UUID consultationId) {
         return consultationRepository.findById(consultationId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Consultation not found"
-                        )
+                        new ResourceNotFoundException("Consultation not found")
                 );
     }
 
-private void validateQueueEntryOwnership(
-        QueueEntry queueEntry,
-        UUID patientId
-) {
-    if (queueEntry == null) {
-        throw new ResourceNotFoundException(
-                "Queue entry not found"
-        );
+    private void validateQueueEntryOwnership(
+            QueueEntry queueEntry,
+            UUID patientId
+    ) {
+        if (queueEntry.getPatientId() == null) {
+            throw new IllegalStateException(
+                    "Queue entry does not contain a patient ID"
+            );
+        }
+        if (!queueEntry.getPatientId().equals(patientId)) {
+            throw new UnauthorizedException(
+                    "This queue entry does not belong to the logged-in patient"
+            );
+        }
     }
 
-    if (queueEntry.getPatientId() == null) {
-        throw new IllegalStateException(
-                "Queue entry does not contain a patient ID"
-        );
-    }
-
-    if (!queueEntry.getPatientId().equals(patientId)) {
-        throw new UnauthorizedException(
-                "This queue entry does not belong to the logged-in patient"
-        );
-    }
-}    private String cleanNullableText(String value) {
+    private String cleanNullableText(String value) {
         if (value == null) {
             return null;
         }
-
         String cleaned = value.trim();
         return cleaned.isEmpty() ? null : cleaned;
     }
@@ -260,9 +284,7 @@ private void validateQueueEntryOwnership(
                 .build();
     }
 
-    private ConsultationResponse mapToResponse(
-            Consultation consultation
-    ) {
+    private ConsultationResponse mapToResponse(Consultation consultation) {
         return ConsultationResponse.builder()
                 .id(consultation.getId())
                 .patientId(

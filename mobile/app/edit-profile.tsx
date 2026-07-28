@@ -55,11 +55,6 @@ export default function EditProfileScreen() {
       setName(patient.name || '');
       setPhone(patient.phone || '');
     } catch (error: any) {
-      console.error(
-        'Failed to load profile:',
-        error.response?.data || error.message
-      );
-
       Alert.alert(
         'Profile Error',
         'Your profile could not be loaded.'
@@ -126,11 +121,6 @@ export default function EditProfileScreen() {
         ]
       );
     } catch (error: any) {
-      console.error(
-        'Failed to update profile:',
-        error.response?.data || error.message
-      );
-
       Alert.alert(
         'Update Failed',
         error.response?.data?.message ||

@@ -1,5 +1,7 @@
 package com.swiftcare.backend.prescription.dto;
 
+import com.swiftcare.backend.pharmacy.dto.DispensationRecordResponse;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -39,6 +41,9 @@ public class PrescriptionResponse {
      * Base64 encoded QR code image.
      */
     private String qrCodeData;
+
+    /** Current status and audit information for every prescribed drug. */
+    private List<DispensationRecordResponse> dispensationRecords;
 
     /**
      * Date and time the prescription was issued.
