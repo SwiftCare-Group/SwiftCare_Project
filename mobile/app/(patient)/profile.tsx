@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import api, { logoutSession, refreshSessionTokens } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useTheme } from '../../context/ThemeContext';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type ProfileData = {
   name?: string;
@@ -47,6 +48,9 @@ export default function ProfileScreen() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [loadingUpgrade, setLoadingUpgrade] = useState(false);
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<'MONTHLY' | 'YEARLY' | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [plansError, setPlansError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [plans, setPlans] = useState<SubscriptionPlanData[]>([]);
 
@@ -66,28 +70,57 @@ export default function ProfileScreen() {
     try {
       const response = await api.get('/patients/me');
       setProfile(response.data);
-    } catch (error: any) {
-      setProfileError(error?.response?.data?.message || 'Your profile could not be loaded.');
+    } catch (error: unknown) {
+      setProfileError(
+        getApiErrorMessage(error, {
+          fallback: 'Your profile could not be loaded.',
+        }),
+      );
     } finally {
       setLoadingProfile(false);
     }
   };
 
   const fetchSubscription = async () => {
+    setSubscriptionError(null);
+
     try {
       const response = await api.get('/subscriptions/status');
-      setSubscription(response.data);
-    } catch {
+      setSubscription(response.data ?? null);
+    } catch (error: any) {
       setSubscription(null);
+
+      if (error?.response?.status !== 404) {
+        setSubscriptionError(
+          getApiErrorMessage(error, {
+            fallback: 'Subscription status could not be loaded.',
+            forbidden: 'Your account is not authorized to access subscriptions.',
+          }),
+        );
+      }
     }
   };
 
   const fetchPlans = async () => {
+    setPlansError(null);
+
     try {
       const response = await api.get('/subscriptions/plans');
-      setPlans(Array.isArray(response.data) ? response.data : []);
-    } catch {
+      const availablePlans = Array.isArray(response.data)
+        ? response.data.filter(
+            (item): item is SubscriptionPlanData =>
+              item?.plan === 'MONTHLY' || item?.plan === 'YEARLY',
+          )
+        : [];
+
+      setPlans(availablePlans);
+    } catch (error: unknown) {
       setPlans([]);
+      setPlansError(
+        getApiErrorMessage(error, {
+          fallback: 'Live subscription prices could not be loaded.',
+        }),
+      );
     }
   };
 
@@ -97,6 +130,11 @@ export default function ProfileScreen() {
   const handleUpgrade = async (
     plan: 'MONTHLY' | 'YEARLY'
   ) => {
+    if (loadingUpgrade) {
+      return;
+    }
+
+    setSelectedUpgradePlan(plan);
     setLoadingUpgrade(true);
 
     try {
@@ -116,15 +154,18 @@ export default function ProfileScreen() {
         pathname: '/(patient)/subscription-checkout',
         params: { paymentUrl, reference },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert(
         'Subscription unavailable',
-        error.response?.data?.message ||
-          error.message ||
-          'Failed to initiate the subscription payment.'
+        getApiErrorMessage(error, {
+          fallback: 'Failed to initiate the subscription payment.',
+          forbidden: 'Your account is not authorized to start a subscription.',
+          conflict: 'A subscription payment is already pending for this account.',
+        }),
       );
     } finally {
       setLoadingUpgrade(false);
+      setSelectedUpgradePlan(null);
     }
   };
 
@@ -145,10 +186,13 @@ export default function ProfileScreen() {
               await fetchProfile();
               await fetchSubscription();
               Alert.alert('Subscription cancelled', 'Your account is now on the free plan.');
-            } catch (error: any) {
+            } catch (error: unknown) {
               Alert.alert(
                 'Unable to cancel',
-                error.response?.data?.message || 'The subscription could not be cancelled.'
+                getApiErrorMessage(error, {
+                  fallback: 'The subscription could not be cancelled.',
+                  conflict: 'This subscription is already inactive.',
+                }),
               );
             } finally {
               setCancelling(false);
@@ -202,7 +246,10 @@ const handleLogout = async () => {
     );
   }
 
-  const isPremium = profile?.tier === 'PREMIUM';
+  const subscriptionStatus = String(subscription?.status ?? '').toUpperCase();
+  const isPremium =
+    String(profile?.tier ?? '').toUpperCase() === 'PREMIUM' ||
+    subscriptionStatus === 'ACTIVE';
 
   const accountItems = [
     {
@@ -356,6 +403,31 @@ const handleLogout = async () => {
         </View>
 
         {/* Subscription */}
+        {subscriptionError ? (
+          <View
+            style={[
+              styles.inlineErrorCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.danger,
+              },
+            ]}
+          >
+            <Ionicons name="warning-outline" size={20} color={colors.danger} />
+            <View style={styles.inlineErrorText}>
+              <Text style={[styles.inlineErrorTitle, { color: colors.textPrimary }]}>
+                Subscription unavailable
+              </Text>
+              <Text style={[styles.inlineErrorMessage, { color: colors.textSecondary }]}>
+                {subscriptionError}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => void fetchSubscription()}>
+              <Text style={[styles.inlineRetryText, { color: colors.primary }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {subscription ? (
           <View
             style={[
@@ -427,7 +499,7 @@ const handleLogout = async () => {
               </View>
             ))}
 
-            {subscription.status === 'ACTIVE' ? (
+            {subscriptionStatus === 'ACTIVE' ? (
               <TouchableOpacity
                 style={styles.cancelSubscriptionButton}
                 onPress={handleCancelSubscription}
@@ -443,7 +515,7 @@ const handleLogout = async () => {
           </View>
         ) : null}
 
-        {!isPremium && subscription?.status !== 'ACTIVE' ? (
+        {!isPremium && subscriptionStatus !== 'ACTIVE' ? (
           <View style={styles.upgradeCard}>
             <LinearGradient
               colors={[
@@ -469,6 +541,12 @@ const handleLogout = async () => {
                 prescriptions
               </Text>
 
+              {plansError ? (
+                <Text style={styles.planLoadWarning}>
+                  {plansError} Default test prices are shown.
+                </Text>
+              ) : null}
+
               <View style={styles.planRow}>
                 <TouchableOpacity
                   style={styles.planButton}
@@ -480,9 +558,13 @@ const handleLogout = async () => {
                     Monthly
                   </Text>
 
-                  <Text style={styles.planButtonPrice}>
-                    {planPrice('MONTHLY', 'GHS 100.00')}
-                  </Text>
+                  {loadingUpgrade && selectedUpgradePlan === 'MONTHLY' ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.planButtonPrice}>
+                      {planPrice('MONTHLY', 'GHS 100.00')}
+                    </Text>
+                  )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -513,24 +595,20 @@ const handleLogout = async () => {
                     Yearly
                   </Text>
 
-                  <Text
-                    style={[
-                      styles.planButtonPriceBest,
-                      { color: colors.primary },
-                    ]}
-                  >
-                    {planPrice('YEARLY', 'GHS 1,000.00')}
-                  </Text>
+                  {loadingUpgrade && selectedUpgradePlan === 'YEARLY' ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.planButtonPriceBest,
+                        { color: colors.primary },
+                      ]}
+                    >
+                      {planPrice('YEARLY', 'GHS 1,000.00')}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
-
-              {loadingUpgrade ? (
-                <ActivityIndicator
-                  size="small"
-                  color={colors.white}
-                  style={styles.upgradeLoader}
-                />
-              ) : null}
             </LinearGradient>
           </View>
         ) : null}
@@ -697,6 +775,38 @@ const handleLogout = async () => {
 }
 
 const styles = StyleSheet.create({
+  inlineErrorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  inlineErrorText: {
+    flex: 1,
+  },
+  inlineErrorTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  inlineErrorMessage: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  inlineRetryText: {
+    fontSize: 12,
+    fontWeight: '700',
+    padding: 6,
+  },
+  planLoadWarning: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
   safeArea: {
     flex: 1,
   },

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrReplace } from '../../../utils/navigation';
 import {
   useCallback,
   useEffect,
@@ -9,6 +10,8 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../../../constants/colors';
 import api from '../../../services/api';
+import { getApiErrorMessage } from '../../../utils/errors';
 
 type PatientDetails = {
   id: string;
@@ -61,61 +65,6 @@ const isValidRouteId = (
   );
 };
 
-const getBackendMessage = (
-  error: any,
-  fallbackMessage: string
-): string => {
-  const responseData = error?.response?.data;
-
-  if (
-    responseData?.errors &&
-    typeof responseData.errors === 'object'
-  ) {
-    const validationMessages = Object.values(
-      responseData.errors
-    ).filter(
-      (message): message is string =>
-        typeof message === 'string' &&
-        message.trim().length > 0
-    );
-
-    if (validationMessages.length > 0) {
-      return validationMessages.join('\n');
-    }
-  }
-
-  if (
-    typeof responseData?.message === 'string' &&
-    responseData.message.trim()
-  ) {
-    return responseData.message;
-  }
-
-  if (
-    typeof responseData?.error === 'string' &&
-    responseData.error.trim()
-  ) {
-    return responseData.error;
-  }
-
-  if (
-    typeof responseData === 'string' &&
-    responseData.trim()
-  ) {
-    return responseData;
-  }
-
-  if (error?.code === 'ECONNABORTED') {
-    return 'The request took too long. Please check your connection and try again.';
-  }
-
-  if (!error?.response) {
-    return 'The server could not be reached. Check that the backend is running and your device is connected to the same network.';
-  }
-
-  return fallbackMessage;
-};
-
 const splitEntries = (value: string): string[] =>
   Array.from(
     new Set(
@@ -134,6 +83,51 @@ const toNullableNumber = (value: string): number | null => {
 
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const validateOptionalRange = (
+  label: string,
+  value: string,
+  minimum: number,
+  maximum: number,
+): string | null => {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < minimum || parsed > maximum) {
+    return `${label} must be between ${minimum} and ${maximum}.`;
+  }
+
+  return null;
+};
+
+const validateBloodPressure = (value: string): string | null => {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const match = /^(\d{2,3})\s*\/\s*(\d{2,3})$/.exec(normalized);
+  if (!match) {
+    return 'Blood pressure must use the format 120/80.';
+  }
+
+  const systolic = Number(match[1]);
+  const diastolic = Number(match[2]);
+
+  if (
+    systolic < 60 ||
+    systolic > 260 ||
+    diastolic < 30 ||
+    diastolic > 160 ||
+    systolic <= diastolic
+  ) {
+    return 'Enter a plausible blood pressure reading.';
+  }
+
+  return null;
 };
 
 export default function ConsultationScreen() {
@@ -205,10 +199,9 @@ export default function ConsultationScreen() {
         setLoadFailed(true);
         Alert.alert(
           'Unable to load consultation',
-          getBackendMessage(
-            error,
-            'The patient details could not be loaded.'
-          )
+          getApiErrorMessage(error, {
+            fallback: 'The patient details could not be loaded.',
+          })
         );
       } finally {
         setLoading(false);
@@ -228,7 +221,7 @@ export default function ConsultationScreen() {
         [
           {
             text: 'Go back',
-            onPress: () => router.back(),
+            onPress: () => goBackOrReplace(router, '/(doctor)/queue'),
           },
         ]
       );
@@ -279,6 +272,19 @@ export default function ConsultationScreen() {
       return;
     }
 
+    const vitalValidationMessage =
+      validateOptionalRange('Temperature', temperature, 30, 45) ??
+      validateBloodPressure(bloodPressure) ??
+      validateOptionalRange('Pulse rate', pulseRate, 20, 250) ??
+      validateOptionalRange('Respiratory rate', respiratoryRate, 5, 80) ??
+      validateOptionalRange('Oxygen saturation', oxygenSaturation, 0, 100) ??
+      validateOptionalRange('Weight', weight, 1, 500);
+
+    if (vitalValidationMessage) {
+      Alert.alert('Check vital signs', vitalValidationMessage);
+      return;
+    }
+
     try {
       setCompleting(true);
 
@@ -296,7 +302,7 @@ export default function ConsultationScreen() {
           diagnosis: cleanedDiagnosis,
           consultationNotes: consultationNotes.trim() || null,
           temperatureCelsius: toNullableNumber(temperature),
-          bloodPressure: bloodPressure.trim() || null,
+          bloodPressure: bloodPressure.trim().replace(/\s+/g, '') || null,
           pulseRate: toNullableNumber(pulseRate),
           respiratoryRate: toNullableNumber(respiratoryRate),
           oxygenSaturation: toNullableNumber(oxygenSaturation),
@@ -328,15 +334,12 @@ export default function ConsultationScreen() {
     } catch (error: any) {
       Alert.alert(
         'Unable to complete consultation',
-        getBackendMessage(
-          error,
-          'The consultation could not be completed. Please try again.'
-        )
+        getApiErrorMessage(error, {
+          fallback: 'The consultation could not be completed. Please try again.',
+          validation: 'Review the consultation fields and try again.',
+          conflict: 'This consultation has already been completed or its queue status changed.',
+        })
       );
-      console.log(
-  'CONSULTATION COMPLETION ERROR:',
-  JSON.stringify(error?.response?.data, null, 2)
-);
     } finally {
       setCompleting(false);
     }
@@ -412,7 +415,7 @@ export default function ConsultationScreen() {
           <View style={styles.headerRow}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => router.back()}
+              onPress={() => goBackOrReplace(router, '/(doctor)/queue')}
               activeOpacity={0.85}
             >
               <Ionicons
@@ -492,7 +495,7 @@ export default function ConsultationScreen() {
 
           <TouchableOpacity
             style={styles.goBackButton}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(doctor)/queue')}
             activeOpacity={0.85}
           >
             <Text
@@ -521,7 +524,7 @@ export default function ConsultationScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(doctor)/queue')}
             disabled={completing}
             activeOpacity={0.85}
           >
@@ -549,11 +552,16 @@ export default function ConsultationScreen() {
         </View>
       </LinearGradient>
 
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       >
         <View style={styles.patientCard}>
           <View style={styles.patientAvatar}>
@@ -846,6 +854,7 @@ export default function ConsultationScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -855,6 +864,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor:
       Colors.headerGradientStart,
+  },
+
+  keyboardView: {
+    flex: 1,
   },
 
   container: {

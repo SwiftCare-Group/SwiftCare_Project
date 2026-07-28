@@ -1,15 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { goBackOrReplace } from "../../utils/navigation";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useState } from "react";
 
 import { useTheme } from "../../context/ThemeContext";
+import api from "../../services/api";
+import { getApiErrorMessage } from "../../utils/errors";
 
 export default function PatientDetailsScreen() {
   const router = useRouter();
@@ -17,6 +23,7 @@ export default function PatientDetailsScreen() {
 
   const {
     patientId,
+    queueEntryId,
     patientName,
     phone,
     age,
@@ -26,6 +33,7 @@ export default function PatientDetailsScreen() {
     queuePosition,
   } = useLocalSearchParams<{
     patientId?: string;
+    queueEntryId?: string;
     patientName?: string;
     phone?: string;
     age?: string;
@@ -34,6 +42,44 @@ export default function PatientDetailsScreen() {
     appointmentTime?: string;
     queuePosition?: string;
   }>();
+
+  const [starting, setStarting] = useState(false);
+
+  const startConsultation = async () => {
+    const entryId = Array.isArray(queueEntryId) ? queueEntryId[0] : queueEntryId;
+    if (!entryId) {
+      Alert.alert(
+        "Unable to start consultation",
+        "This patient record does not include a queue entry. Return to the queue and select the patient again."
+      );
+      return;
+    }
+
+    if (starting) {
+      return;
+    }
+
+    setStarting(true);
+    try {
+      await api.patch(`/queue/${entryId}/start`);
+      router.replace({
+        pathname: "/(doctor)/consultation/[queueEntryId]",
+        params: {
+          queueEntryId: entryId,
+          patientId: Array.isArray(patientId) ? patientId[0] : patientId || "",
+        },
+      });
+    } catch (error: unknown) {
+      Alert.alert(
+        "Unable to start consultation",
+        getApiErrorMessage(error, {
+          fallback: "The consultation could not be started.",
+        })
+      );
+    } finally {
+      setStarting(false);
+    }
+  };
 
   return (
     <SafeAreaView
@@ -51,7 +97,7 @@ export default function PatientDetailsScreen() {
         <TouchableOpacity
           style={styles.backButton}
           activeOpacity={0.8}
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(doctor)/queue')}
         >
           <Ionicons
             name="arrow-back"
@@ -184,7 +230,7 @@ export default function PatientDetailsScreen() {
             label="Severity score"
             value={
               severityScore
-                ? `${severityScore}/10`
+                ? `${severityScore}/4`
                 : "Not available"
             }
             colors={colors}
@@ -231,25 +277,23 @@ export default function PatientDetailsScreen() {
             { backgroundColor: colors.primary },
           ]}
           activeOpacity={0.85}
-          onPress={() => {
-            router.push({
-              pathname: "/(doctor)/consultations",
-              params: {
-                patientId: patientId || "",
-                patientName: patientName || "",
-              },
-            });
-          }}
+          onPress={() => void startConsultation()}
+          disabled={starting}
         >
-          <Ionicons
-            name="videocam-outline"
-            size={21}
-            color="#FFFFFF"
-          />
-
-          <Text style={styles.consultationButtonText}>
-            Start Consultation
-          </Text>
+          {starting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons
+                name="medical-outline"
+                size={21}
+                color="#FFFFFF"
+              />
+              <Text style={styles.consultationButtonText}>
+                Start Consultation
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

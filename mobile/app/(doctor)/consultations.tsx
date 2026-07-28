@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Colors } from '../../constants/colors';import api from '../../services/api';
+import { Colors } from '../../constants/colors';
 
 
 export default function ConsultationsScreen() {

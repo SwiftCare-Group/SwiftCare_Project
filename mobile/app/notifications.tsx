@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { goBackOrReplace } from '../utils/navigation';
 
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -18,30 +19,9 @@ import {
   getNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
-  saveNotifications,
 } from '../services/notificationStorage';
 
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: '1',
-    title: 'Welcome to SwiftCare',
-    message:
-      'Your account is ready. You can now book appointments and monitor your queue position.',
-    type: 'system',
-    createdAt: new Date().toISOString(),
-    read: false,
-  },
-  {
-    id: '2',
-    title: 'Appointment reminders',
-    message:
-      'Enable appointment reminders in Settings so you do not miss upcoming visits.',
-    type: 'appointment',
-    createdAt: new Date().toISOString(),
-    read: false,
-  },
-];
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -52,43 +32,65 @@ export default function NotificationsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadNotifications();
   }, []);
 
-const loadNotifications = async () => {
-  setLoadError(null);
-  try {
-    const savedNotifications = await getNotifications();
-
-    if (savedNotifications.length === 0) {
-      setNotifications(DEFAULT_NOTIFICATIONS);
-      await saveNotifications(DEFAULT_NOTIFICATIONS);
-    } else {
+  const loadNotifications = async () => {
+    setLoadError(null);
+    try {
+      const savedNotifications = await getNotifications();
       setNotifications(savedNotifications);
+    } catch {
+      setLoadError('Notifications could not be loaded from this device.');
+    } finally {
+      setLoading(false);
     }
-  } catch {
-    setLoadError('Notifications could not be loaded from this device.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-const markAsRead = async (id: string) => {
-  await markNotificationAsRead(id);
-  await loadNotifications();
-};
+  const runStorageOperation = async (
+    operation: () => Promise<void>,
+    failureMessage: string,
+  ) => {
+    if (saving) {
+      return;
+    }
 
-const markAllAsRead = async () => {
-  await markAllNotificationsAsRead();
-  await loadNotifications();
-};
+    setSaving(true);
+    setOperationError(null);
+    try {
+      await operation();
+      await loadNotifications();
+    } catch {
+      setOperationError(failureMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-const clearAll = async () => {
-  await clearNotifications();
-  setNotifications([]);
-};
+  const markAsRead = async (id: string) => {
+    await runStorageOperation(
+      () => markNotificationAsRead(id),
+      'This notification could not be updated.',
+    );
+  };
+
+  const markAllAsRead = async () => {
+    await runStorageOperation(
+      markAllNotificationsAsRead,
+      'Notifications could not be marked as read.',
+    );
+  };
+
+  const clearAll = async () => {
+    await runStorageOperation(
+      clearNotifications,
+      'Notifications could not be cleared.',
+    );
+  };
   const getIcon = (
     type: NotificationItem['type']
   ): keyof typeof Ionicons.glyphMap => {
@@ -109,6 +111,10 @@ const clearAll = async () => {
 
   const formatDate = (value: string) => {
     const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return 'Unknown time';
+    }
 
     return date.toLocaleString('en-GB', {
       day: 'numeric',
@@ -157,7 +163,7 @@ const clearAll = async () => {
       >
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(patient)/home')}
         >
           <Ionicons
             name="chevron-back"
@@ -179,7 +185,9 @@ const clearAll = async () => {
 
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={markAllAsRead}
+          onPress={() => void markAllAsRead()}
+          disabled={saving || notifications.length === 0}
+          accessibilityLabel="Mark all notifications as read"
         >
           <Ionicons
             name="checkmark-done-outline"
@@ -190,11 +198,35 @@ const clearAll = async () => {
       </View>
 
       {loadError ? (
-        <View style={[styles.errorBanner, { backgroundColor: colors.surface, borderColor: colors.danger }]}> 
+        <View
+          style={[
+            styles.errorBanner,
+            { backgroundColor: colors.surface, borderColor: colors.danger },
+          ]}
+        >
           <Ionicons name="warning-outline" size={20} color={colors.danger} />
-          <Text style={[styles.errorBannerText, { color: colors.textPrimary }]}>{loadError}</Text>
+          <Text style={[styles.errorBannerText, { color: colors.textPrimary }]}>
+            {loadError}
+          </Text>
           <TouchableOpacity onPress={() => void loadNotifications()}>
             <Text style={[styles.retryText, { color: colors.primary }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {operationError ? (
+        <View
+          style={[
+            styles.errorBanner,
+            { backgroundColor: colors.surface, borderColor: colors.danger },
+          ]}
+        >
+          <Ionicons name="alert-circle-outline" size={20} color={colors.danger} />
+          <Text style={[styles.errorBannerText, { color: colors.textPrimary }]}>
+            {operationError}
+          </Text>
+          <TouchableOpacity onPress={() => setOperationError(null)}>
+            <Text style={[styles.retryText, { color: colors.primary }]}>Dismiss</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -214,7 +246,9 @@ const clearAll = async () => {
                 borderColor: colors.danger,
               },
             ]}
-            onPress={clearAll}
+            onPress={() => void clearAll()}
+            disabled={saving}
+            accessibilityLabel="Clear all notifications"
           >
             <Text
               style={[
@@ -291,7 +325,9 @@ const clearAll = async () => {
                 },
               ]}
               activeOpacity={0.8}
-              onPress={() => markAsRead(item.id)}
+              onPress={() => void markAsRead(item.id)}
+              disabled={saving || item.read}
+              accessibilityLabel={`${item.read ? 'Read' : 'Unread'} notification: ${item.title}`}
             >
               <View
                 style={[

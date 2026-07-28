@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../../constants/colors';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type StaffRole = 'DOCTOR' | 'PHARMACIST' | 'LAB_TECHNICIAN';
 
@@ -49,14 +50,6 @@ function roleLabel(role?: StaffRole) {
   return ROLE_OPTIONS.find(option => option.value === role)?.label ?? 'Staff';
 }
 
-function getErrorMessage(error: any, fallback: string) {
-  const responseMessage = error?.response?.data?.message;
-  if (typeof responseMessage === 'string' && responseMessage.trim()) {
-    return responseMessage;
-  }
-  return fallback;
-}
-
 export default function StaffScreen() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -80,7 +73,7 @@ export default function StaffScreen() {
       setStaff(Array.isArray(response.data) ? response.data : []);
       setStaffLoadError(null);
     } catch (error) {
-      setStaffLoadError(getErrorMessage(error, 'Staff accounts could not be loaded.'));
+      setStaffLoadError(getApiErrorMessage(error, { fallback: 'Staff accounts could not be loaded.' }));
     }
   }, []);
 
@@ -101,7 +94,7 @@ export default function StaffScreen() {
       });
     } catch (error) {
       setDepartmentLoadError(
-        getErrorMessage(error, 'Departments could not be loaded. Create or activate a department first.'),
+        getApiErrorMessage(error, { fallback: 'Departments could not be loaded. Create or activate a department first.' }),
       );
     }
   }, []);
@@ -144,6 +137,10 @@ export default function StaffScreen() {
   };
 
   const handleCreate = async () => {
+    if (submitting) {
+      return;
+    }
+
     if (validationMessage) {
       Alert.alert('Complete the form', validationMessage);
       return;
@@ -172,7 +169,7 @@ export default function StaffScreen() {
     } catch (error) {
       Alert.alert(
         'Unable to create account',
-        getErrorMessage(error, 'Review the entered details and try again.'),
+        getApiErrorMessage(error, { fallback: 'Review the entered details and try again.' }),
       );
     } finally {
       setSubmitting(false);

@@ -11,13 +11,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addNotification } from '../../services/notificationStorage';
 import api from '../../services/api';
 import { useHaptics } from '../../hooks/useHaptics';
 import { useTheme } from '../../context/ThemeContext';
+import { getApiErrorMessage } from '../../utils/errors';
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +54,7 @@ type Appointment = {
 };
 
 export default function AppointmentsScreen() {
+  const router = useRouter();
   const { colors } = useTheme();
 
   const { mediumTap, successNotification, errorNotification } =
@@ -75,6 +77,8 @@ export default function AppointmentsScreen() {
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [departmentError, setDepartmentError] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
 
   const [selectedDept, setSelectedDept] =
@@ -108,8 +112,11 @@ export default function AppointmentsScreen() {
   }, []);
 
   useEffect(() => {
-    if (preSelectedDept) {
-      setSelectedDept(preSelectedDept);
+    const resolvedDepartment = Array.isArray(preSelectedDept)
+      ? preSelectedDept[0]
+      : preSelectedDept;
+    if (resolvedDepartment) {
+      setSelectedDept(resolvedDepartment);
       setShowBooking(true);
     }
   }, [preSelectedDept]);
@@ -147,6 +154,7 @@ export default function AppointmentsScreen() {
     .map(slot => slot.slice(11, 16));
 
   const fetchAppointments = async () => {
+    setLoadError(null);
     try {
       const response =
         await api.get('/appointments');
@@ -156,14 +164,19 @@ export default function AppointmentsScreen() {
           ? response.data
           : []
       );
-    } catch (error) {
-      setAppointments([]);
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Your appointments could not be loaded.',
+        })
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const fetchDepartments = async () => {
+    setDepartmentError(null);
     try {
       const response =
         await api.get('/departments');
@@ -173,8 +186,12 @@ export default function AppointmentsScreen() {
           ? response.data
           : []
       );
-    } catch (error) {
-      setDepartments([]);
+    } catch (error: unknown) {
+      setDepartmentError(
+        getApiErrorMessage(error, {
+          fallback: 'Departments could not be loaded.',
+        })
+      );
     }
   };
 
@@ -200,7 +217,7 @@ export default function AppointmentsScreen() {
       setSelectedTime('');
       Alert.alert(
         'Unable to load appointment times',
-        error.response?.data?.message || 'Please try again.'
+        getApiErrorMessage(error, { fallback: 'Please try again.' })
       );
     } finally {
       setLoadingSlots(false);
@@ -230,14 +247,15 @@ export default function AppointmentsScreen() {
   };
 
   const handleBook = async () => {
+    if (booking) {
+      return;
+    }
+
     mediumTap();
 
     if (activeTab === 'online') {
-      Alert.alert(
-        'Online Consultation',
-        'Online appointment booking will be available soon.'
-      );
-
+      setShowBooking(false);
+      router.push('/(patient)/consultation');
       return;
     }
 
@@ -371,9 +389,9 @@ await addNotification({
 
       Alert.alert(
         'Booking Failed',
-        error.response?.data?.message ||
-          error.message ||
-          'Failed to book appointment. Please try again.'
+        getApiErrorMessage(error, {
+          fallback: 'Failed to book appointment. Please try again.',
+        })
       );
     } finally {
       setBooking(false);
@@ -416,8 +434,9 @@ await addNotification({
 
               Alert.alert(
                 'Cancellation Failed',
-                error.response?.data?.message ||
-                  'Failed to cancel appointment.'
+                getApiErrorMessage(error, {
+                  fallback: 'Failed to cancel appointment.',
+                })
               );
             }
           },
@@ -528,6 +547,21 @@ await addNotification({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {loadError ? (
+          <View
+            style={[
+              styles.errorBanner,
+              { backgroundColor: colors.surface, borderColor: colors.danger },
+            ]}
+          >
+            <Ionicons name="warning-outline" size={20} color={colors.danger} />
+            <Text style={[styles.errorBannerText, { color: colors.textPrimary }]}>{loadError}</Text>
+            <TouchableOpacity onPress={() => void fetchAppointments()}>
+              <Text style={[styles.retryText, { color: colors.primary }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Booking form */}
         {showBooking ? (
           <View
@@ -703,8 +737,7 @@ await addNotification({
                       },
                     ]}
                   >
-                    This service is being prepared and
-                    will be available soon.
+                    Book a secure video consultation with an available doctor. Premium access may be required.
                   </Text>
                 </View>
               </View>
@@ -746,7 +779,7 @@ await addNotification({
                         },
                       ]}
                     >
-                      No departments are available.
+                      {departmentError || 'No departments are available.'}
                     </Text>
                   </View>
                 ) : (
@@ -1912,4 +1945,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 14 },
+  errorBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  retryText: { fontSize: 13, fontWeight: '700' },
 });

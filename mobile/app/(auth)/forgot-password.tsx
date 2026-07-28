@@ -14,7 +14,11 @@ import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import api from "../../services/api";
-import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import { getApiErrorMessage } from "../../utils/errors";
+import { goBackOrReplace } from "../../utils/navigation";
+import SwiftCareLogo from "../../components/branding/SwiftCareLogo";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -23,8 +27,8 @@ export default function ForgotPasswordScreen() {
   const handleResetPassword = async () => {
     const cleanedEmail = email.trim();
 
-    if (!cleanedEmail) {
-      Alert.alert("Email required", "Please enter your email address.");
+    if (!EMAIL_PATTERN.test(cleanedEmail)) {
+      Alert.alert("Check your email", "Please enter a valid email address.");
       return;
     }
 
@@ -39,10 +43,13 @@ export default function ForgotPasswordScreen() {
         "Request received",
         "If an account exists for this email, password reset instructions will be sent."
       );
-    } catch (error) {
+    } catch (error: unknown) {
       Alert.alert(
         "Unable to continue",
-        "Something went wrong. Please try again."
+        getApiErrorMessage(error, {
+          fallback: "The password reset request could not be sent.",
+          validation: "Please enter a valid account email address.",
+        })
       );
     } finally {
       setLoading(false);
@@ -57,13 +64,7 @@ export default function ForgotPasswordScreen() {
       >
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(auth)/login');
-            }
-          }}
+          onPress={() => goBackOrReplace(router, "/(auth)/login")}
         >
           <MaterialIcons name="arrow-back" size={24} color="#0B8FAC" />
         </TouchableOpacity>
@@ -88,6 +89,9 @@ export default function ForgotPasswordScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            editable={!loading}
+            returnKeyType="done"
+            onSubmitEditing={() => void handleResetPassword()}
           />
 
           <TouchableOpacity

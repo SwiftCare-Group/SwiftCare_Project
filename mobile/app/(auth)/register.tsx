@@ -17,10 +17,36 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import api from '../../services/api';
+import api, { clearLocalSession } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import { normalizeRole } from '../../utils/auth';
+import { getApiErrorMessage } from '../../utils/errors';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const isValidPastDate = (value: string): boolean => {
+  if (!DATE_PATTERN.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+};
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -34,49 +60,87 @@ export default function RegisterScreen() {
   const { mediumTap, successNotification, errorNotification } = useHaptics();
 
 
-const handleRegister = async () => {
-  mediumTap();
-
-  if (!name.trim() || !email.trim() || !phone.trim() || !dateOfBirth.trim() || !password) {
-    errorNotification();
-    Alert.alert('Error', 'All fields are required');
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const response = await api.post('/auth/register', {
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone.trim(),
-      dateOfBirth: dateOfBirth.trim(),
-      password,
-    });
-
-    const { accessToken } = response.data;
-
-    if (!accessToken) {
-      throw new Error('No access token was returned');
+  const handleRegister = async () => {
+    if (loading) {
+      return;
     }
 
-    await AsyncStorage.setItem('accessToken', accessToken);
+    mediumTap();
 
-    successNotification();
-    router.replace('/(auth)/health-profile');
-  } catch (error: any) {
-    errorNotification();
+    const cleanedName = name.trim();
+    const cleanedEmail = email.trim().toLowerCase();
+    const cleanedPhone = phone.trim();
+    const cleanedDateOfBirth = dateOfBirth.trim();
+    const phoneDigits = cleanedPhone.replace(/\D/g, '');
 
-    const message =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      'Registration failed. Try again.';
+    let validationMessage: string | null = null;
 
-    Alert.alert('Registration Failed', message);
-  } finally {
-    setLoading(false);
-  }
-};
+    if (cleanedName.length < 2) {
+      validationMessage = 'Enter your full name.';
+    } else if (!EMAIL_PATTERN.test(cleanedEmail)) {
+      validationMessage = 'Enter a valid email address.';
+    } else if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      validationMessage = 'Enter a valid phone number.';
+    } else if (!isValidPastDate(cleanedDateOfBirth)) {
+      validationMessage = 'Enter a valid past date in YYYY-MM-DD format.';
+    } else if (password.length < 8) {
+      validationMessage = 'Use a password with at least 8 characters.';
+    }
+
+    if (validationMessage) {
+      errorNotification();
+      Alert.alert('Check your details', validationMessage);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await api.post('/auth/register', {
+        name: cleanedName,
+        email: cleanedEmail,
+        phone: cleanedPhone,
+        dateOfBirth: cleanedDateOfBirth,
+        password,
+      });
+
+      const accessToken = response.data?.accessToken;
+      const refreshToken = response.data?.refreshToken;
+      const role = normalizeRole(response.data?.role) ?? 'PATIENT';
+
+      if (typeof accessToken !== 'string' || !accessToken.trim()) {
+        throw new Error('The server did not return a valid access token.');
+      }
+
+      await clearLocalSession();
+
+      const storageEntries: [string, string][] = [
+        ['accessToken', accessToken],
+        ['userRole', role],
+      ];
+
+      if (typeof refreshToken === 'string' && refreshToken.trim()) {
+        storageEntries.push(['refreshToken', refreshToken]);
+      }
+
+      await AsyncStorage.multiSet(storageEntries);
+      successNotification();
+      router.replace('/(auth)/health-profile');
+    } catch (error: unknown) {
+      errorNotification();
+      Alert.alert(
+        'Registration Failed',
+        getApiErrorMessage(error, {
+          fallback: 'Registration failed. Please try again.',
+          conflict: 'An account with this email or phone number already exists.',
+          validation: 'Please review the registration details and try again.',
+        }),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
@@ -115,6 +179,8 @@ const handleRegister = async () => {
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
+                editable={!loading}
+                returnKeyType="next"
               />
             </View>
 
@@ -129,6 +195,9 @@ const handleRegister = async () => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                returnKeyType="next"
               />
             </View>
 
@@ -142,6 +211,8 @@ const handleRegister = async () => {
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
+                editable={!loading}
+                returnKeyType="next"
               />
             </View>
 
@@ -154,6 +225,10 @@ const handleRegister = async () => {
                 placeholderTextColor={Colors.textDisabled}
                 value={dateOfBirth}
                 onChangeText={setDateOfBirth}
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+                editable={!loading}
+                returnKeyType="next"
               />
             </View>
 
@@ -167,10 +242,16 @@ const handleRegister = async () => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleRegister()}
               />
               <TouchableOpacity
                 style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
+                onPress={() => setShowPassword(current => !current)}
+                disabled={loading}
               >
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}

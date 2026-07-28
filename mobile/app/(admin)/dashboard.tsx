@@ -12,28 +12,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../../services/api';
+import api, { logoutSession } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import { getApiErrorMessage } from '../../utils/errors';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchStats = async () => {
+    setLoadError(null);
     try {
       const response = await api.get('/admin/stats');
       setStats(response.data);
-    } catch {
-      setStats({
-        totalDepartments: 0,
-        activeDepartments: 0,
-        pendingAppointments: 0,
-        completedAppointments: 0,
-      });
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Dashboard statistics could not be loaded.',
+        })
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -48,7 +49,7 @@ export default function AdminDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'userRole']);
+    await logoutSession();
     router.replace('/(auth)/login');
   };
 
@@ -94,6 +95,16 @@ export default function AdminDashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
       >
+        {loadError ? (
+          <View style={styles.errorCard}>
+            <Ionicons name="warning-outline" size={20} color={Colors.danger} />
+            <Text style={styles.errorText}>{loadError}</Text>
+            <TouchableOpacity onPress={() => void fetchStats()}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           {STAT_CARDS.map((card, index) => (
@@ -152,4 +163,7 @@ const styles = StyleSheet.create({
   actionInfo: { flex: 1 },
   actionLabel: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   actionSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  errorCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.danger, borderRadius: 14, padding: 14, marginBottom: 18 },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 18, color: Colors.textPrimary },
+  retryText: { color: Colors.primary, fontSize: 13, fontWeight: '700' },
 });

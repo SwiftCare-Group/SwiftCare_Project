@@ -1,23 +1,24 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
-import { Stack, useRouter } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { ThemeProvider, useTheme } from "../context/ThemeContext";
-import api from "../services/api";
-import { registerForPushNotifications } from "../services/notifications";
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import api, { clearLocalSession } from '../services/api';
+import { registerForPushNotifications } from '../services/notifications';
+import {
+  homeRouteForRole,
+  isStaffRole,
+  normalizeRole,
+  type SwiftCareRole,
+} from '../utils/auth';
+import { isAuthenticationError, isNetworkError } from '../utils/errors';
 
-// Keep the native splash screen visible while authentication is checked.
 SplashScreen.preventAutoHideAsync().catch(() => {
   // The splash screen may already be controlled elsewhere.
-});
-
-SplashScreen.setOptions({
-  duration: 800,
-  fade: true,
 });
 
 type NotificationData = {
@@ -28,229 +29,196 @@ type NotificationData = {
   departmentId?: string;
 };
 
-const SAFE_NOTIFICATION_ROUTES = new Set([
-  "/(patient)/home",
-  "/(patient)/appointments",
-  "/(patient)/queue",
-  "/(patient)/prescription",
-  "/(patient)/lab-results",
-  "/(patient)/medical-history",
-  "/(patient)/profile",
-  "/notifications",
+const PATIENT_NOTIFICATION_ROUTES = new Set([
+  '/(patient)/home',
+  '/(patient)/appointments',
+  '/(patient)/queue',
+  '/(patient)/prescription',
+  '/(patient)/lab-results',
+  '/(patient)/medical-history',
+  '/(patient)/profile',
+  '/notifications',
 ]);
 
 export default function RootLayout() {
   const router = useRouter();
-
   const [appReady, setAppReady] = useState(false);
 
-  /*
-   * Register global notification listeners.
-   *
-   * These listeners remain active regardless of whether the patient is
-   * currently on the home screen, queue screen, or another screen.
-   */
+  const routeNotification = useCallback(
+    async (data: NotificationData | undefined) => {
+      if (!data) {
+        return;
+      }
+
+      const storedRole = normalizeRole(
+        await AsyncStorage.getItem('userRole'),
+      );
+
+      if (storedRole !== 'PATIENT') {
+        return;
+      }
+
+      if (data.type === 'PATIENT_CALLED') {
+        router.push('/(patient)/queue');
+        return;
+      }
+
+      if (
+        typeof data.route === 'string' &&
+        PATIENT_NOTIFICATION_ROUTES.has(data.route)
+      ) {
+        router.push(data.route as never);
+      }
+    },
+    [router],
+  );
+
   useEffect(() => {
     const receivedSubscription =
       Notifications.addNotificationReceivedListener(() => {
-        // The operating system displays the notification while the app is open.
+        // The system notification banner is configured globally.
       });
 
     const responseSubscription =
-      Notifications.addNotificationResponseReceivedListener((response) => {
+      Notifications.addNotificationResponseReceivedListener(response => {
         const data = response.notification.request.content
           .data as NotificationData;
-
-
-        if (data?.type === "PATIENT_CALLED") {
-          router.push("/(patient)/queue");
-          return;
-        }
-
-        /*
-         * This supports future SwiftCare notifications that provide
-         * a destination route in the notification data.
-         */
-        if (
-          typeof data?.route === "string" &&
-          SAFE_NOTIFICATION_ROUTES.has(data.route)
-        ) {
-          router.push(data.route as never);
-        }
+        void routeNotification(data);
       });
-
-    /*
-     * Handle a notification that launched the application from a
-     * terminated state.
-     */
-    const handleInitialNotification = async () => {
-      try {
-        const lastResponse =
-          await Notifications.getLastNotificationResponseAsync();
-
-        if (!lastResponse) {
-          return;
-        }
-
-        const data = lastResponse.notification.request.content
-          .data as NotificationData;
-
-        if (data?.type === "PATIENT_CALLED") {
-          router.push("/(patient)/queue");
-          return;
-        }
-
-        if (
-          typeof data?.route === "string" &&
-          SAFE_NOTIFICATION_ROUTES.has(data.route)
-        ) {
-          router.push(data.route as never);
-        }
-      } catch {
-        // Notification routing is optional; authentication can continue normally.
-      }
-    };
-
-    void handleInitialNotification();
 
     return () => {
       receivedSubscription.remove();
       responseSubscription.remove();
     };
-  }, [router]);
+  }, [routeNotification]);
 
-  /*
-   * Check the stored access token and determine whether the account is
-   * a patient, administrator, doctor, or pharmacist.
-   */
+  useEffect(() => {
+    if (!appReady) {
+      return;
+    }
+
+    const handleInitialNotification = async () => {
+      try {
+        const lastResponse =
+          await Notifications.getLastNotificationResponseAsync();
+
+        if (lastResponse) {
+          const data = lastResponse.notification.request.content
+            .data as NotificationData;
+          await routeNotification(data);
+          await Notifications.clearLastNotificationResponseAsync();
+        }
+      } catch {
+        // Notification routing is optional.
+      }
+    };
+
+    void handleInitialNotification();
+  }, [appReady, routeNotification]);
+
   useEffect(() => {
     let isMounted = true;
 
-    const logoutInvalidUser = async () => {
-      try {
-        await AsyncStorage.multiRemove([
-          "accessToken",
-          "refreshToken",
-          "userRole",
-        ]);
-      } catch {
-        // Continue to the login screen even if local storage cleanup fails.
-      }
-
+    const goToLogin = async () => {
+      await clearLocalSession().catch(() => undefined);
       if (isMounted) {
-        router.replace("/(auth)/login");
+        router.replace('/(auth)/login');
       }
     };
 
     const registerPatientNotifications = async () => {
-      try {
-        const pushToken =
-          await registerForPushNotifications();
+      await registerForPushNotifications().catch(() => null);
+    };
 
-        if (!pushToken) {
-          return;
+    const persistAndRoute = async (role: SwiftCareRole) => {
+      await AsyncStorage.setItem('userRole', role);
+      if (!isMounted) {
+        return;
+      }
+
+      router.replace(homeRouteForRole(role));
+      if (role === 'PATIENT') {
+        void registerPatientNotifications();
+      }
+    };
+
+    const validateKnownRole = async (
+      role: SwiftCareRole,
+    ): Promise<boolean> => {
+      const endpoint = isStaffRole(role)
+        ? '/doctors/me'
+        : '/patients/me';
+
+      try {
+        const response = await api.get(endpoint);
+        const resolvedRole =
+          normalizeRole(response.data?.role) ?? role;
+        await persistAndRoute(resolvedRole);
+        return true;
+      } catch (error) {
+        if (isAuthenticationError(error)) {
+          return false;
         }
+
+        // Keep a valid locally stored session usable during a temporary outage.
+        if (isNetworkError(error) || !isAuthenticationError(error)) {
+          await persistAndRoute(role);
+          return true;
+        }
+
+        return false;
+      }
+    };
+
+    const discoverRole = async (): Promise<SwiftCareRole | null> => {
+      try {
+        const patientResponse = await api.get('/patients/me');
+        return normalizeRole(patientResponse.data?.role) ?? 'PATIENT';
+      } catch (patientError) {
+        if (isNetworkError(patientError)) {
+          return null;
+        }
+      }
+
+      try {
+        const staffResponse = await api.get('/doctors/me');
+        return normalizeRole(staffResponse.data?.role);
       } catch {
-        // Push registration is optional and must not block app startup.
+        return null;
       }
     };
 
     const checkAuthentication = async () => {
       try {
-        const token =
-          await AsyncStorage.getItem("accessToken");
+        const stored = await AsyncStorage.multiGet([
+          'accessToken',
+          'userRole',
+        ]);
+        const token = stored.find(([key]) => key === 'accessToken')?.[1];
+        const storedRole = normalizeRole(
+          stored.find(([key]) => key === 'userRole')?.[1],
+        );
 
         if (!token) {
           if (isMounted) {
-            router.replace("/(auth)/login");
+            router.replace('/(auth)/login');
           }
-
           return;
         }
 
-        /*
-         * First check whether the authenticated account belongs to a
-         * patient or administrator.
-         */
-        try {
-          const patientResponse =
-            await api.get("/patients/me");
-
-          const patientProfile =
-            patientResponse.data;
-
-          const role = String(
-            patientProfile?.role ?? "PATIENT"
-          ).toUpperCase();
-
-          if (!isMounted) {
-            return;
-          }
-
-          if (role === "ADMIN") {
-            router.replace("/(admin)/dashboard");
-            return;
-          }
-
-          /*
-           * Only patient accounts need to register for the
-           * PATIENT_CALLED notification at this stage.
-           */
-          router.replace("/(patient)/home");
-          void registerPatientNotifications();
-
+        if (storedRole && (await validateKnownRole(storedRole))) {
           return;
-        } catch {
-          // Staff accounts are not present in the patient service; check staff next.
         }
 
-        /*
-         * If the account was not found through the patient endpoint,
-         * check whether it is a doctor or pharmacist account.
-         */
-        try {
-          const staffResponse =
-            await api.get("/doctors/me");
-
-          const staffProfile =
-            staffResponse.data;
-
-          const role = String(
-            staffProfile?.role ?? ""
-          ).toUpperCase();
-
-          if (!isMounted) {
-            return;
-          }
-
-          if (role === "DOCTOR") {
-            router.replace("/(doctor)/queue");
-            return;
-          }
-
-          if (role === "PHARMACIST") {
-            router.replace(
-              "/(pharmacist)/dispense"
-            );
-            return;
-          }
-
-          if (role === "ADMIN") {
-            router.replace("/(admin)/dashboard");
-            return;
-          }
-
-          if (role === "LAB_TECHNICIAN") {
-            router.replace("/(lab)/dashboard");
-            return;
-          }
-
-          await logoutInvalidUser();
-        } catch {
-          await logoutInvalidUser();
+        const discoveredRole = await discoverRole();
+        if (discoveredRole) {
+          await persistAndRoute(discoveredRole);
+          return;
         }
-      } catch (error) {
-        await logoutInvalidUser();
+
+        await goToLogin();
+      } catch {
+        await goToLogin();
       } finally {
         if (isMounted) {
           setAppReady(true);
@@ -265,10 +233,6 @@ export default function RootLayout() {
     };
   }, [router]);
 
-  /*
-   * Hide the native splash screen only after the authentication check
-   * has finished.
-   */
   useEffect(() => {
     if (!appReady) {
       return;
@@ -291,17 +255,13 @@ function AppNavigator() {
 
   return (
     <>
-      <StatusBar
-        style={isDarkMode ? "light" : "dark"}
-      />
-
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: "slide_from_right",
+          animation: 'slide_from_right',
           contentStyle: {
-            backgroundColor:
-              colors.background,
+            backgroundColor: colors.background,
           },
         }}
       />

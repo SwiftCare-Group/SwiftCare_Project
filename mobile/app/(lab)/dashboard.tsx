@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/colors';
 import api, { logoutSession } from '../../services/api';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type LabOrder = {
   id: string;
@@ -39,6 +40,7 @@ export default function LabDashboard() {
   const [orders, setOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<LabOrder | null>(null);
   const [result, setResult] = useState('');
@@ -46,13 +48,15 @@ export default function LabDashboard() {
   const [notes, setNotes] = useState('');
 
   const fetchOrders = useCallback(async () => {
+    setLoadError(null);
     try {
       const response = await api.get('/lab-orders/pending');
       setOrders(Array.isArray(response.data) ? response.data : []);
-    } catch (error: any) {
-      Alert.alert(
-        'Unable to load orders',
-        error?.response?.data?.message ?? 'Please try again.',
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Laboratory orders could not be loaded.',
+        }),
       );
     } finally {
       setLoading(false);
@@ -72,11 +76,52 @@ export default function LabDashboard() {
     } catch (error: any) {
       Alert.alert(
         'Update failed',
-        error?.response?.data?.message ?? 'The order could not be started.',
+        getApiErrorMessage(error, {
+          fallback: 'The order could not be started.',
+          conflict: 'This laboratory order has already changed status.',
+        }),
       );
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const closeResultModal = () => {
+    if (updatingId) {
+      return;
+    }
+
+    setSelectedOrder(null);
+    setResult('');
+    setInterpretation('');
+    setNotes('');
+  };
+
+  const openResultModal = async (order: LabOrder) => {
+    if (updatingId) {
+      return;
+    }
+
+    if (order.status === 'ORDERED') {
+      setUpdatingId(order.id);
+      try {
+        await api.patch(`/lab-orders/${order.id}/start`);
+        setSelectedOrder({ ...order, status: 'IN_PROGRESS' });
+      } catch (error: unknown) {
+        Alert.alert(
+          'Unable to start test',
+          getApiErrorMessage(error, {
+            fallback: 'The laboratory test could not be started.',
+            conflict: 'This order has already changed status. Refresh the queue.',
+          }),
+        );
+      } finally {
+        setUpdatingId(null);
+      }
+      return;
+    }
+
+    setSelectedOrder(order);
   };
 
   const submitResult = async () => {
@@ -101,10 +146,15 @@ export default function LabDashboard() {
       setInterpretation('');
       setNotes('');
       await fetchOrders();
+      Alert.alert('Result saved', 'The laboratory result is now available to the care team.');
     } catch (error: any) {
       Alert.alert(
         'Result not saved',
-        error?.response?.data?.message ?? 'Please check the form and try again.',
+        getApiErrorMessage(error, {
+          fallback: 'Please check the form and try again.',
+          validation: 'Review the laboratory result and try again.',
+          conflict: 'This laboratory order has already been completed or cancelled.',
+        }),
       );
     } finally {
       setUpdatingId(null);
@@ -144,6 +194,23 @@ export default function LabDashboard() {
         </View>
       </LinearGradient>
 
+      {loadError ? (
+        <View style={styles.errorBanner}>
+          <Ionicons name="cloud-offline-outline" size={21} color={Colors.danger} />
+          <View style={styles.errorBannerContent}>
+            <Text style={styles.errorBannerTitle}>Unable to load laboratory queue</Text>
+            <Text style={styles.errorBannerText}>{loadError}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => void fetchOrders()}
+            accessibilityLabel="Retry loading laboratory orders"
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       <FlatList
         data={orders}
         keyExtractor={item => item.id}
@@ -159,11 +226,15 @@ export default function LabDashboard() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="flask-outline" size={44} color={Colors.primary} />
-            <Text style={styles.emptyTitle}>No pending lab orders</Text>
-            <Text style={styles.emptyText}>New orders will appear here automatically.</Text>
-          </View>
+          loadError ? null : (
+            <View style={styles.emptyState}>
+              <Ionicons name="flask-outline" size={44} color={Colors.primary} />
+              <Text style={styles.emptyTitle}>No pending lab orders</Text>
+              <Text style={styles.emptyText}>
+                New orders will appear here automatically.
+              </Text>
+            </View>
+          )
         }
         renderItem={({ item }) => (
           <View style={styles.card}>
@@ -201,7 +272,7 @@ export default function LabDashboard() {
 
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => setSelectedOrder(item)}
+                onPress={() => void openResultModal(item)}
                 disabled={updatingId === item.id}
               >
                 <Text style={styles.primaryButtonText}>Record Result</Text>
@@ -215,7 +286,7 @@ export default function LabDashboard() {
         visible={selectedOrder !== null}
         transparent
         animationType="slide"
-        onRequestClose={() => setSelectedOrder(null)}
+        onRequestClose={closeResultModal}
       >
         <KeyboardAvoidingView
           style={styles.modalBackdrop}
@@ -237,6 +308,7 @@ export default function LabDashboard() {
                 value={result}
                 onChangeText={setResult}
                 placeholder="Result"
+                placeholderTextColor={Colors.textDisabled}
                 multiline
                 returnKeyType="default"
               />
@@ -245,6 +317,7 @@ export default function LabDashboard() {
                 value={interpretation}
                 onChangeText={setInterpretation}
                 placeholder="Interpretation (optional)"
+                placeholderTextColor={Colors.textDisabled}
                 returnKeyType="next"
               />
               <TextInput
@@ -252,13 +325,14 @@ export default function LabDashboard() {
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="Notes (optional)"
+                placeholderTextColor={Colors.textDisabled}
                 returnKeyType="done"
               />
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelButton}
-                  onPress={() => setSelectedOrder(null)}
+                  onPress={closeResultModal}
                   disabled={updatingId !== null}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -293,6 +367,23 @@ const styles = StyleSheet.create({
   subtitle: { color: 'rgba(255,255,255,0.78)', marginTop: 3 },
   logoutButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' },
   list: { padding: 18, paddingBottom: 40, backgroundColor: Colors.background, flexGrow: 1 },
+  errorBanner: {
+    marginHorizontal: 18,
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+    backgroundColor: Colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  errorBannerContent: { flex: 1 },
+  errorBannerTitle: { color: Colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  errorBannerText: { color: Colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  retryButton: { paddingHorizontal: 10, paddingVertical: 8 },
+  retryButtonText: { color: Colors.primary, fontSize: 12, fontWeight: '800' },
   card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 12 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   testIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { goBackOrReplace } from '../../utils/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type LabResult = {
   result?: string;
@@ -40,13 +42,19 @@ export default function PatientLabResultsScreen() {
   const [orders, setOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
+    setLoadError(null);
     try {
       const response = await api.get('/lab-orders/patient/me');
       setOrders(Array.isArray(response.data) ? response.data : []);
-    } catch {
-      setOrders([]);
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Your laboratory orders could not be loaded.',
+        })
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,7 +95,7 @@ export default function PatientLabResultsScreen() {
         colors={[colors.headerGradientStart, colors.headerGradientEnd]}
         style={styles.header}
       >
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => goBackOrReplace(router, '/(patient)/home')}>
           <Ionicons name="chevron-back" size={24} color={colors.white} />
         </TouchableOpacity>
         <View style={styles.headerText}>
@@ -111,7 +119,24 @@ export default function PatientLabResultsScreen() {
           />
         }
       >
-        {orders.length === 0 ? (
+        {loadError ? (
+          <View
+            style={[
+              styles.emptyCard,
+              { backgroundColor: colors.surface, borderColor: colors.danger },
+            ]}
+          >
+            <Ionicons name="cloud-offline-outline" size={44} color={colors.danger} />
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Unable to load results</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{loadError}</Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={() => void loadOrders()}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : orders.length === 0 ? (
           <View
             style={[
               styles.emptyCard,
@@ -206,4 +231,6 @@ const styles = StyleSheet.create({
   interpretation: { fontSize: 13, lineHeight: 19, marginTop: 8 },
   performed: { fontSize: 11, marginTop: 10 },
   pendingText: { fontSize: 13, fontStyle: 'italic', marginTop: 14 },
+  retryButton: { marginTop: 18, minWidth: 130, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  retryButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 });

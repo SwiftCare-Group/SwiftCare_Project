@@ -7,6 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { goBackOrReplace } from '../utils/navigation';
 
 import { useTheme } from '../context/ThemeContext';
 
@@ -43,7 +44,7 @@ export default function TermsScreen() {
           name="chevron-back"
           size={26}
           color={colors.textPrimary}
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/settings')}
         />
 
         <Text

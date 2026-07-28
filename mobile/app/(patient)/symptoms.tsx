@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { getApiErrorMessage } from '../../utils/errors';
 
 
 const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
@@ -45,6 +46,10 @@ export default function SymptomsScreen() {
 
 
   const handleSubmit = async () => {
+    if (loading) {
+      return;
+    }
+
     mediumTap();
     if (!symptoms.trim()) {
       Alert.alert('Error', 'Please describe your symptoms');
@@ -53,9 +58,13 @@ export default function SymptomsScreen() {
 
     setLoading(true);
     try {
-      const response = await api.post('/symptoms/submit', { symptoms });
+      const response = await api.post('/symptoms/submit', { symptoms: symptoms.trim() });
+      const severityScore = Number(response.data?.severityScore);
+      if (!Number.isFinite(severityScore) || severityScore < 1 || severityScore > 4) {
+        throw new Error('The symptom service returned an invalid severity score.');
+      }
       setResult(response.data);
-      await AsyncStorage.setItem('lastSeverityScore', String(response.data.severityScore));
+      await AsyncStorage.setItem('lastSeverityScore', String(severityScore));
 
       if (response.data.isEmergency) {
         warningNotification();
@@ -67,8 +76,13 @@ export default function SymptomsScreen() {
       } else{
         successNotification();
       }
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to submit symptoms');
+    } catch (error: unknown) {
+      Alert.alert(
+        'Assessment unavailable',
+        getApiErrorMessage(error, {
+          fallback: 'Failed to submit your symptoms.',
+        })
+      );
     } finally {
       setLoading(false);
     }
@@ -187,7 +201,7 @@ export default function SymptomsScreen() {
                     style={[
                       styles.scoreBarFill,
                       {
-                        width: `${(result.severityScore / 4) * 100}%`as any,
+                        width: `${Math.min(100, Math.max(0, (Number(result.severityScore) / 4) * 100))}%` as any,
                         backgroundColor: severityConfig?.color,
                       }
                     ]}

@@ -19,6 +19,7 @@ import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
 import { useTheme } from '../../context/ThemeContext';
+import { getApiErrorMessage } from '../../utils/errors';
 
 const QUEUE_NOTIFICATION_KEY = 'swiftcareQueueNotificationPositions';
 const QUEUE_REFRESH_INTERVAL_MS = 30_000;
@@ -43,12 +44,14 @@ export default function QueueScreen() {
   const { lightTap, warningNotification } = useHaptics();
 
   const lastNotifiedPositionsRef = useRef<Record<string, number>>({});
+  const fetchingRef = useRef(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [queueStatuses, setQueueStatuses] = useState<
     Record<string, QueueStatus | null>
   >({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadLastNotifiedPositions = useCallback(async () => {
     try {
@@ -81,13 +84,23 @@ export default function QueueScreen() {
   );
 
   const fetchData = useCallback(async () => {
+    if (fetchingRef.current) {
+      return;
+    }
+
+    fetchingRef.current = true;
+    setLoadError(null);
+
     try {
       const response = await api.get('/appointments');
       const allAppointments = Array.isArray(response.data)
         ? response.data
         : [];
       const pendingAppointments = allAppointments.filter(
-        (appointment: Appointment) => appointment.status === 'PENDING'
+        (appointment: Appointment) =>
+          !['COMPLETED', 'CANCELLED'].includes(
+            String(appointment.status ?? '').toUpperCase(),
+          ),
       );
 
       const statuses: Record<string, QueueStatus | null> = {};
@@ -143,10 +156,14 @@ export default function QueueScreen() {
 
       setAppointments(pendingAppointments);
       setQueueStatuses(statuses);
-    } catch {
-      setAppointments([]);
-      setQueueStatuses({});
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Your queue information could not be loaded.',
+        }),
+      );
     } finally {
+      fetchingRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -203,11 +220,12 @@ export default function QueueScreen() {
                 'Your appointment has been cancelled.'
               );
               await fetchData();
-            } catch (error: any) {
+            } catch (error: unknown) {
               Alert.alert(
                 'Cancellation Failed',
-                error.response?.data?.message ||
-                  'Failed to cancel the appointment.'
+                getApiErrorMessage(error, {
+                  fallback: 'Failed to cancel the appointment.',
+                })
               );
             }
           },
@@ -341,7 +359,36 @@ export default function QueueScreen() {
           />
         }
       >
-        {appointments.length === 0 ? (
+        {loadError && appointments.length === 0 ? (
+          <View
+            style={[
+              styles.emptyState,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="cloud-offline-outline" size={44} color={colors.textDisabled} />
+            <Text style={[styles.emptyText, { color: colors.textPrimary }]}>
+              Queue unavailable
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              {loadError}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setLoading(true);
+                void fetchData();
+              }}
+            >
+              <Text style={[styles.retryButtonText, { color: colors.white }]}>
+                Try Again
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : appointments.length === 0 ? (
           <View
             style={[
               styles.emptyState,
@@ -846,6 +893,18 @@ export default function QueueScreen() {
 }
 
 const styles = StyleSheet.create({
+  retryButton: {
+    minHeight: 46,
+    marginTop: 18,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   safeArea: {
     flex: 1,
   },

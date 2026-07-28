@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
@@ -22,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../../constants/colors';
-import api from '../../services/api';
+import api, { logoutSession } from '../../services/api';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 type Department = {
@@ -482,12 +482,7 @@ export default function DoctorQueueScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.multiRemove([
-                'accessToken',
-                'refreshToken',
-                'userRole',
-              ]);
-
+              await logoutSession();
               router.replace('/(auth)/login');
             } catch {
               Alert.alert(
@@ -685,12 +680,10 @@ export default function DoctorQueueScreen() {
       pathname:
         '/(doctor)/patient-details' as any,
       params: {
-        patientId: String(
-          patient.patientId ?? patient.id ?? ''
-        ),
-        patientName: String(
-          patient.patientName ?? ''
-        ),
+        patientId: String(patient.patientId ?? ''),
+        queueEntryId: String(patient.id ?? ''),
+        patientName: String(patient.patientName ?? ''),
+        phone: String(patient.patientNumber ?? ''),
         age: String(patient.age ?? ''),
         severityScore: String(
           patient.severityScore ?? ''

@@ -16,6 +16,7 @@ import { WebView } from 'react-native-webview';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import { getApiErrorMessage } from '../../utils/errors';
 
 
 const SCHEDULE_OPTIONS = [
@@ -31,6 +32,8 @@ export default function ConsultationScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
   const [selectedOffsetMinutes, setSelectedOffsetMinutes] = useState(60);
   const [showBooking, setShowBooking] = useState(false);
@@ -47,16 +50,24 @@ export default function ConsultationScreen() {
         api.get('/consultations/doctors'),
         api.get('/consultations'),
       ]);
-      setDoctors(doctorsRes.data);
-      setConsultations(consultationsRes.data);
-    } catch (error: any) {
-      setLoadError(error?.response?.data?.message || 'Consultations could not be loaded. Check your connection and try again.');
+      setDoctors(Array.isArray(doctorsRes.data) ? doctorsRes.data : []);
+      setConsultations(Array.isArray(consultationsRes.data) ? consultationsRes.data : []);
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Consultations could not be loaded. Check your connection and try again.',
+        })
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleBook = async () => {
+    if (booking) {
+      return;
+    }
+
     mediumTap();
     if (!selectedDoctor) {
       Alert.alert('Error', 'Please select a doctor');
@@ -64,7 +75,6 @@ export default function ConsultationScreen() {
     }
     setBooking(true);
     try {
-      successNotification();
       const scheduledAt = new Date(
         Date.now() + selectedOffsetMinutes * 60_000
       );
@@ -72,15 +82,17 @@ export default function ConsultationScreen() {
         doctorId: selectedDoctor,
         scheduledAt: scheduledAt.toISOString().slice(0, 19),
       });
+      successNotification();
       Alert.alert('Success', 'Consultation booked successfully');
       setShowBooking(false);
       setSelectedDoctor(null);
       setSelectedOffsetMinutes(60);
-      fetchData();
-    } catch (error: any) {
+      await fetchData();
+    } catch (error: unknown) {
       errorNotification();
-      const message = error.response?.data?.message || 'Failed to book consultation';
-      if (message.includes('Premium') || error.response?.status === 401 || error.response?.status === 403) {
+      const message = getApiErrorMessage(error, { fallback: 'Failed to book consultation' });
+      const status = (error as any)?.response?.status;
+      if (message.toLowerCase().includes('premium') || status === 402 || status === 403) {
         Alert.alert('Premium Required', 'Online consultations are available for Premium subscribers only. Upgrade in your profile to access this feature.');
       } else {
         Alert.alert('Error', message);
@@ -105,10 +117,12 @@ export default function ConsultationScreen() {
               await api.put(`/consultations/${consultationId}/cancel`);
               await fetchData();
               Alert.alert('Consultation cancelled', 'The booking has been cancelled.');
-            } catch (error: any) {
+            } catch (error: unknown) {
               Alert.alert(
                 'Unable to cancel',
-                error?.response?.data?.message || 'The consultation could not be cancelled.'
+                getApiErrorMessage(error, {
+                  fallback: 'The consultation could not be cancelled.',
+                })
               );
             } finally {
               setCancellingId(null);
@@ -120,13 +134,31 @@ export default function ConsultationScreen() {
   };
 
   const handleJoin = async (consultationId: string) => {
+    if (joiningId) {
+      return;
+    }
+
     mediumTap();
+    setJoiningId(consultationId);
+    setSessionError(null);
     try {
       const response = await api.put(`/consultations/${consultationId}/join`);
-      setSessionUrl(response.data.sessionUrl);
+      const nextSessionUrl = response.data?.sessionUrl;
+      if (
+        typeof nextSessionUrl !== 'string' ||
+        !/^https?:\/\//i.test(nextSessionUrl)
+      ) {
+        throw new Error('The consultation provider returned an invalid session link.');
+      }
+      setSessionUrl(nextSessionUrl);
       setShowSession(true);
-    } catch {
-      Alert.alert('Error', 'Failed to join session');
+    } catch (error: unknown) {
+      Alert.alert(
+        'Unable to join session',
+        getApiErrorMessage(error, { fallback: 'Failed to join the consultation session.' })
+      );
+    } finally {
+      setJoiningId(null);
     }
   };
 
@@ -320,6 +352,7 @@ export default function ConsultationScreen() {
                     <TouchableOpacity
                       style={styles.joinButton}
                       onPress={() => handleJoin(con.id)}
+                      disabled={joiningId === con.id}
                     >
                       <LinearGradient
                         colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
@@ -327,10 +360,16 @@ export default function ConsultationScreen() {
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                       >
-                        <Ionicons name="videocam-outline" size={16} color={Colors.white} />
-                        <Text style={styles.joinButtonText}>
-                          {con.status === 'IN_PROGRESS' ? 'Rejoin Session' : 'Join Session'}
-                        </Text>
+                        {joiningId === con.id ? (
+                          <ActivityIndicator size="small" color={Colors.white} />
+                        ) : (
+                          <>
+                            <Ionicons name="videocam-outline" size={16} color={Colors.white} />
+                            <Text style={styles.joinButtonText}>
+                              {con.status === 'IN_PROGRESS' ? 'Rejoin Session' : 'Join Session'}
+                            </Text>
+                          </>
+                        )}
                       </LinearGradient>
                     </TouchableOpacity>
 
@@ -355,25 +394,49 @@ export default function ConsultationScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      <Modal visible={showSession} animationType="slide" onRequestClose={() => setShowSession(false)}>
+      <Modal
+        visible={showSession}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowSession(false);
+          setSessionUrl(null);
+          setSessionError(null);
+        }}
+      >
         <View style={styles.sessionContainer}>
           <View style={styles.sessionHeader}>
             <Text style={styles.sessionTitle}>Live Consultation</Text>
             <TouchableOpacity
               style={styles.leaveButton}
-              onPress={() => setShowSession(false)}
+              onPress={() => {
+                setShowSession(false);
+                setSessionUrl(null);
+                setSessionError(null);
+              }}
             >
               <Text style={styles.leaveButtonText}>Leave</Text>
             </TouchableOpacity>
           </View>
-          {sessionUrl && (
+          {sessionError ? (
+            <View style={styles.sessionErrorContainer}>
+              <Ionicons name="warning-outline" size={42} color={Colors.danger} />
+              <Text style={styles.sessionErrorTitle}>Video session unavailable</Text>
+              <Text style={styles.sessionErrorText}>{sessionError}</Text>
+            </View>
+          ) : sessionUrl ? (
             <WebView
               source={{ uri: sessionUrl }}
               style={styles.webview}
               allowsInlineMediaPlayback
               mediaPlaybackRequiresUserAction={false}
+              onError={() => setSessionError('The video consultation page could not be loaded.')}
+              onHttpError={event =>
+                setSessionError(
+                  `The video provider returned status ${event.nativeEvent.statusCode}.`
+                )
+              }
             />
-          )}
+          ) : null}
         </View>
       </Modal>
     </>
@@ -445,4 +508,7 @@ const styles = StyleSheet.create({
   leaveButton: { backgroundColor: Colors.danger, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   leaveButtonText: { color: Colors.white, fontWeight: '700' },
   webview: { flex: 1 },
+  sessionErrorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, backgroundColor: Colors.background },
+  sessionErrorTitle: { marginTop: 14, fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
+  sessionErrorText: { marginTop: 8, fontSize: 14, lineHeight: 20, color: Colors.textSecondary, textAlign: 'center' },
 });

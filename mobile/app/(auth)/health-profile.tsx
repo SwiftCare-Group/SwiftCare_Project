@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { getApiErrorMessage } from '../../utils/errors';
 
 export default function HealthProfileScreen() {
   const router = useRouter();
@@ -29,6 +30,10 @@ export default function HealthProfileScreen() {
     value.split(',').map(item => item.trim()).filter(item => item.length > 0);
 
   const handleSubmit = async () => {
+    if (loading) {
+      return;
+    }
+
     setLoading(true);
     try {
       await api.post('/profile/health', {
@@ -37,8 +42,13 @@ export default function HealthProfileScreen() {
         knownDiagnoses: parseList(knownDiagnoses),
       });
       router.replace('/(patient)/home');
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to save health profile.');
+    } catch (error: unknown) {
+      Alert.alert(
+        'Unable to save profile',
+        getApiErrorMessage(error, {
+          fallback: 'Failed to save your health profile.',
+        })
+      );
     } finally {
       setLoading(false);
     }
@@ -128,7 +138,12 @@ export default function HealthProfileScreen() {
 
             <TouchableOpacity
               style={styles.skipButton}
-              onPress={() => router.replace('/(patient)/home')}
+              onPress={() => {
+                if (!loading) {
+                  router.replace('/(patient)/home');
+                }
+              }}
+              disabled={loading}
             >
               <Text style={styles.skipText}>Skip for now</Text>
             </TouchableOpacity>

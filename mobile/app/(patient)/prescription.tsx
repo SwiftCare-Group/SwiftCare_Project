@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useTheme } from '../../context/ThemeContext';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type DispensationRecord = {
   drugName?: string;
@@ -42,6 +43,7 @@ export default function PrescriptionScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [expandedQr, setExpandedQr] =
     useState<string | null>(null);
@@ -51,6 +53,8 @@ export default function PrescriptionScreen() {
   }, []);
 
   const fetchData = async () => {
+    setLoadError(null);
+
     try {
       const prescriptionResponse =
         await api.get('/prescriptions/my');
@@ -62,8 +66,12 @@ export default function PrescriptionScreen() {
         : [];
 
       setPrescriptions(prescriptionList);
-    } catch (error) {
-      setPrescriptions([]);
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Your prescriptions could not be loaded.',
+        }),
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -177,7 +185,36 @@ export default function PrescriptionScreen() {
           />
         }
       >
-        {prescriptions.length === 0 ? (
+        {loadError && prescriptions.length === 0 ? (
+          <View
+            style={[
+              styles.emptyState,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="cloud-offline-outline" size={44} color={colors.textDisabled} />
+            <Text style={[styles.emptyText, { color: colors.textPrimary }]}>
+              Prescriptions unavailable
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              {loadError}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setLoading(true);
+                void fetchData();
+              }}
+            >
+              <Text style={[styles.retryButtonText, { color: colors.white }]}>
+                Try Again
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : prescriptions.length === 0 ? (
           <View
             style={[
               styles.emptyState,
@@ -234,26 +271,40 @@ export default function PrescriptionScreen() {
               ? prescription.dispensationRecords
               : [];
 
-            const pendingDrugs = dispensationRecords.filter(
-              record => record.status === 'PENDING'
+            const drugs = Array.isArray(prescription.drugs)
+              ? prescription.drugs.filter(
+                  (drug): drug is string =>
+                    typeof drug === 'string' && drug.trim().length > 0,
+                )
+              : [];
+
+            const recordForDrug = (drug: string) =>
+              dispensationRecords.find(
+                item =>
+                  item.drugName?.trim().toLowerCase() ===
+                  drug.trim().toLowerCase(),
+              );
+
+            const pendingDrugs = drugs.filter(
+              drug => (recordForDrug(drug)?.status ?? 'PENDING') === 'PENDING',
             );
-            const unavailableDrugs = dispensationRecords.filter(
-              record => record.status === 'UNAVAILABLE'
+            const unavailableDrugs = drugs.filter(
+              drug => recordForDrug(drug)?.status === 'UNAVAILABLE',
             );
             const allDispensed =
-              dispensationRecords.length > 0 &&
+              drugs.length > 0 &&
               pendingDrugs.length === 0 &&
               unavailableDrugs.length === 0;
             const hasUnavailable = unavailableDrugs.length > 0;
 
-            const drugs = Array.isArray(
-              prescription.drugs
-            )
-              ? prescription.drugs
-              : [];
-
             const qrExpanded =
               expandedQr === prescription.id;
+            const rawQrCode = prescription.qrCodeData?.trim();
+            const qrImageUri = rawQrCode
+              ? rawQrCode.startsWith('data:image/')
+                ? rawQrCode
+                : `data:image/png;base64,${rawQrCode}`
+              : null;
 
             return (
               <View
@@ -389,9 +440,7 @@ export default function PrescriptionScreen() {
                     </Text>
                   ) : (
                     drugs.map((drug, index) => {
-                      const record = dispensationRecords.find(
-                        item => item.drugName?.toLowerCase() === drug.toLowerCase()
-                      );
+                      const record = recordForDrug(drug);
                       const status = record?.status ?? 'PENDING';
                       const isPending = status === 'PENDING';
                       const isUnavailable = status === 'UNAVAILABLE';
@@ -534,7 +583,7 @@ export default function PrescriptionScreen() {
 
                 {/* Expanded QR */}
                 {qrExpanded ? (
-                  prescription.qrCodeData ? (
+                  qrImageUri ? (
                     <View
                       style={[
                         styles.qrContainer,
@@ -556,9 +605,7 @@ export default function PrescriptionScreen() {
                         ]}
                       >
                         <Image
-                          source={{
-                            uri: `data:image/png;base64,${prescription.qrCodeData}`,
-                          }}
+                          source={{ uri: qrImageUri }}
                           style={styles.qrImage}
                           resizeMode="contain"
                         />
@@ -670,8 +717,8 @@ export default function PrescriptionScreen() {
                           },
                         ]}
                       >
-                        QR code is not available for
-                        this prescription.
+                        QR code is not available for this prescription.
+                        Give the pharmacist this ID: {prescription.id}
                       </Text>
                     </View>
                   )
@@ -686,6 +733,18 @@ export default function PrescriptionScreen() {
 }
 
 const styles = StyleSheet.create({
+  retryButton: {
+    minHeight: 46,
+    marginTop: 18,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   safeArea: {
     flex: 1,
   },
