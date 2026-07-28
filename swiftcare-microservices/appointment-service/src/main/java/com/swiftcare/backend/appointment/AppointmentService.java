@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.Period;
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +41,8 @@ public class AppointmentService {
             UUID patientId,
             AppointmentRequest request
     ) {
+        validateAppointmentRequest(request);
+
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(
                         () -> new ResourceNotFoundException(
@@ -48,28 +51,52 @@ public class AppointmentService {
                 );
 
         Department department = departmentRepository
-                .findById(request.getDepartmentId())
-                .orElseThrow(
-                        () -> new ResourceNotFoundException(
-                                "Department not found"
+                .findActiveForBooking(request.getDepartmentId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Active department not found"
+                ));
+
+        validateWithinOperatingHours(
+                department,
+                request.getScheduledTime()
+        );
+
+        LocalDateTime dayStart = request.getScheduledTime()
+                .toLocalDate()
+                .atStartOfDay();
+        LocalDateTime dayEnd = dayStart.plusDays(1);
+        long bookedForDay = appointmentRepository
+                .countByDepartmentIdAndScheduledTimeBetweenAndStatusIn(
+                        department.getId(),
+                        dayStart,
+                        dayEnd,
+                        List.of(
+                                AppointmentStatus.PENDING,
+                                AppointmentStatus.ACTIVE
                         )
                 );
 
-        validateAppointmentRequest(request);
+        if (bookedForDay >= department.getQueueCapacity()) {
+            throw new IllegalStateException(
+                    "This department has reached its appointment capacity for the selected day."
+            );
+        }
 
-        boolean slotTaken =
-        appointmentRepository
-                .existsByDepartmentIdAndScheduledTimeAndStatus(
+        boolean slotTaken = appointmentRepository
+                .existsByDepartmentIdAndScheduledTimeAndStatusIn(
                         request.getDepartmentId(),
                         request.getScheduledTime(),
-                        AppointmentStatus.PENDING
+                        List.of(
+                                AppointmentStatus.PENDING,
+                                AppointmentStatus.ACTIVE
+                        )
                 );
 
-if (slotTaken) {
-    throw new IllegalArgumentException(
-            "This appointment time is already booked. Please choose another time."
-    );
-}
+        if (slotTaken) {
+            throw new IllegalArgumentException(
+                    "This appointment time is already booked. Please choose another time."
+            );
+        }
 
         int queuePosition = calculateQueuePosition(
                 patient,
@@ -164,15 +191,13 @@ if (slotTaken) {
         return mapToResponse(appointment);
     }
 
-    @Transactional(readOnly = true)
+@Transactional(readOnly = true)
     public QueueStatusResponse getQueueStatus(UUID appointmentId) {
         QueueEntry entry = queueEntryRepository
                 .findByAppointmentId(appointmentId)
-                .orElseThrow(
-                        () -> new ResourceNotFoundException(
-                                "Queue entry not found"
-                        )
-                );
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Queue entry not found"
+                ));
 
         String queueStatus = entry.getStatus() != null
                 ? entry.getStatus().name()
@@ -200,6 +225,12 @@ if (slotTaken) {
         if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
             throw new IllegalStateException(
                     "This appointment has already been cancelled."
+            );
+        }
+
+        if (appointment.getStatus() != AppointmentStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Only pending appointments can be cancelled."
             );
         }
 
@@ -258,6 +289,39 @@ if (slotTaken) {
         }
 
         return position;
+    }
+
+    private void validateWithinOperatingHours(
+            Department department,
+            LocalDateTime scheduledTime
+    ) {
+        String operatingHours = department.getOperatingHours();
+        if (operatingHours == null || operatingHours.isBlank()) {
+            throw new IllegalStateException(
+                    "Department operating hours are not configured"
+            );
+        }
+
+        try {
+            String[] parts = operatingHours.split("\\s*-\\s*");
+            LocalTime opening = LocalTime.parse(parts[0].trim());
+            LocalTime closing = LocalTime.parse(parts[1].trim());
+            LocalTime requestedTime = scheduledTime.toLocalTime();
+
+            if (requestedTime.isBefore(opening)
+                    || !requestedTime.isBefore(closing)) {
+                throw new IllegalArgumentException(
+                        "Appointment time must fall within department operating hours: "
+                                + operatingHours
+                );
+            }
+        } catch (IllegalArgumentException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException(
+                    "Department operating hours are invalid"
+            );
+        }
     }
 
     private LocalDateTime calculateEstimatedCallTime(
@@ -403,9 +467,15 @@ if (slotTaken) {
             );
         }
 
-        int severityScore = request.getSeverityScore();
+        if (!request.getScheduledTime().isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException(
+                    "Scheduled time must be in the future."
+            );
+        }
 
-        if (severityScore < 1 || severityScore > 4) {
+        Integer severityScore = request.getSeverityScore();
+
+        if (severityScore == null || severityScore < 1 || severityScore > 4) {
             throw new IllegalArgumentException(
                     "Severity score must be between 1 and 4."
             );

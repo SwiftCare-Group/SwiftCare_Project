@@ -1,28 +1,40 @@
 package com.swiftcare.backend.notification.security;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Component
+@RequiredArgsConstructor
 public class AuthenticatedPatientResolver {
+
+    private final JdbcTemplate jdbcTemplate;
 
     public UUID resolvePatientId(String email) {
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Authenticated user email is missing");
+            throw new IllegalArgumentException(
+                    "Authenticated user email is missing"
+            );
         }
 
-        /*
-         * Temporary deterministic UUID generated from the authenticated email.
-         *
-         * This only works correctly if the other services use the same method
-         * to derive the patient's UUID from their email.
-         */
-        return UUID.nameUUIDFromBytes(
-                email.trim()
-                        .toLowerCase()
-                        .getBytes(StandardCharsets.UTF_8)
-        );
+        try {
+            return jdbcTemplate.queryForObject(
+                    """
+                    SELECT id
+                    FROM patients
+                    WHERE LOWER(email) = LOWER(?)
+                      AND is_deleted = FALSE
+                    """,
+                    UUID.class,
+                    email.trim()
+            );
+        } catch (EmptyResultDataAccessException exception) {
+            throw new PatientAccountNotFoundException(
+                    "No active patient account matches the authenticated user"
+            );
+        }
     }
 }

@@ -25,23 +25,18 @@ public class SecurityConfig {
 
         return http
                 .csrf(AbstractHttpConfigurer::disable)
-
                 .cors(cors -> {
                 })
-
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
-
                 .authorizeHttpRequests(auth -> auth
-
                         .requestMatchers(
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
-
                         .requestMatchers(
                                 "/auth/register",
                                 "/auth/login",
@@ -51,153 +46,172 @@ public class SecurityConfig {
                                 "/auth/forgot-password",
                                 "/auth/reset-password"
                         ).permitAll()
-
+                        .requestMatchers("/subscriptions/webhook")
+                        .permitAll()
                         .requestMatchers(
-                                "/subscriptions/webhook"
-                        ).permitAll()
+                                "/subscriptions/upgrade",
+                                "/subscriptions/verify",
+                                "/subscriptions/status",
+                                "/subscriptions/plans",
+                                "/subscriptions/cancel"
+                        ).hasRole("PATIENT")
 
+                        /* Patient profile permissions. */
                         .requestMatchers(
-                                "/internal/**"
-                        ).permitAll()
+                                "/patients/me/**",
+                                "/profile/health"
+                        ).hasRole("PATIENT")
 
+                        /* Symptom assessment permissions. */
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/symptoms/submit"
+                        ).hasRole("PATIENT")
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/departments/**"
-                        ).permitAll()
+                                "/symptoms/**"
+                        ).hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
 
-                        /*
-                         * Consultation permissions
-                         */
+                        /* Appointment and queue permissions. */
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/appointments"
+                        ).hasRole("PATIENT")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/appointments"
+                        ).hasRole("PATIENT")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/appointments/*",
+                                "/appointments/*/queue"
+                        ).hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/appointments/*/cancel"
+                        ).hasAnyRole("PATIENT", "ADMIN")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/departments/*/queue"
+                        ).hasAnyRole("DOCTOR", "ADMIN")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/queue/*"
+                        ).hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/queue/*/call",
+                                "/queue/*/skip",
+                                "/queue/*/start",
+                                "/queue/*/complete",
+                                "/queue/*/cancel"
+                        ).hasAnyRole("DOCTOR", "ADMIN")
 
+                        /* Staff profile permissions. */
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/doctors/me"
+                        ).hasAnyRole(
+                                "DOCTOR",
+                                "PHARMACIST",
+                                "LAB_TECHNICIAN",
+                                "ADMIN"
+                        )
+
+                        /* Consultation permissions. */
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/consultations/complete-workflow"
+                        ).hasRole("DOCTOR")
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/consultations"
                         ).hasRole("PATIENT")
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/consultations"
                         ).hasRole("PATIENT")
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/consultations/doctors"
                         ).authenticated()
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/consultations/doctor/**"
                         ).hasRole("DOCTOR")
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/consultations/*"
-                        ).hasAnyRole(
-                                "PATIENT",
-                                "DOCTOR",
-                                "ADMIN"
-                        )
-
+                        ).hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
                         .requestMatchers(
                                 HttpMethod.PUT,
-                                "/consultations/*/join",
-                                "/consultations/*/complete",
+                                "/consultations/*/join"
+                        ).hasAnyRole("PATIENT", "DOCTOR")
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/consultations/*/complete"
+                        ).hasAnyRole("DOCTOR", "ADMIN")
+                        .requestMatchers(
+                                HttpMethod.PUT,
                                 "/consultations/*/cancel"
-                        ).hasRole("DOCTOR")
+                        ).hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
 
-                        /*
-                         * Prescription permissions
-                         */
-
+                        /* Prescription permissions. */
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/prescriptions"
                         ).hasRole("DOCTOR")
-
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/prescriptions/lookup"
+                        ).hasRole("PHARMACIST")
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/prescriptions/*/dispense"
                         ).hasRole("PHARMACIST")
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/prescriptions/my"
                         ).hasRole("PATIENT")
-
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/prescriptions/*/remaining"
-                        ).hasAnyRole(
-                                "DOCTOR",
-                                "PHARMACIST"
-                        )
-
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/prescriptions/*/qr"
-                        ).hasAnyRole(
-                                "PATIENT",
-                                "DOCTOR",
-                                "PHARMACIST"
-                        )
-
-                        .requestMatchers(
-                                HttpMethod.GET,
+                                "/prescriptions/*/remaining",
+                                "/prescriptions/*/dispensations",
+                                "/prescriptions/*/qr",
                                 "/prescriptions/*"
                         ).hasAnyRole(
                                 "PATIENT",
                                 "DOCTOR",
-                                "PHARMACIST"
+                                "PHARMACIST",
+                                "ADMIN"
                         )
 
-                        /*
-                         * Laboratory permissions
-                         */
-
+                        /* Laboratory permissions. */
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/lab-orders"
                         ).hasRole("DOCTOR")
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/lab-orders/doctor/me"
                         ).hasRole("DOCTOR")
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/lab-orders/patient/me"
                         ).hasRole("PATIENT")
-
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/lab-orders/pending"
-                        ).hasAnyRole(
-                                "ADMIN",
-                                "LAB_TECHNICIAN"
-                        )
-
+                        ).hasAnyRole("ADMIN", "LAB_TECHNICIAN")
                         .requestMatchers(
                                 HttpMethod.PATCH,
-                                "/lab-orders/*/start"
-                        ).hasAnyRole(
-                                "ADMIN",
-                                "LAB_TECHNICIAN"
-                        )
-
-                        .requestMatchers(
-                                HttpMethod.PATCH,
+                                "/lab-orders/*/start",
                                 "/lab-orders/*/result"
-                        ).hasAnyRole(
-                                "ADMIN",
-                                "LAB_TECHNICIAN"
-                        )
-
+                        ).hasAnyRole("ADMIN", "LAB_TECHNICIAN")
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/lab-orders/*/cancel"
-                        ).hasRole("DOCTOR")
-
+                        ).hasAnyRole("DOCTOR", "ADMIN")
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/lab-orders/*"
@@ -208,23 +222,42 @@ public class SecurityConfig {
                                 "LAB_TECHNICIAN"
                         )
 
-                        /*
-                         * Admin permissions
-                         */
-
+                        /* Clinical-record permissions. */
                         .requestMatchers(
-                                "/admin/**"
-                        ).hasRole("ADMIN")
+                                HttpMethod.POST,
+                                "/clinical-records",
+                                "/clinical-records/complete"
+                        ).hasRole("DOCTOR")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/clinical-records/patient/me"
+                        ).hasRole("PATIENT")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/clinical-records/doctor/me",
+                                "/clinical-records/queue/*",
+                                "/clinical-records/patient/*"
+                        ).hasAnyRole("DOCTOR", "ADMIN")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/clinical-records/*"
+                        ).hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
 
-                        .anyRequest()
-                        .authenticated()
+                        .requestMatchers("/admin/**")
+                        .hasRole("ADMIN")
+
+                        // Department details and booking slots are public.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/departments/**"
+                        ).permitAll()
+
+                        .anyRequest().authenticated()
                 )
-
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
-
                 .build();
     }
 

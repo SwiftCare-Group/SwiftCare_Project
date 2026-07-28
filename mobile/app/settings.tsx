@@ -45,11 +45,10 @@ const loadSettings = async () => {
     setSettings(savedSettings);
 
   } catch (error) {
-    console.error(
-      'Failed to load settings:',
-      error
+    Alert.alert(
+      'Settings Error',
+      'Your saved preferences could not be loaded. Default settings are being used.'
     );
-
   } finally {
     setLoading(false);
   }
@@ -66,11 +65,6 @@ const handleSettingChange = async (
 
     setSettings(updatedSettings);
   } catch (error) {
-    console.error(
-      'Failed to update setting:',
-      error
-    );
-
     Alert.alert(
       'Settings Error',
       'Your preference could not be saved.'

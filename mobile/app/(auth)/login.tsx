@@ -7,7 +7,6 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -22,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/colors";
 import { useHaptics } from "../../hooks/useHaptics";
 import api from "../../services/api";
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -137,19 +137,6 @@ export default function LoginScreen() {
         const status = error.response?.status;
         const responseData = error.response?.data;
 
-        console.log("Login error details:", {
-          message: error.message,
-          code: error.code,
-          baseURL: error.config?.baseURL,
-          url: error.config?.url,
-          method: error.config?.method,
-          fullURL:
-            `${error.config?.baseURL ?? ""}` +
-            `${error.config?.url ?? ""}`,
-          status,
-          responseData,
-        });
-
         if (status === 400) {
           alertMessage =
             responseData?.message ||
@@ -178,10 +165,7 @@ export default function LoginScreen() {
             alertMessage;
         }
       } else if (error instanceof Error) {
-        console.log("Login error:", error.message);
         alertMessage = error.message;
-      } else {
-        console.log("Unknown login error:", error);
       }
 
       Alert.alert("Login Failed", alertMessage);
@@ -204,11 +188,7 @@ export default function LoginScreen() {
         style={styles.headerGradient}
       >
         <View style={styles.brandContainer}>
-          <Image
-            source={require("../../assets/icon.png")}
-            style={styles.headerLogo}
-            resizeMode="cover"
-          />
+          <SwiftCareLogo size={92} />
 
           <Text style={styles.appName}>
             SwiftCare
@@ -451,6 +431,9 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 26,
     marginBottom: 14,
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   appName: {

@@ -1,6 +1,7 @@
 package com.swiftcare.backend.auth;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class AdminAccountSeeder implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
@@ -29,15 +31,15 @@ public class AdminAccountSeeder implements CommandLineRunner {
     public void run(String... args) {
 
         if (adminEmail == null || adminEmail.isBlank()) {
-            System.out.println(
-                    "Bootstrap admin not created: email is not configured."
+            log.info(
+                    "Bootstrap administrator not created because email is not configured"
             );
             return;
         }
 
         if (adminPassword == null || adminPassword.isBlank()) {
-            System.out.println(
-                    "Bootstrap admin not created: password is not configured."
+            log.info(
+                    "Bootstrap administrator not created because password is not configured"
             );
             return;
         }
@@ -45,20 +47,21 @@ public class AdminAccountSeeder implements CommandLineRunner {
         String normalizedEmail =
                 adminEmail.trim().toLowerCase();
 
-        Integer existingAdminCount = jdbcTemplate.queryForObject(
+        Integer existingIdentityCount = jdbcTemplate.queryForObject(
                 """
-                SELECT COUNT(*)
-                FROM doctors
-                WHERE LOWER(email) = LOWER(?)
+                SELECT (
+                    SELECT COUNT(*) FROM doctors WHERE LOWER(email) = LOWER(?)
+                ) + (
+                    SELECT COUNT(*) FROM patients WHERE LOWER(email) = LOWER(?)
+                )
                 """,
                 Integer.class,
+                normalizedEmail,
                 normalizedEmail
         );
 
-        if (existingAdminCount != null && existingAdminCount > 0) {
-            System.out.println(
-                    "Bootstrap admin already exists: " + normalizedEmail
-            );
+        if (existingIdentityCount != null && existingIdentityCount > 0) {
+            log.info("Bootstrap administrator email already belongs to an account");
             return;
         }
 
@@ -74,11 +77,8 @@ public class AdminAccountSeeder implements CommandLineRunner {
         );
 
         if (departmentIds.isEmpty()) {
-            System.out.println(
-                    "Bootstrap admin was not created because no department exists."
-            );
-            System.out.println(
-                    "Create at least one department, then restart identity-service."
+            log.warn(
+                    "Bootstrap administrator was not created because no department exists"
             );
             return;
         }
@@ -108,16 +108,13 @@ public class AdminAccountSeeder implements CommandLineRunner {
                 adminName,
                 normalizedEmail,
                 passwordHash,
-                "ADMIN-001",
+                "ADMIN-" + adminId.toString().substring(0, 8).toUpperCase(),
                 departmentId,
                 true,
                 false,
                 "ADMIN"
         );
 
-        System.out.println(
-                "Bootstrap administrator created successfully: "
-                        + normalizedEmail
-        );
+        log.info("Bootstrap administrator created successfully");
     }
 }

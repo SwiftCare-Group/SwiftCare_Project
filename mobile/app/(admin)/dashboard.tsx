@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -24,20 +25,15 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const [deptRes, aptRes] = await Promise.all([
-        api.get('/departments'),
-        api.get('/appointments').catch(() => ({ data: [] })),
-      ]);
-      const departments = deptRes.data;
-      const appointments = aptRes.data;
+      const response = await api.get('/admin/stats');
+      setStats(response.data);
+    } catch {
       setStats({
-        totalDepartments: departments.length,
-        activeDepartments: departments.filter((d: any) => d.isActive).length,
-        pendingAppointments: appointments.filter((a: any) => a.status === 'PENDING').length,
-        completedAppointments: appointments.filter((a: any) => a.status === 'COMPLETED').length,
+        totalDepartments: 0,
+        activeDepartments: 0,
+        pendingAppointments: 0,
+        completedAppointments: 0,
       });
-    } catch (error) {
-      console.error('Failed to fetch stats');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -52,7 +48,7 @@ export default function AdminDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('accessToken');
+    await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'userRole']);
     router.replace('/(auth)/login');
   };
 
@@ -78,9 +74,12 @@ export default function AdminDashboard() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>Admin Dashboard</Text>
-            <Text style={styles.headerSubtitle}>SwiftCare Hospital System</Text>
+          <View style={styles.headerIdentity}>
+            <SwiftCareLogo size={46} compact />
+            <View>
+              <Text style={styles.headerTitle}>Admin Dashboard</Text>
+              <Text style={styles.headerSubtitle}>SwiftCare Hospital System</Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color={Colors.white} />
@@ -139,6 +138,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
   logoutBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },

@@ -30,12 +30,9 @@ public class AppointmentController {
     ) {
         UUID patientId = getAuthenticatedPatientId(authentication);
 
-        AppointmentResponse response =
-                appointmentService.bookAppointment(patientId, request);
-
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(response);
+                .body(appointmentService.bookAppointment(patientId, request));
     }
 
     @GetMapping
@@ -51,17 +48,22 @@ public class AppointmentController {
 
     @GetMapping("/{id}")
     public ResponseEntity<AppointmentResponse> getAppointment(
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(
-                appointmentService.getAppointment(id)
-        );
+        AppointmentResponse response = appointmentService.getAppointment(id);
+        ensureCanReadAppointment(response.getPatientId(), authentication);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}/queue")
     public ResponseEntity<QueueStatusResponse> getQueueStatus(
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            Authentication authentication
     ) {
+        AppointmentResponse appointment = appointmentService.getAppointment(id);
+        ensureCanReadAppointment(appointment.getPatientId(), authentication);
+
         return ResponseEntity.ok(
                 appointmentService.getQueueStatus(id)
         );
@@ -69,34 +71,73 @@ public class AppointmentController {
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<AppointmentResponse> cancelAppointment(
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            Authentication authentication
     ) {
+        AppointmentResponse appointment = appointmentService.getAppointment(id);
+        ensureCanCancelAppointment(appointment.getPatientId(), authentication);
+
         return ResponseEntity.ok(
                 appointmentService.cancelAppointment(id)
         );
     }
 
-    private UUID getAuthenticatedPatientId(
+    private void ensureCanReadAppointment(
+            UUID ownerPatientId,
             Authentication authentication
     ) {
+        if (hasRole(authentication, "DOCTOR") || hasRole(authentication, "ADMIN")) {
+            return;
+        }
+
+        ensurePatientOwnsResource(ownerPatientId, authentication);
+    }
+
+    private void ensureCanCancelAppointment(
+            UUID ownerPatientId,
+            Authentication authentication
+    ) {
+        if (hasRole(authentication, "ADMIN")) {
+            return;
+        }
+
+        ensurePatientOwnsResource(ownerPatientId, authentication);
+    }
+
+    private void ensurePatientOwnsResource(
+            UUID ownerPatientId,
+            Authentication authentication
+    ) {
+        UUID authenticatedPatientId = getAuthenticatedPatientId(authentication);
+
+        if (!authenticatedPatientId.equals(ownerPatientId)) {
+            throw new SecurityException(
+                    "You cannot access another patient's appointment"
+            );
+        }
+    }
+
+    private UUID getAuthenticatedPatientId(Authentication authentication) {
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || authentication.getName() == null
                 || authentication.getName().isBlank()) {
-
             throw new IllegalStateException(
                     "Authenticated patient email is unavailable"
             );
         }
 
-        String email = authentication.getName();
-
-        return patientRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Patient not found for email: " + email
-                        )
-                )
+        return patientRepository
+                .findByEmailIgnoreCaseAndIsDeletedFalse(authentication.getName().trim())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Authenticated patient account was not found"
+                ))
                 .getId();
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }
 }

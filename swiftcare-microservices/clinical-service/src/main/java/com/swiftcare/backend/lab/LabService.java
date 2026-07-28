@@ -10,7 +10,6 @@ import com.swiftcare.backend.lab.dto.LabResultResponse;
 import com.swiftcare.backend.patient.Patient;
 import com.swiftcare.backend.patient.PatientRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +19,6 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class LabService {
 
     private final LabOrderRepository labOrderRepository;
@@ -124,14 +122,6 @@ public class LabService {
         LabOrder savedOrder =
                 labOrderRepository.save(order);
 
-        log.info(
-                "Lab order {} created for consultation {} " +
-                        "by doctor {}",
-                savedOrder.getId(),
-                consultation.getId(),
-                consultation.getDoctor().getId()
-        );
-
         return mapToOrderResponse(savedOrder);
     }
 
@@ -169,7 +159,9 @@ public class LabService {
         );
 
         Patient patient = patientRepository
-                .findByEmail(authenticatedPatientEmail)
+                .findByEmailIgnoreCaseAndIsDeletedFalse(
+                        authenticatedPatientEmail.trim()
+                )
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Authenticated patient not found"
@@ -191,8 +183,11 @@ public class LabService {
     @Transactional(readOnly = true)
     public List<LabOrderResponse> getPendingOrders() {
         return labOrderRepository
-                .findAllByStatusOrderByOrderedAtAsc(
-                        LabStatus.ORDERED
+                .findAllByStatusInOrderByOrderedAtAsc(
+                        List.of(
+                                LabStatus.ORDERED,
+                                LabStatus.IN_PROGRESS
+                        )
                 )
                 .stream()
                 .map(this::mapToOrderResponse)
@@ -206,7 +201,7 @@ public class LabService {
     public LabOrderResponse startOrder(
             UUID orderId
     ) {
-        LabOrder order = findOrderById(orderId);
+        LabOrder order = findOrderByIdForUpdate(orderId);
 
         if (order.getStatus() == LabStatus.COMPLETED) {
             throw new IllegalStateException(
@@ -233,7 +228,8 @@ public class LabService {
     @Transactional
     public LabOrderResponse recordResult(
             UUID orderId,
-            LabResultRequest request
+            LabResultRequest request,
+            String authenticatedStaffName
     ) {
         if (request == null) {
             throw new IllegalArgumentException(
@@ -241,7 +237,7 @@ public class LabService {
             );
         }
 
-        LabOrder order = findOrderById(orderId);
+        LabOrder order = findOrderByIdForUpdate(orderId);
 
         if (order.getStatus() == LabStatus.CANCELLED) {
             throw new IllegalStateException(
@@ -262,8 +258,8 @@ public class LabService {
         );
 
         String performedBy = normalizeRequiredText(
-                request.getPerformedBy(),
-                "Performed by is required"
+                authenticatedStaffName,
+                "Authenticated staff name is unavailable"
         );
 
         LabResult result = LabResult.builder()
@@ -290,12 +286,6 @@ public class LabService {
         LabOrder savedOrder =
                 labOrderRepository.save(order);
 
-        log.info(
-                "Result recorded for lab order {} by {}",
-                orderId,
-                performedBy
-        );
-
         return mapToOrderResponse(savedOrder);
     }
 
@@ -318,7 +308,7 @@ public class LabService {
     public LabOrderResponse cancelOrder(
             UUID orderId
     ) {
-        LabOrder order = findOrderById(orderId);
+        LabOrder order = findOrderByIdForUpdate(orderId);
 
         if (order.getStatus() == LabStatus.COMPLETED) {
             throw new IllegalStateException(
@@ -331,6 +321,24 @@ public class LabService {
         return mapToOrderResponse(
                 labOrderRepository.save(order)
         );
+    }
+
+    private LabOrder findOrderByIdForUpdate(
+            UUID orderId
+    ) {
+        if (orderId == null) {
+            throw new IllegalArgumentException(
+                    "Lab order ID is required"
+            );
+        }
+
+        return labOrderRepository
+                .findForUpdateById(orderId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Laboratory order not found"
+                        )
+                );
     }
 
     private LabOrder findOrderById(

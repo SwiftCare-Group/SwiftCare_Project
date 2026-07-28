@@ -9,5 +9,6 @@ import java.util.UUID;
 @Repository
 public interface PatientRepository extends JpaRepository<Patient, UUID> {
     Optional<Patient> findByEmail(String email);
+    Optional<Patient> findByEmailIgnoreCaseAndIsDeletedFalse(String email);
     boolean existsByEmail(String email);
 }

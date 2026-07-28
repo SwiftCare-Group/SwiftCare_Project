@@ -5,6 +5,7 @@ import {
   Text,
   View,
   Switch,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -59,11 +60,8 @@ export default function PrivacySettingsScreen() {
         });
       }
 
-    } catch(error) {
-      console.log(
-        'Failed loading privacy settings',
-        error
-      );
+    } catch {
+      Alert.alert('Unable to load settings', 'Your saved privacy settings could not be read. Default settings are being used.');
     }
   };
 
@@ -80,10 +78,15 @@ export default function PrivacySettingsScreen() {
 
     setSettings(updated);
 
-    await AsyncStorage.setItem(
-      PRIVACY_KEY,
-      JSON.stringify(updated)
-    );
+    try {
+      await AsyncStorage.setItem(
+        PRIVACY_KEY,
+        JSON.stringify(updated)
+      );
+    } catch {
+      setSettings(settings);
+      Alert.alert('Unable to save', 'This privacy setting could not be saved on the device.');
+    }
   };
 
 

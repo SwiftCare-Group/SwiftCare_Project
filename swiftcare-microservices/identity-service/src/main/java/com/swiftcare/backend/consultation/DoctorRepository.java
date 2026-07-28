@@ -11,4 +11,6 @@ import java.util.UUID;
 public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     List<Doctor> findAllByIsAvailableOnlineTrueAndIsDeletedFalse();
     Optional<Doctor> findByEmail(String email);
+    Optional<Doctor> findByEmailIgnoreCaseAndIsDeletedFalse(String email);
+    boolean existsByEmailIgnoreCase(String email);
 }

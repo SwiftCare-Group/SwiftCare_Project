@@ -8,7 +8,6 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "scheme": "swiftcare",
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.swiftcare.app",
@@ -16,7 +15,6 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
@@ -26,14 +24,19 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.swiftcare.app"
     },
-
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SwiftCare to scan prescription QR codes.",
+          "recordAudioAndroid": false
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -46,7 +49,6 @@
       "expo-font",
       "expo-notifications"
     ],
-
     "extra": {
       "router": {},
       "eas": {

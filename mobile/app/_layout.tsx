@@ -4,6 +4,7 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 import api from "../services/api";
@@ -27,6 +28,17 @@ type NotificationData = {
   departmentId?: string;
 };
 
+const SAFE_NOTIFICATION_ROUTES = new Set([
+  "/(patient)/home",
+  "/(patient)/appointments",
+  "/(patient)/queue",
+  "/(patient)/prescription",
+  "/(patient)/lab-results",
+  "/(patient)/medical-history",
+  "/(patient)/profile",
+  "/notifications",
+]);
+
 export default function RootLayout() {
   const router = useRouter();
 
@@ -40,11 +52,8 @@ export default function RootLayout() {
    */
   useEffect(() => {
     const receivedSubscription =
-      Notifications.addNotificationReceivedListener((notification) => {
-        console.log(
-          "PUSH NOTIFICATION RECEIVED:",
-          notification.request.content
-        );
+      Notifications.addNotificationReceivedListener(() => {
+        // The operating system displays the notification while the app is open.
       });
 
     const responseSubscription =
@@ -52,7 +61,6 @@ export default function RootLayout() {
         const data = response.notification.request.content
           .data as NotificationData;
 
-        console.log("PUSH NOTIFICATION OPENED:", data);
 
         if (data?.type === "PATIENT_CALLED") {
           router.push("/(patient)/queue");
@@ -63,7 +71,10 @@ export default function RootLayout() {
          * This supports future SwiftCare notifications that provide
          * a destination route in the notification data.
          */
-        if (typeof data?.route === "string" && data.route.length > 0) {
+        if (
+          typeof data?.route === "string" &&
+          SAFE_NOTIFICATION_ROUTES.has(data.route)
+        ) {
           router.push(data.route as never);
         }
       });
@@ -86,12 +97,17 @@ export default function RootLayout() {
 
         if (data?.type === "PATIENT_CALLED") {
           router.push("/(patient)/queue");
+          return;
         }
-      } catch (error) {
-        console.error(
-          "FAILED TO READ INITIAL NOTIFICATION:",
-          error
-        );
+
+        if (
+          typeof data?.route === "string" &&
+          SAFE_NOTIFICATION_ROUTES.has(data.route)
+        ) {
+          router.push(data.route as never);
+        }
+      } catch {
+        // Notification routing is optional; authentication can continue normally.
       }
     };
 
@@ -115,12 +131,10 @@ export default function RootLayout() {
         await AsyncStorage.multiRemove([
           "accessToken",
           "refreshToken",
+          "userRole",
         ]);
-      } catch (error) {
-        console.error(
-          "FAILED TO CLEAR INVALID SESSION:",
-          error
-        );
+      } catch {
+        // Continue to the login screen even if local storage cleanup fails.
       }
 
       if (isMounted) {
@@ -133,21 +147,11 @@ export default function RootLayout() {
         const pushToken =
           await registerForPushNotifications();
 
-        if (pushToken) {
-          console.log(
-            "PATIENT PUSH NOTIFICATIONS REGISTERED:",
-            pushToken
-          );
+        if (!pushToken) {
+          return;
         }
-      } catch (error) {
-        /*
-         * Notification registration should not prevent the patient
-         * from entering the application.
-         */
-        console.error(
-          "PATIENT NOTIFICATION REGISTRATION FAILED:",
-          error
-        );
+      } catch {
+        // Push registration is optional and must not block app startup.
       }
     };
 
@@ -179,11 +183,6 @@ export default function RootLayout() {
             patientProfile?.role ?? "PATIENT"
           ).toUpperCase();
 
-          console.log(
-            "PATIENT PROFILE:",
-            JSON.stringify(patientProfile)
-          );
-
           if (!isMounted) {
             return;
           }
@@ -201,16 +200,8 @@ export default function RootLayout() {
           void registerPatientNotifications();
 
           return;
-        } catch (patientError: any) {
-          console.log(
-            "PATIENT PROFILE CHECK FAILED:",
-            {
-              status:
-                patientError?.response?.status,
-              data: patientError?.response?.data,
-              message: patientError?.message,
-            }
-          );
+        } catch {
+          // Staff accounts are not present in the patient service; check staff next.
         }
 
         /*
@@ -228,11 +219,6 @@ export default function RootLayout() {
             staffProfile?.role ?? ""
           ).toUpperCase();
 
-          console.log(
-            "STAFF PROFILE:",
-            JSON.stringify(staffProfile)
-          );
-
           if (!isMounted) {
             return;
           }
@@ -249,26 +235,21 @@ export default function RootLayout() {
             return;
           }
 
-          await logoutInvalidUser();
-        } catch (staffError: any) {
-          console.log(
-            "STAFF PROFILE CHECK FAILED:",
-            {
-              status:
-                staffError?.response?.status,
-              data: staffError?.response?.data,
-              message: staffError?.message,
-            }
-          );
+          if (role === "ADMIN") {
+            router.replace("/(admin)/dashboard");
+            return;
+          }
 
+          if (role === "LAB_TECHNICIAN") {
+            router.replace("/(lab)/dashboard");
+            return;
+          }
+
+          await logoutInvalidUser();
+        } catch {
           await logoutInvalidUser();
         }
       } catch (error) {
-        console.error(
-          "AUTHENTICATION CHECK FAILED:",
-          error
-        );
-
         await logoutInvalidUser();
       } finally {
         if (isMounted) {
@@ -327,3 +308,94 @@ function AppNavigator() {
     </>
   );
 }
+
+export function ErrorBoundary({
+  error,
+  retry,
+}: {
+  error: Error;
+  retry: () => void;
+}) {
+  const router = useRouter();
+
+  return (
+    <View style={errorStyles.container}>
+      <View style={errorStyles.icon}>
+        <Text style={errorStyles.iconText}>!</Text>
+      </View>
+      <Text style={errorStyles.title}>SwiftCare encountered a problem</Text>
+      <Text style={errorStyles.message}>
+        {error?.message || "The screen could not be displayed."}
+      </Text>
+      <TouchableOpacity style={errorStyles.primaryButton} onPress={retry}>
+        <Text style={errorStyles.primaryButtonText}>Try again</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={errorStyles.secondaryButton}
+        onPress={() => router.replace("/(auth)/login")}
+      >
+        <Text style={errorStyles.secondaryButtonText}>Return to sign in</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const errorStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 28,
+    backgroundColor: "#F5F7FA",
+  },
+  icon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+    backgroundColor: "#FDECEC",
+  },
+  iconText: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#D64545",
+  },
+  title: {
+    fontSize: 21,
+    fontWeight: "800",
+    textAlign: "center",
+    color: "#17324D",
+  },
+  message: {
+    marginTop: 10,
+    marginBottom: 24,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    color: "#66788A",
+  },
+  primaryButton: {
+    width: "100%",
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#0B8FAC",
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  secondaryButton: {
+    marginTop: 12,
+    padding: 10,
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0B8FAC",
+  },
+});

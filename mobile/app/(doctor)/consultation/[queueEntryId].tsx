@@ -1,7 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -56,6 +60,82 @@ const isValidRouteId = (
       UUID_PATTERN.test(value)
   );
 };
+
+const getBackendMessage = (
+  error: any,
+  fallbackMessage: string
+): string => {
+  const responseData = error?.response?.data;
+
+  if (
+    responseData?.errors &&
+    typeof responseData.errors === 'object'
+  ) {
+    const validationMessages = Object.values(
+      responseData.errors
+    ).filter(
+      (message): message is string =>
+        typeof message === 'string' &&
+        message.trim().length > 0
+    );
+
+    if (validationMessages.length > 0) {
+      return validationMessages.join('\n');
+    }
+  }
+
+  if (
+    typeof responseData?.message === 'string' &&
+    responseData.message.trim()
+  ) {
+    return responseData.message;
+  }
+
+  if (
+    typeof responseData?.error === 'string' &&
+    responseData.error.trim()
+  ) {
+    return responseData.error;
+  }
+
+  if (
+    typeof responseData === 'string' &&
+    responseData.trim()
+  ) {
+    return responseData;
+  }
+
+  if (error?.code === 'ECONNABORTED') {
+    return 'The request took too long. Please check your connection and try again.';
+  }
+
+  if (!error?.response) {
+    return 'The server could not be reached. Check that the backend is running and your device is connected to the same network.';
+  }
+
+  return fallbackMessage;
+};
+
+const splitEntries = (value: string): string[] =>
+  Array.from(
+    new Set(
+      value
+        .split(/[\n,;]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    )
+  );
+
+const toNullableNumber = (value: string): number | null => {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export default function ConsultationScreen() {
   const router = useRouter();
 
@@ -64,59 +144,71 @@ export default function ConsultationScreen() {
     patientId?: string | string[];
   }>();
 
-  const queueEntryId = getSingleParam(params.queueEntryId);
-  const routePatientId = getSingleParam(params.patientId);
+  const queueEntryId = getSingleParam(
+    params.queueEntryId
+  );
+
+  const routePatientId = getSingleParam(
+    params.patientId
+  );
 
   const [patient, setPatient] =
     useState<PatientDetails | null>(null);
 
-  const [diagnosis, setDiagnosis] = useState('');
-  const [consultationNotes, setConsultationNotes] =
+  const [diagnosis, setDiagnosis] =
     useState('');
-  const [prescription, setPrescription] = useState('');
-  const [labRequest, setLabRequest] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState(false);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [
+    consultationNotes,
+    setConsultationNotes,
+  ] = useState('');
+
+  const [prescription, setPrescription] =
+    useState('');
+
+  const [labRequest, setLabRequest] =
+    useState('');
+
+  const [temperature, setTemperature] = useState('');
+  const [bloodPressure, setBloodPressure] = useState('');
+  const [pulseRate, setPulseRate] = useState('');
+  const [respiratoryRate, setRespiratoryRate] = useState('');
+  const [oxygenSaturation, setOxygenSaturation] = useState('');
+  const [weight, setWeight] = useState('');
+  const [followUpInstructions, setFollowUpInstructions] = useState('');
+  const [referralNotes, setReferralNotes] = useState('');
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [completing, setCompleting] =
+    useState(false);
+
+  const [loadFailed, setLoadFailed] =
+    useState(false);
 
   const fetchPatientDetails = useCallback(
     async (id: string) => {
       try {
         setLoading(true);
         setLoadFailed(false);
-
-        console.log('FETCHING QUEUE ENTRY:', {
-          queueEntryId: id,
-          url: `/queue/${id}`,
-        });
-
-        const response = await api.get(`/queue/${id}`);
+        const response = await api.get(
+          `/queue/${id}`,
+          {
+            timeout: 15000,
+          }
+        );
 
         setPatient(response.data);
       } catch (error: any) {
+        setPatient(null);
         setLoadFailed(true);
-
-        console.error('CONSULTATION LOAD ERROR:', {
-          queueEntryId: id,
-          url: error?.config?.url,
-          method: error?.config?.method,
-          status: error?.response?.status,
-          data: error?.response?.data,
-          message: error?.message,
-        });
-
-        const backendMessage =
-          error?.response?.data?.message ??
-          error?.response?.data?.error ??
-          'The patient details could not be loaded.';
-
         Alert.alert(
           'Unable to load consultation',
-          typeof backendMessage === 'string'
-            ? backendMessage
-            : JSON.stringify(backendMessage)
+          getBackendMessage(
+            error,
+            'The patient details could not be loaded.'
+          )
         );
       } finally {
         setLoading(false);
@@ -127,15 +219,6 @@ export default function ConsultationScreen() {
 
   useEffect(() => {
     if (!isValidRouteId(queueEntryId)) {
-      console.error(
-        'INVALID OR MISSING CONSULTATION PARAMETERS:',
-        {
-          queueEntryId,
-          patientId: routePatientId,
-          params,
-        }
-      );
-
       setLoading(false);
       setLoadFailed(true);
 
@@ -161,7 +244,109 @@ export default function ConsultationScreen() {
     router,
   ]);
 
+  const completeConsultation = async () => {
+    if (completing) {
+      return;
+    }
+
+    if (!isValidRouteId(queueEntryId)) {
+      Alert.alert(
+        'Invalid consultation',
+        'The queue entry ID is missing or invalid.'
+      );
+
+      return;
+    }
+
+    const cleanedDiagnosis =
+      diagnosis.trim();
+
+    if (!cleanedDiagnosis) {
+      Alert.alert(
+        'Diagnosis required',
+        'Please enter the patient diagnosis before completing the consultation.'
+      );
+
+      return;
+    }
+
+    if (cleanedDiagnosis.length > 500) {
+      Alert.alert(
+        'Diagnosis too long',
+        'The diagnosis cannot exceed 500 characters.'
+      );
+
+      return;
+    }
+
+    try {
+      setCompleting(true);
+
+      const drugs = splitEntries(prescription);
+      const labOrders = splitEntries(labRequest).map((testName) => ({
+        testName,
+        clinicalReason: cleanedDiagnosis,
+        instructions: null,
+      }));
+
+      await api.post(
+        '/consultations/complete-workflow',
+        {
+          queueEntryId,
+          diagnosis: cleanedDiagnosis,
+          consultationNotes: consultationNotes.trim() || null,
+          temperatureCelsius: toNullableNumber(temperature),
+          bloodPressure: bloodPressure.trim() || null,
+          pulseRate: toNullableNumber(pulseRate),
+          respiratoryRate: toNullableNumber(respiratoryRate),
+          oxygenSaturation: toNullableNumber(oxygenSaturation),
+          weightKg: toNullableNumber(weight),
+          followUpInstructions: followUpInstructions.trim() || null,
+          referralNotes: referralNotes.trim() || null,
+          drugs,
+          labOrders,
+        },
+        {
+          timeout: 30000,
+        }
+      );
+
+      Alert.alert(
+        'Consultation completed',
+        'The clinical record was saved and the patient was removed from the active queue.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace(
+                '/(doctor)/queue' as any
+              );
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Unable to complete consultation',
+        getBackendMessage(
+          error,
+          'The consultation could not be completed. Please try again.'
+        )
+      );
+      console.log(
+  'CONSULTATION COMPLETION ERROR:',
+  JSON.stringify(error?.response?.data, null, 2)
+);
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   const handleCompleteConsultation = () => {
+    if (completing) {
+      return;
+    }
+
     if (!isValidRouteId(queueEntryId)) {
       Alert.alert(
         'Consultation error',
@@ -182,7 +367,7 @@ export default function ConsultationScreen() {
 
     Alert.alert(
       'Complete consultation',
-      'Are you sure you want to complete this consultation?',
+      'Are you sure you want to save this clinical record and complete the consultation?',
       [
         {
           text: 'Cancel',
@@ -196,86 +381,6 @@ export default function ConsultationScreen() {
     );
   };
 
-const completeConsultation = async () => {
-  if (!queueEntryId || queueEntryId === 'undefined') {
-    Alert.alert(
-      'Invalid consultation',
-      'The queue entry ID is missing.'
-    );
-    return;
-  }
-
-  if (!diagnosis.trim()) {
-    Alert.alert(
-      'Diagnosis required',
-      'Please enter the patient diagnosis before completing the consultation.'
-    );
-    return;
-  }
-
-  try {
-    setSubmitting(true);
-
-    const clinicalRecordPayload = {
-      queueEntryId: String(queueEntryId),
-      diagnosis: diagnosis.trim(),
-      consultationNotes: consultationNotes.trim() || null,
-      prescription: prescription.trim() || null,
-      labRequest: labRequest.trim() || null,
-    };
-
-    console.log(
-      'CREATING CLINICAL RECORD:',
-      clinicalRecordPayload
-    );
-
-    await api.post(
-      '/clinical-records',
-      clinicalRecordPayload
-    );
-
-    console.log(
-      'COMPLETING QUEUE ENTRY:',
-      queueEntryId
-    );
-
-    await api.patch(
-      `/queue/${queueEntryId}/complete`
-    );
-
-    Alert.alert(
-      'Consultation completed',
-      'The clinical record has been saved successfully.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            router.replace('/(doctor)/queue' as any);
-          },
-        },
-      ]
-    );
-  } catch (error: any) {
-    console.error('COMPLETE CONSULTATION ERROR:', {
-      status: error?.response?.status,
-      data: error?.response?.data,
-      message: error?.message,
-      url: error?.config?.url,
-    });
-
-    const backendMessage =
-      error?.response?.data?.message ||
-      error?.response?.data?.error;
-
-    Alert.alert(
-      'Unable to complete consultation',
-      backendMessage ||
-        'The consultation could not be completed. Please try again.'
-    );
-  } finally {
-    setSubmitting(false);
-  }
-};
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -308,6 +413,7 @@ const completeConsultation = async () => {
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
+              activeOpacity={0.85}
             >
               <Ionicons
                 name="arrow-back"
@@ -316,12 +422,22 @@ const completeConsultation = async () => {
               />
             </TouchableOpacity>
 
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>
+            <View
+              style={
+                styles.headerTextContainer
+              }
+            >
+              <Text
+                style={styles.headerTitle}
+              >
                 Consultation
               </Text>
 
-              <Text style={styles.headerSubtitle}>
+              <Text
+                style={
+                  styles.headerSubtitle
+                }
+              >
                 Patient details unavailable
               </Text>
             </View>
@@ -341,16 +457,20 @@ const completeConsultation = async () => {
             Consultation could not be loaded
           </Text>
 
-          <Text style={styles.errorDescription}>
-            The queue entry information is missing or could
-            not be retrieved.
+          <Text
+            style={styles.errorDescription}
+          >
+            The queue entry information is
+            missing or could not be retrieved.
           </Text>
 
           {isValidRouteId(queueEntryId) ? (
             <TouchableOpacity
               style={styles.retryButton}
               onPress={() =>
-                fetchPatientDetails(queueEntryId)
+                fetchPatientDetails(
+                  queueEntryId
+                )
               }
               activeOpacity={0.85}
             >
@@ -360,7 +480,11 @@ const completeConsultation = async () => {
                 color={Colors.white}
               />
 
-              <Text style={styles.retryButtonText}>
+              <Text
+                style={
+                  styles.retryButtonText
+                }
+              >
                 Try again
               </Text>
             </TouchableOpacity>
@@ -371,7 +495,9 @@ const completeConsultation = async () => {
             onPress={() => router.back()}
             activeOpacity={0.85}
           >
-            <Text style={styles.goBackButtonText}>
+            <Text
+              style={styles.goBackButtonText}
+            >
               Go back
             </Text>
           </TouchableOpacity>
@@ -397,6 +523,7 @@ const completeConsultation = async () => {
             style={styles.backButton}
             onPress={() => router.back()}
             disabled={completing}
+            activeOpacity={0.85}
           >
             <Ionicons
               name="arrow-back"
@@ -405,13 +532,18 @@ const completeConsultation = async () => {
             />
           </TouchableOpacity>
 
-          <View style={styles.headerTextContainer}>
+          <View
+            style={styles.headerTextContainer}
+          >
             <Text style={styles.headerTitle}>
               Consultation
             </Text>
 
-            <Text style={styles.headerSubtitle}>
-              Record medical findings and treatment
+            <Text
+              style={styles.headerSubtitle}
+            >
+              Record medical findings and
+              treatment
             </Text>
           </View>
         </View>
@@ -432,7 +564,9 @@ const completeConsultation = async () => {
             />
           </View>
 
-          <View style={styles.patientInformation}>
+          <View
+            style={styles.patientInformation}
+          >
             <Text style={styles.patientName}>
               {patient?.patientName ??
                 'Patient information'}
@@ -445,11 +579,27 @@ const completeConsultation = async () => {
                 routePatientId ??
                 'Not available'}
             </Text>
+
+            {(patient?.age ||
+              patient?.gender) && (
+              <Text
+                style={styles.patientMeta}
+              >
+                {patient?.age
+                  ? `${patient.age} years`
+                  : ''}
+                {patient?.age &&
+                patient?.gender
+                  ? ' • '
+                  : ''}
+                {patient?.gender ?? ''}
+              </Text>
+            )}
           </View>
 
           <View style={styles.severityBadge}>
             <Text style={styles.severityText}>
-              {patient?.severityScore ?? 0}/10
+              {patient?.severityScore ?? 0}/4
             </Text>
           </View>
         </View>
@@ -475,9 +625,17 @@ const completeConsultation = async () => {
             value={diagnosis}
             onChangeText={setDiagnosis}
             placeholder="Enter the diagnosis"
-            placeholderTextColor={Colors.textDisabled}
+            placeholderTextColor={
+              Colors.textDisabled
+            }
             editable={!completing}
+            maxLength={500}
+            returnKeyType="done"
           />
+
+          <Text style={styles.characterCount}>
+            {diagnosis.length}/500
+          </Text>
         </View>
 
         <View style={styles.formSection}>
@@ -491,13 +649,80 @@ const completeConsultation = async () => {
               styles.multilineInput,
             ]}
             value={consultationNotes}
-            onChangeText={setConsultationNotes}
+            onChangeText={
+              setConsultationNotes
+            }
             placeholder="Symptoms, examination findings and observations"
-            placeholderTextColor={Colors.textDisabled}
+            placeholderTextColor={
+              Colors.textDisabled
+            }
             multiline
             textAlignVertical="top"
             editable={!completing}
           />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.fieldLabel}>Vital signs</Text>
+          <Text style={styles.fieldHint}>
+            Enter the available measurements. Leave unknown values blank.
+          </Text>
+
+          <View style={styles.vitalsGrid}>
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={temperature}
+              onChangeText={setTemperature}
+              placeholder="Temperature °C"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="decimal-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={bloodPressure}
+              onChangeText={setBloodPressure}
+              placeholder="Blood pressure 120/80"
+              placeholderTextColor={Colors.textDisabled}
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={pulseRate}
+              onChangeText={setPulseRate}
+              placeholder="Pulse bpm"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="number-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={respiratoryRate}
+              onChangeText={setRespiratoryRate}
+              placeholder="Respiratory rate"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="number-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={oxygenSaturation}
+              onChangeText={setOxygenSaturation}
+              placeholder="SpO₂ %"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="number-pad"
+              editable={!completing}
+            />
+            <TextInput
+              style={[styles.input, styles.vitalInput]}
+              value={weight}
+              onChangeText={setWeight}
+              placeholder="Weight kg"
+              placeholderTextColor={Colors.textDisabled}
+              keyboardType="decimal-pad"
+              editable={!completing}
+            />
+          </View>
         </View>
 
         <View style={styles.formSection}>
@@ -513,7 +738,9 @@ const completeConsultation = async () => {
             value={prescription}
             onChangeText={setPrescription}
             placeholder="Medication, dosage and instructions"
-            placeholderTextColor={Colors.textDisabled}
+            placeholderTextColor={
+              Colors.textDisabled
+            }
             multiline
             textAlignVertical="top"
             editable={!completing}
@@ -533,6 +760,36 @@ const completeConsultation = async () => {
             value={labRequest}
             onChangeText={setLabRequest}
             placeholder="Enter any required laboratory tests"
+            placeholderTextColor={
+              Colors.textDisabled
+            }
+            multiline
+            textAlignVertical="top"
+            editable={!completing}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.fieldLabel}>Follow-up instructions</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={followUpInstructions}
+            onChangeText={setFollowUpInstructions}
+            placeholder="Review date, home care and warning signs"
+            placeholderTextColor={Colors.textDisabled}
+            multiline
+            textAlignVertical="top"
+            editable={!completing}
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.fieldLabel}>Referral notes</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={referralNotes}
+            onChangeText={setReferralNotes}
+            placeholder="Optional referral destination and reason"
             placeholderTextColor={Colors.textDisabled}
             multiline
             textAlignVertical="top"
@@ -543,9 +800,12 @@ const completeConsultation = async () => {
         <TouchableOpacity
           style={[
             styles.completeButton,
-            completing && styles.disabledButton,
+            completing &&
+              styles.disabledButton,
           ]}
-          onPress={handleCompleteConsultation}
+          onPress={
+            handleCompleteConsultation
+          }
           disabled={
             completing ||
             !isValidRouteId(queueEntryId)
@@ -553,10 +813,20 @@ const completeConsultation = async () => {
           activeOpacity={0.85}
         >
           {completing ? (
-            <ActivityIndicator
-              size="small"
-              color={Colors.white}
-            />
+            <>
+              <ActivityIndicator
+                size="small"
+                color={Colors.white}
+              />
+
+              <Text
+                style={
+                  styles.completeButtonText
+                }
+              >
+                Completing...
+              </Text>
+            </>
           ) : (
             <>
               <Ionicons
@@ -565,7 +835,11 @@ const completeConsultation = async () => {
                 color={Colors.white}
               />
 
-              <Text style={styles.completeButtonText}>
+              <Text
+                style={
+                  styles.completeButtonText
+                }
+              >
                 Complete consultation
               </Text>
             </>
@@ -579,7 +853,8 @@ const completeConsultation = async () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor:
+      Colors.headerGradientStart,
   },
 
   container: {
@@ -623,7 +898,8 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor:
+      'rgba(255,255,255,0.16)',
   },
 
   headerTextContainer: {
@@ -678,11 +954,18 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
 
+  patientMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+
   severityBadge: {
     paddingHorizontal: 11,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: `${Colors.warning}18`,
+    backgroundColor:
+      `${Colors.warning}18`,
   },
 
   severityText: {
@@ -713,6 +996,25 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
 
+  fieldHint: {
+    marginTop: -4,
+    marginBottom: 10,
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+
+  vitalsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+
+  vitalInput: {
+    width: '48%',
+    marginBottom: 0,
+  },
+
   formSection: {
     marginTop: 19,
   },
@@ -740,9 +1042,17 @@ const styles = StyleSheet.create({
     minHeight: 110,
   },
 
+  characterCount: {
+    marginTop: 5,
+    alignSelf: 'flex-end',
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+
   completeButton: {
     minHeight: 52,
     marginTop: 26,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -776,7 +1086,8 @@ const styles = StyleSheet.create({
     borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: `${Colors.danger}12`,
+    backgroundColor:
+      `${Colors.danger}12`,
   },
 
   errorTitle: {
@@ -798,6 +1109,7 @@ const styles = StyleSheet.create({
     minWidth: 150,
     minHeight: 48,
     marginTop: 22,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

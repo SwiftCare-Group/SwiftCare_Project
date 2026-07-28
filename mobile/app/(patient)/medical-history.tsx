@@ -24,6 +24,7 @@ type AppointmentStatus =
 
 type MedicalHistoryItem = {
   id: string;
+  appointmentId?: string;
   departmentName?: string;
   scheduledTime: string;
   status: AppointmentStatus;
@@ -51,30 +52,69 @@ export default function MedicalHistoryScreen() {
 
   const fetchMedicalHistory = async () => {
     try {
-      const response = await api.get('/appointments');
+      const [appointmentsResult, recordsResult] = await Promise.allSettled([
+        api.get('/appointments'),
+        api.get('/clinical-records/patient/me'),
+      ]);
 
-      const appointments = Array.isArray(response.data)
-        ? response.data
-        : [];
+      const appointments =
+        appointmentsResult.status === 'fulfilled' &&
+        Array.isArray(appointmentsResult.value.data)
+          ? appointmentsResult.value.data
+          : [];
+      const clinicalRecords =
+        recordsResult.status === 'fulfilled' &&
+        Array.isArray(recordsResult.value.data)
+          ? recordsResult.value.data
+          : [];
 
-      const historyRecords = appointments
-        .filter(
-          (appointment: MedicalHistoryItem) =>
-            appointment.status === 'COMPLETED' ||
-            appointment.status === 'CANCELLED'
-        )
-        .sort(
-          (
-            first: MedicalHistoryItem,
-            second: MedicalHistoryItem
-          ) =>
+      const completedAppointmentIds = new Set<string>();
+      const careRecords: MedicalHistoryItem[] = clinicalRecords.map(
+        (record: any) => {
+          if (record.appointmentId) {
+            completedAppointmentIds.add(String(record.appointmentId));
+          }
+
+          return {
+            id: String(record.id),
+            appointmentId: record.appointmentId
+              ? String(record.appointmentId)
+              : undefined,
+            departmentName: record.departmentName,
+            scheduledTime: record.createdAt ?? record.updatedAt,
+            status: 'COMPLETED',
+            doctorName: record.doctorName,
+            diagnosis: record.diagnosis,
+            prescriptionStatus: record.prescription
+              ? 'Issued'
+              : 'Not issued',
+          };
+        }
+      );
+
+      const appointmentHistory: MedicalHistoryItem[] = appointments
+        .filter((appointment: MedicalHistoryItem) => {
+          if (appointment.status === 'CANCELLED') {
+            return true;
+          }
+          return (
+            appointment.status === 'COMPLETED' &&
+            !completedAppointmentIds.has(String(appointment.id))
+          );
+        })
+        .map((appointment: MedicalHistoryItem) => ({
+          ...appointment,
+          appointmentId: appointment.id,
+        }));
+
+      setRecords(
+        [...careRecords, ...appointmentHistory].sort(
+          (first, second) =>
             new Date(second.scheduledTime).getTime() -
             new Date(first.scheduledTime).getTime()
-        );
-
-      setRecords(historyRecords);
-    } catch (error) {
-      console.error('Failed to fetch medical history:', error);
+        )
+      );
+    } catch {
       setRecords([]);
     } finally {
       setLoading(false);
@@ -430,7 +470,7 @@ export default function MedicalHistoryScreen() {
                     label="Severity"
                     value={
                       record.severityScore !== undefined
-                        ? `${record.severityScore}/10`
+                        ? `${record.severityScore}/4`
                         : 'Not recorded'
                     }
                     colors={colors}

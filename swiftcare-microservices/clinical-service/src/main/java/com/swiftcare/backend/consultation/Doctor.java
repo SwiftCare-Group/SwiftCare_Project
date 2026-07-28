@@ -46,11 +46,12 @@ public class Doctor {
 
     @PrePersist
     protected void onCreate() {
-        this.isAvailableOnline = true;
-        this.isDeleted = false;
         if (this.role == null) {
             this.role = Role.DOCTOR;
         }
+        this.isAvailableOnline =
+                this.role == Role.DOCTOR && this.isAvailableOnline;
+        this.isDeleted = false;
     }
 
     @Enumerated(EnumType.STRING)

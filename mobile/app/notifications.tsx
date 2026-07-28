@@ -51,27 +51,25 @@ export default function NotificationsScreen() {
     useState<NotificationItem[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotifications();
   }, []);
 
 const loadNotifications = async () => {
+  setLoadError(null);
   try {
-    const savedNotifications =
-      await getNotifications();
+    const savedNotifications = await getNotifications();
 
     if (savedNotifications.length === 0) {
       setNotifications(DEFAULT_NOTIFICATIONS);
-
-await saveNotifications(DEFAULT_NOTIFICATIONS);    } else {
+      await saveNotifications(DEFAULT_NOTIFICATIONS);
+    } else {
       setNotifications(savedNotifications);
     }
-  } catch (error) {
-    console.error(
-      'Failed to load notifications:',
-      error
-    );
+  } catch {
+    setLoadError('Notifications could not be loaded from this device.');
   } finally {
     setLoading(false);
   }
@@ -190,6 +188,16 @@ const clearAll = async () => {
           />
         </TouchableOpacity>
       </View>
+
+      {loadError ? (
+        <View style={[styles.errorBanner, { backgroundColor: colors.surface, borderColor: colors.danger }]}> 
+          <Ionicons name="warning-outline" size={20} color={colors.danger} />
+          <Text style={[styles.errorBannerText, { color: colors.textPrimary }]}>{loadError}</Text>
+          <TouchableOpacity onPress={() => void loadNotifications()}>
+            <Text style={[styles.retryText, { color: colors.primary }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <ScrollView
         style={{
@@ -390,6 +398,28 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 40,
+  },
+
+  errorBanner: {
+    marginHorizontal: 20,
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  errorBannerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+
+  retryText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   clearButton: {

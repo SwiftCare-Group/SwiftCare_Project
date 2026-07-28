@@ -24,10 +24,26 @@ public interface AppointmentRepository
             AppointmentStatus status
     );
 
-    boolean existsByDepartmentIdAndScheduledTimeAndStatus(
+    long countByStatus(AppointmentStatus status);
+
+    long countByDepartmentIdAndScheduledTimeBetweenAndStatusIn(
+            UUID departmentId,
+            LocalDateTime start,
+            LocalDateTime end,
+            List<AppointmentStatus> statuses
+    );
+
+    List<Appointment> findAllByDepartmentIdAndScheduledTimeBetweenAndStatusIn(
+            UUID departmentId,
+            LocalDateTime start,
+            LocalDateTime end,
+            List<AppointmentStatus> statuses
+    );
+
+    boolean existsByDepartmentIdAndScheduledTimeAndStatusIn(
             UUID departmentId,
             LocalDateTime scheduledTime,
-            AppointmentStatus status
+            List<AppointmentStatus> statuses
     );
 
     @Query("""

@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -21,6 +20,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useHaptics } from "../../hooks/useHaptics";
 import api from "../../services/api";
 import { getUnreadNotificationCount } from "../../services/notificationStorage";
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 type Patient = {
   id: string;
@@ -102,11 +102,6 @@ export default function HomeScreen() {
       const count = await getUnreadNotificationCount();
       setUnreadCount(Number(count) || 0);
     } catch (error) {
-      console.error(
-        "Failed to load unread notifications:",
-        error
-      );
-
       setUnreadCount(0);
     }
   }, []);
@@ -160,7 +155,7 @@ export default function HomeScreen() {
 
       try {
         const prescriptionResponse =
-          await api.get("/prescriptions");
+          await api.get("/prescriptions/my");
 
         const prescriptions = Array.isArray(
           prescriptionResponse.data
@@ -205,12 +200,7 @@ export default function HomeScreen() {
       );
 
       setUpcomingConsultation(upcoming ?? null);
-    } catch (error: any) {
-      console.error(
-        "Failed to fetch home data:",
-        error?.response?.data ?? error?.message ?? error
-      );
-    } finally {
+    } catch (error: any) {    } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -351,11 +341,7 @@ export default function HomeScreen() {
         >
           <View style={styles.headerTop}>
             <View style={styles.brandGreetingRow}>
-              <Image
-                source={require("../../assets/icon.png")}
-                style={styles.headerLogo}
-                resizeMode="contain"
-              />
+              <SwiftCareLogo size={48} compact />
 
               <View style={styles.greetingContainer}>
                 <Text style={styles.brandName}>
@@ -1448,6 +1434,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: Colors.white,
     marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   greetingContainer: {

@@ -59,11 +59,6 @@ public class NotificationClient {
                 .body(request)
                 .retrieve()
                 .toBodilessEntity();
-
-        log.info(
-                "Patient-called notification request sent for patient {}",
-                patientId
-        );
     }
 
     public record PatientCalledRequest(

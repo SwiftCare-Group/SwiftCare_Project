@@ -1,5 +1,4 @@
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,38 +18,37 @@ type ServiceItem = {
   title: string;
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
-  route?: string;
-  comingSoon?: boolean;
+  route: string;
 };
 
 const SERVICES: ServiceItem[] = [
   {
     id: 'medical-history',
     title: 'Medical History',
-    subtitle: 'View your previous appointments and care records',
+    subtitle: 'View diagnoses, consultation notes and completed visits',
     icon: 'document-text-outline',
     route: '/(patient)/medical-history',
   },
   {
     id: 'prescriptions',
     title: 'Prescriptions',
-    subtitle: 'Access your active and previous prescriptions',
+    subtitle: 'Show secure QR codes and track pharmacy dispensing',
     icon: 'medical-outline',
     route: '/(patient)/prescription',
   },
   {
     id: 'lab-results',
     title: 'Laboratory Results',
-    subtitle: 'Review test results and medical reports',
+    subtitle: 'Follow pending tests and review completed results',
     icon: 'flask-outline',
-    comingSoon: true,
+    route: '/(patient)/lab-results',
   },
   {
-    id: 'doctors',
-    title: 'Doctors',
-    subtitle: 'Find doctors and view their specialties',
-    icon: 'people-outline',
-    comingSoon: true,
+    id: 'consultation',
+    title: 'Online Consultation',
+    subtitle: 'Find an available doctor and book a premium video visit',
+    icon: 'videocam-outline',
+    route: '/(patient)/consultation',
   },
   {
     id: 'symptoms',
@@ -60,32 +58,25 @@ const SERVICES: ServiceItem[] = [
     route: '/(patient)/symptoms',
   },
   {
-    id: 'emergency-contact',
-    title: 'Emergency Contact',
-    subtitle: 'Manage emergency contacts and urgent assistance',
-    icon: 'call-outline',
-    comingSoon: true,
+    id: 'appointments',
+    title: 'Appointments',
+    subtitle: 'Book a department visit and manage upcoming appointments',
+    icon: 'calendar-outline',
+    route: '/(patient)/appointments',
   },
   {
-    id: 'hospital-map',
-    title: 'Hospital Navigation',
-    subtitle: 'Find departments and services inside the hospital',
-    icon: 'map-outline',
-    comingSoon: true,
+    id: 'notifications',
+    title: 'Notifications',
+    subtitle: 'Review queue, prescription and care updates',
+    icon: 'notifications-outline',
+    route: '/notifications',
   },
   {
-    id: 'insurance',
-    title: 'Insurance',
-    subtitle: 'Manage health insurance and payment details',
-    icon: 'shield-checkmark-outline',
-    comingSoon: true,
-  },
-  {
-    id: 'health-records',
-    title: 'Health Records',
-    subtitle: 'Track allergies, vitals and important health details',
-    icon: 'heart-outline',
-    comingSoon: true,
+    id: 'settings',
+    title: 'Settings and Privacy',
+    subtitle: 'Manage your profile, security and notification preferences',
+    icon: 'settings-outline',
+    route: '/settings',
   },
 ];
 
@@ -97,15 +88,7 @@ export default function ServicesScreen() {
   const openService = (service: ServiceItem) => {
     lightTap();
 
-    if (service.route) {
-      router.push(service.route as any);
-      return;
-    }
-
-    Alert.alert(
-      service.title,
-      'This SwiftCare service is currently being prepared and will be available soon.'
-    );
+    router.push(service.route as any);
   };
 
   return (
@@ -244,27 +227,6 @@ export default function ServicesScreen() {
                     {service.title}
                   </Text>
 
-                  {service.comingSoon ? (
-                    <View
-                      style={[
-                        styles.comingSoonBadge,
-                        {
-                          backgroundColor: colors.warningLight,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.comingSoonText,
-                          {
-                            color: colors.warning,
-                          },
-                        ]}
-                      >
-                        Soon
-                      </Text>
-                    </View>
-                  ) : null}
                 </View>
 
                 <Text
@@ -458,19 +420,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: 4,
-  },
-
-  comingSoonBadge: {
-    marginLeft: 8,
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-
-  comingSoonText: {
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
   },
 
   supportCard: {

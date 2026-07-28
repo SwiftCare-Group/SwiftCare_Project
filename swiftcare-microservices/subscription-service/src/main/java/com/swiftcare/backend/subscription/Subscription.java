@@ -42,7 +42,6 @@ public class Subscription {
     @Column(nullable = false)
     private LocalDateTime expiresAt;
 
-    @Column
     private LocalDateTime cancelledAt;
 
     @Column(nullable = false)
@@ -50,7 +49,18 @@ public class Subscription {
 
     @PrePersist
     protected void onCreate() {
-        this.startedAt = LocalDateTime.now();
-        this.status = SubscriptionStatus.ACTIVE;
+        LocalDateTime now = LocalDateTime.now();
+
+        if (startedAt == null) {
+            startedAt = now;
+        }
+
+        if (expiresAt == null) {
+            expiresAt = now;
+        }
+
+        if (status == null) {
+            status = SubscriptionStatus.PENDING;
+        }
     }
 }

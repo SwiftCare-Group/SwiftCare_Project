@@ -19,5 +19,9 @@ public class DispensationRecordResponse {
     private String drugName;
     private DispensationStatus status;
     private String pharmacyName;
+    private UUID pharmacistId;
+    private String pharmacistName;
+    private String quantityDispensed;
+    private String notes;
     private LocalDateTime dispensedAt;
 }

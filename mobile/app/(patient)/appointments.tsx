@@ -31,16 +31,6 @@ const DAYS = [
   'Sat',
 ];
 
-const TIME_SLOTS = [
-  '08:00',
-  '08:30',
-  '09:00',
-  '09:30',
-  '10:00',
-  '11:00',
-  '13:00',
-  '13:30',
-];
 
 type AppointmentStatus =
   | 'PENDING'
@@ -81,6 +71,9 @@ export default function AppointmentsScreen() {
     Department[]
   >([]);
 
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
 
@@ -91,7 +84,7 @@ export default function AppointmentsScreen() {
     useState<Date>(new Date());
 
   const [selectedTime, setSelectedTime] =
-    useState('09:00');
+    useState('');
 
   const [showBooking, setShowBooking] =
     useState(false);
@@ -121,18 +114,37 @@ export default function AppointmentsScreen() {
     }
   }, [preSelectedDept]);
 
-  const getDates = (): Date[] => {
-    const dates: Date[] = [];
-    const today = new Date();
-
-    for (let index = 0; index < 7; index += 1) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + index);
-      dates.push(date);
+  useEffect(() => {
+    if (!selectedDept) {
+      setAvailableSlots([]);
+      setSelectedTime('');
+      return;
     }
 
-    return dates;
+    void fetchAvailableSlots(selectedDept);
+  }, [selectedDept]);
+
+  const parseLocalSlot = (value: string): Date => {
+    const [datePart, timePart = '00:00'] = value.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
   };
+
+  const dateKey = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const dates = Array.from(
+    new Set(availableSlots.map(slot => slot.slice(0, 10)))
+  ).map(value => parseLocalSlot(`${value}T00:00:00`));
+
+  const timesForSelectedDate = availableSlots
+    .filter(slot => slot.startsWith(dateKey(selectedDate)))
+    .map(slot => slot.slice(11, 16));
 
   const fetchAppointments = async () => {
     try {
@@ -145,11 +157,6 @@ export default function AppointmentsScreen() {
           : []
       );
     } catch (error) {
-      console.error(
-        'Failed to fetch appointments:',
-        error
-      );
-
       setAppointments([]);
     } finally {
       setLoading(false);
@@ -167,18 +174,47 @@ export default function AppointmentsScreen() {
           : []
       );
     } catch (error) {
-      console.error(
-        'Failed to fetch departments:',
-        error
-      );
-
       setDepartments([]);
+    }
+  };
+
+  const fetchAvailableSlots = async (departmentId: string) => {
+    setLoadingSlots(true);
+    try {
+      const response = await api.get(`/departments/${departmentId}/slots`);
+      const slots = Array.isArray(response.data)
+        ? response.data.filter((slot): slot is string => typeof slot === 'string')
+        : [];
+
+      setAvailableSlots(slots);
+
+      if (slots.length > 0) {
+        const firstSlot = parseLocalSlot(slots[0]);
+        setSelectedDate(firstSlot);
+        setSelectedTime(slots[0].slice(11, 16));
+      } else {
+        setSelectedTime('');
+      }
+    } catch (error: any) {
+      setAvailableSlots([]);
+      setSelectedTime('');
+      Alert.alert(
+        'Unable to load appointment times',
+        error.response?.data?.message || 'Please try again.'
+      );
+    } finally {
+      setLoadingSlots(false);
     }
   };
 
   const handleDateSelection = (date: Date) => {
     mediumTap();
     setSelectedDate(date);
+
+    const firstTime = availableSlots
+      .find(slot => slot.startsWith(dateKey(date)))
+      ?.slice(11, 16);
+    setSelectedTime(firstTime || '');
   };
 
   const handleDepartmentSelection = (
@@ -213,6 +249,15 @@ export default function AppointmentsScreen() {
         'Please select a department before booking.'
       );
 
+      return;
+    }
+
+    if (!selectedTime) {
+      errorNotification();
+      Alert.alert(
+        'Time Required',
+        'Select one of the available appointment times.'
+      );
       return;
     }
 
@@ -264,18 +309,22 @@ const severityScore =
       : rawSeverity <= 8
         ? 3
         : 4;
+const selectedSlot = availableSlots.find(
+  slot =>
+    slot.startsWith(dateKey(selectedDate)) &&
+    slot.slice(11, 16) === selectedTime
+);
+
+if (!selectedSlot) {
+  throw new Error('The selected appointment time is no longer available.');
+}
+
 const payload = {
   departmentId: selectedDept,
-  scheduledTime: scheduledTime
-    .toISOString()
-    .slice(0, 19),
+  scheduledTime: selectedSlot,
   severityScore,
 };
 
-console.log(
-  'BOOKING PAYLOAD:',
-  JSON.stringify(payload, null, 2)
-);
 
 await api.post('/appointments', payload);
       const selectedDepartment =
@@ -313,33 +362,18 @@ await addNotification({
       setShowBooking(false);
       setSelectedDept(null);
       setSelectedDate(new Date());
-      setSelectedTime('09:00');
+      setSelectedTime('');
+      setAvailableSlots([]);
 
       await fetchAppointments();
         } catch (error: any) {
       errorNotification();
 
-      console.log(
-        'BOOKING ERROR STATUS:',
-        error.response?.status
-      );
-
-      console.log(
-        'BOOKING ERROR DATA:',
-        JSON.stringify(
-          error.response?.data,
-          null,
-          2
-        )
-      );
-
       Alert.alert(
         'Booking Failed',
-        JSON.stringify(
-          error.response?.data,
-          null,
-          2
-        ) || 'Failed to book appointment.'
+        error.response?.data?.message ||
+          error.message ||
+          'Failed to book appointment. Please try again.'
       );
     } finally {
       setBooking(false);
@@ -414,8 +448,6 @@ await addNotification({
       minute: '2-digit',
     });
   };
-
-  const dates = getDates();
 
   if (loading) {
     return (
@@ -806,6 +838,15 @@ await addNotification({
                   />
                 </View>
 
+                {loadingSlots ? (
+                  <ActivityIndicator color={colors.primary} style={styles.slotLoader} />
+                ) : dates.length === 0 ? (
+                  <Text style={[styles.noSlotsText, { color: colors.textSecondary }]}>
+                    {selectedDept
+                      ? 'No appointment times are currently available.'
+                      : 'Select a department to view available dates.'}
+                  </Text>
+                ) : (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -867,6 +908,7 @@ await addNotification({
                     );
                   })}
                 </ScrollView>
+                )}
 
                 {/* Time selection */}
                 <Text
@@ -881,7 +923,12 @@ await addNotification({
                 </Text>
 
                 <View style={styles.timeGrid}>
-                  {TIME_SLOTS.map(time => {
+                  {timesForSelectedDate.length === 0 && !loadingSlots ? (
+                    <Text style={[styles.noSlotsText, { color: colors.textSecondary }]}>
+                      No times available for this date.
+                    </Text>
+                  ) : null}
+                  {timesForSelectedDate.map(time => {
                     const selected =
                       selectedTime === time;
 
@@ -1606,6 +1653,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  slotLoader: { marginVertical: 18 },
+  noSlotsText: { fontSize: 13, lineHeight: 19, marginVertical: 12 },
   timeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

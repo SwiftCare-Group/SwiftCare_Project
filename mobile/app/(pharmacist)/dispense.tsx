@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 export default function DispenseScreen() {
   const router = useRouter();
@@ -51,7 +52,7 @@ export default function DispenseScreen() {
     }
     setDispensing(drugName);
     try {
-      await api.put(`/prescriptions/${prescription.id}/dispense`, {
+      await api.patch(`/prescriptions/${prescription.id}/dispense`, {
         drugName, status, pharmacyName: pharmacyName.trim(),
       });
       const remainingRes = await api.get(`/prescriptions/${prescription.id}/remaining`);
@@ -71,7 +72,11 @@ export default function DispenseScreen() {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.removeItem('accessToken');
+          await AsyncStorage.multiRemove([
+            'accessToken',
+            'refreshToken',
+            'userRole',
+          ]);
           router.replace('/(auth)/login');
         },
       },
@@ -85,9 +90,12 @@ export default function DispenseScreen() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>Dispense Medication</Text>
-            <Text style={styles.headerSubtitle}>Enter prescription ID to dispense</Text>
+          <View style={styles.headerIdentity}>
+            <SwiftCareLogo size={46} compact />
+            <View>
+              <Text style={styles.headerTitle}>Dispense Medication</Text>
+              <Text style={styles.headerSubtitle}>Scan or enter a prescription ID</Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color={Colors.white} />
@@ -240,6 +248,7 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
   logoutBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },

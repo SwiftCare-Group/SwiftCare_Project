@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -22,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../../constants/colors';
 import api from '../../services/api';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 type Department = {
   id: string;
@@ -47,7 +49,7 @@ type QueuePatient = {
   premium?: boolean;
 };
 
-const LIVE_REFRESH_INTERVAL_MS = 5000;
+const LIVE_REFRESH_INTERVAL_MS = 15000;
 const DEFAULT_CONSULTATION_MINUTES = 15;
 
 const getSeverityDetails = (
@@ -250,20 +252,45 @@ export default function DoctorQueueScreen() {
     setProcessingPatientId,
   ] = useState<string | null>(null);
 
+  const isMountedRef = useRef(true);
+  const queueRequestInFlightRef = useRef(false);
+  const processingPatientIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    processingPatientIdRef.current = processingPatientId;
+  }, [processingPatientId]);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const fetchQueue = useCallback(
     async (
       departmentId: string,
-      showLoader = false
+      options?: {
+        showLoader?: boolean;
+        force?: boolean;
+      }
     ) => {
+      const showLoader = options?.showLoader ?? false;
+      const force = options?.force ?? false;
+
+      if (queueRequestInFlightRef.current && !force) {
+        return;
+      }
+
+      queueRequestInFlightRef.current = true;
+
       try {
-        if (showLoader) {
+        if (showLoader && isMountedRef.current) {
           setLoadingQueue(true);
         }
 
-        setErrorMessage('');
-
         const response = await api.get(
-          `/departments/${departmentId}/queue`
+          `/departments/${departmentId}/queue`,
+          { timeout: 15000 }
         );
 
         const queueData: QueuePatient[] =
@@ -271,27 +298,56 @@ export default function DoctorQueueScreen() {
             ? response.data
             : response.data?.queue ?? [];
 
-        setQueue(queueData);
-      } catch (error: any) {
-        console.error(
-          'FAILED TO FETCH DOCTOR QUEUE:',
-          {
-            status: error?.response?.status,
-            data: error?.response?.data,
-            message: error?.message,
-            url: error?.config?.url,
+        const statusPriority: Record<string, number> = {
+          IN_CONSULTATION: 0,
+          CALLED: 1,
+          WAITING: 2,
+          COMPLETED: 3,
+          CANCELLED: 4,
+        };
+
+        const sortedQueue = [...queueData].sort(
+          (first, second) => {
+            const firstStatus =
+              first.status?.toUpperCase() ?? 'WAITING';
+            const secondStatus =
+              second.status?.toUpperCase() ?? 'WAITING';
+
+            const statusDifference =
+              (statusPriority[firstStatus] ?? 99) -
+              (statusPriority[secondStatus] ?? 99);
+
+            if (statusDifference !== 0) {
+              return statusDifference;
+            }
+
+            return (
+              (first.queuePosition ?? Number.MAX_SAFE_INTEGER) -
+              (second.queuePosition ?? Number.MAX_SAFE_INTEGER)
+            );
           }
         );
 
-        setErrorMessage(
-          getBackendErrorMessage(
-            error,
-            'Unable to load the patient queue.'
-          )
-        );
+        if (isMountedRef.current) {
+          setQueue(sortedQueue);
+          setErrorMessage('');
+        }
+      } catch (error: any) {
+        if (isMountedRef.current) {
+          setErrorMessage(
+            getBackendErrorMessage(
+              error,
+              'Unable to load the patient queue.'
+            )
+          );
+        }
       } finally {
-        setLoadingQueue(false);
-        setRefreshing(false);
+        queueRequestInFlightRef.current = false;
+
+        if (isMountedRef.current) {
+          setLoadingQueue(false);
+          setRefreshing(false);
+        }
       }
     },
     []
@@ -335,16 +391,6 @@ export default function DoctorQueueScreen() {
           return departmentData[0].id;
         });
       } catch (error: any) {
-        console.error(
-          'FAILED TO FETCH DEPARTMENTS:',
-          {
-            status: error?.response?.status,
-            data: error?.response?.data,
-            message: error?.message,
-            url: error?.config?.url,
-          }
-        );
-
         setErrorMessage(
           getBackendErrorMessage(
             error,
@@ -367,12 +413,12 @@ export default function DoctorQueueScreen() {
       return;
     }
 
-    fetchQueue(selectedDept, true);
+    fetchQueue(selectedDept, { showLoader: true });
   }, [fetchQueue, selectedDept]);
 
   /*
-   * Refresh immediately whenever the doctor returns to
-   * this screen and continue refreshing every five seconds.
+   * Poll only while this screen is focused. The selected-department
+   * effect performs the immediate fetch, preventing duplicate calls.
    */
   useFocusEffect(
     useCallback(() => {
@@ -380,14 +426,8 @@ export default function DoctorQueueScreen() {
         return undefined;
       }
 
-      fetchQueue(selectedDept);
-
       const intervalId = setInterval(() => {
-        /*
-         * Avoid overwriting the UI while an action such as
-         * call, skip, start, or complete is still processing.
-         */
-        if (!processingPatientId) {
+        if (!processingPatientIdRef.current) {
           fetchQueue(selectedDept);
         }
       }, LIVE_REFRESH_INTERVAL_MS);
@@ -395,11 +435,7 @@ export default function DoctorQueueScreen() {
       return () => {
         clearInterval(intervalId);
       };
-    }, [
-      fetchQueue,
-      processingPatientId,
-      selectedDept,
-    ])
+    }, [fetchQueue, selectedDept])
   );
 
   const handleSelectDepartment = useCallback(
@@ -422,13 +458,13 @@ export default function DoctorQueueScreen() {
     }
 
     setRefreshing(true);
-    fetchQueue(selectedDept);
+    fetchQueue(selectedDept, { force: true });
   }, [fetchQueue, selectedDept]);
 
   const refreshSelectedDepartment =
     useCallback(async () => {
       if (selectedDept) {
-        await fetchQueue(selectedDept);
+        await fetchQueue(selectedDept, { force: true });
       }
     }, [fetchQueue, selectedDept]);
 
@@ -449,6 +485,7 @@ export default function DoctorQueueScreen() {
               await AsyncStorage.multiRemove([
                 'accessToken',
                 'refreshToken',
+                'userRole',
               ]);
 
               router.replace('/(auth)/login');
@@ -483,13 +520,6 @@ export default function DoctorQueueScreen() {
         } has been called.`
       );
     } catch (error: any) {
-      console.error('CALL PATIENT ERROR:', {
-        status: error?.response?.status,
-        data: error?.response?.data,
-        message: error?.message,
-        url: error?.config?.url,
-      });
-
       Alert.alert(
         'Unable to call patient',
         getBackendErrorMessage(
@@ -537,17 +567,6 @@ export default function DoctorQueueScreen() {
                 } has been moved to the end of the queue.`
               );
             } catch (error: any) {
-              console.error(
-                'SKIP PATIENT ERROR:',
-                {
-                  status:
-                    error?.response?.status,
-                  data: error?.response?.data,
-                  message: error?.message,
-                  url: error?.config?.url,
-                }
-              );
-
               Alert.alert(
                 'Unable to skip patient',
                 getBackendErrorMessage(
@@ -597,17 +616,6 @@ export default function DoctorQueueScreen() {
         },
       });
     } catch (error: any) {
-      console.error(
-        'START CONSULTATION ERROR:',
-        {
-          queueEntryId: patient.id,
-          status: error?.response?.status,
-          data: error?.response?.data,
-          message: error?.message,
-          url: error?.config?.url,
-        }
-      );
-
       Alert.alert(
         'Unable to start consultation',
         getBackendErrorMessage(
@@ -652,17 +660,6 @@ export default function DoctorQueueScreen() {
                 'The patient has been removed from the active queue and the remaining positions have been updated.'
               );
             } catch (error: any) {
-              console.error(
-                'COMPLETE CONSULTATION ERROR:',
-                {
-                  status:
-                    error?.response?.status,
-                  data: error?.response?.data,
-                  message: error?.message,
-                  url: error?.config?.url,
-                }
-              );
-
               Alert.alert(
                 'Unable to complete consultation',
                 getBackendErrorMessage(
@@ -819,9 +816,11 @@ export default function DoctorQueueScreen() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <View
-            style={styles.headerTextContainer}
-          >
+          <View style={styles.headerIdentity}>
+            <SwiftCareLogo size={46} compact />
+            <View
+              style={styles.headerTextContainer}
+            >
             <Text style={styles.headerTitle}>
               Patient Queue
             </Text>
@@ -830,6 +829,7 @@ export default function DoctorQueueScreen() {
               Live queue ordered by medical
               urgency
             </Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -914,7 +914,7 @@ export default function DoctorQueueScreen() {
           </View>
 
           <Text style={styles.liveRefreshText}>
-            Refreshes every 5 seconds
+            Refreshes every 15 seconds
           </Text>
         </View>
 
@@ -1816,6 +1816,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
 
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerTextContainer: {
     flex: 1,
     marginRight: 15,

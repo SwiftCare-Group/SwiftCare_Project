@@ -1,6 +1,6 @@
 package com.swiftcare.backend.common.security;
 
-import com.swiftcare.backend.common.exception.UnauthorizedException;
+import org.springframework.security.access.AccessDeniedException;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.springframework.security.core.Authentication;
@@ -15,6 +15,6 @@ public class PremiumAccessAspect {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         boolean premium = authentication != null && authentication.isAuthenticated()
                 && authentication.getAuthorities().stream().anyMatch(a -> "TIER_PREMIUM".equals(a.getAuthority()));
-        if (!premium) throw new UnauthorizedException("This feature requires a Premium subscription.");
+        if (!premium) throw new AccessDeniedException("This feature requires a Premium subscription.");
     }
 }

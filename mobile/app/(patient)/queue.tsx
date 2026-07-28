@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,12 +12,16 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { addNotification } from '../../services/notificationStorage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
 import { useTheme } from '../../context/ThemeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const QUEUE_NOTIFICATION_KEY = 'swiftcareQueueNotificationPositions';
+const QUEUE_REFRESH_INTERVAL_MS = 30_000;
 
 type Appointment = {
   id: string;
@@ -37,163 +41,147 @@ type QueueStatus = {
 export default function QueueScreen() {
   const { colors } = useTheme();
   const { lightTap, warningNotification } = useHaptics();
-const [lastNotifiedPositions, setLastNotifiedPositions] =
-  useState<Record<string, number>>({});
-    const QUEUE_NOTIFICATION_KEY =
-  'swiftcareQueueNotificationPositions';
+
+  const lastNotifiedPositionsRef = useRef<Record<string, number>>({});
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [queueStatuses, setQueueStatuses] = useState<
     Record<string, QueueStatus | null>
   >({});
-
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadLastNotifiedPositions = async () => {
-  try {
-    const saved = await AsyncStorage.getItem(
-      QUEUE_NOTIFICATION_KEY
-    );
-
-    if (saved) {
-      const parsed = JSON.parse(saved);
-
-      if (parsed && typeof parsed === 'object') {
-        setLastNotifiedPositions(parsed);
+  const loadLastNotifiedPositions = useCallback(async () => {
+    try {
+      const saved = await AsyncStorage.getItem(QUEUE_NOTIFICATION_KEY);
+      if (!saved) {
+        return;
       }
+
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        lastNotifiedPositionsRef.current = parsed as Record<string, number>;
+      }
+    } catch {
+      lastNotifiedPositionsRef.current = {};
     }
-  } catch (error) {
-    console.error(
-      'Failed to load queue notification positions:',
-      error
-    );
-  }
-};
+  }, []);
 
-const saveLastNotifiedPositions = async (
-  positions: Record<string, number>
-) => {
-  try {
-    await AsyncStorage.setItem(
-      QUEUE_NOTIFICATION_KEY,
-      JSON.stringify(positions)
-    );
-  } catch (error) {
-    console.error(
-      'Failed to save queue notification positions:',
-      error
-    );
-  }
-};
+  const saveLastNotifiedPositions = useCallback(
+    async (positions: Record<string, number>) => {
+      try {
+        await AsyncStorage.setItem(
+          QUEUE_NOTIFICATION_KEY,
+          JSON.stringify(positions)
+        );
+      } catch {
+        // Notification history is optional and should not block queue updates.
+      }
+    },
+    []
+  );
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const response = await api.get('/appointments');
-
       const allAppointments = Array.isArray(response.data)
         ? response.data
         : [];
-
       const pendingAppointments = allAppointments.filter(
-        (appointment: Appointment) =>
-          appointment.status === 'PENDING'
+        (appointment: Appointment) => appointment.status === 'PENDING'
       );
 
-      setAppointments(pendingAppointments);
-
       const statuses: Record<string, QueueStatus | null> = {};
-
-      await Promise.all(
+      await Promise.allSettled(
         pendingAppointments.map(async (appointment: Appointment) => {
           try {
             const queueResponse = await api.get(
-              `/appointments/${appointment.id}/queue`
+              `/appointments/${appointment.id}/queue`,
+              { timeout: 10_000 }
             );
-
             statuses[appointment.id] = queueResponse.data;
-          } catch (error) {
-            console.error(
-              `Failed to fetch queue for appointment ${appointment.id}:`,
-              error
-            );
-
+          } catch {
             statuses[appointment.id] = null;
           }
         })
       );
 
+      const updatedNotificationPositions = {
+        ...lastNotifiedPositionsRef.current,
+      };
+      let notificationPositionsChanged = false;
+
       for (const appointment of pendingAppointments) {
-  const queue = statuses[appointment.id];
-  const currentPosition = queue?.currentPosition;
+        const currentPosition = statuses[appointment.id]?.currentPosition;
+        if (currentPosition !== 1 && currentPosition !== 2) {
+          continue;
+        }
+        if (updatedNotificationPositions[appointment.id] === currentPosition) {
+          continue;
+        }
 
-  if (
-    currentPosition !== 1 &&
-    currentPosition !== 2
-  ) {
-    continue;
-  }
+        await addNotification({
+          title: currentPosition === 1 ? 'You Are Next' : 'Almost Your Turn',
+          message:
+            currentPosition === 1
+              ? `Please proceed to ${
+                  appointment.departmentName || 'the clinic'
+                }. You are next in the queue.`
+              : `You are now number 2 in the ${
+                  appointment.departmentName || 'clinic'
+                } queue. Please prepare to proceed.`,
+          type: 'queue',
+        });
 
-  const alreadyNotified =
-    lastNotifiedPositions[appointment.id] ===
-    currentPosition;
+        updatedNotificationPositions[appointment.id] = currentPosition;
+        notificationPositionsChanged = true;
+      }
 
-  if (alreadyNotified) {
-    continue;
-  }
+      if (notificationPositionsChanged) {
+        lastNotifiedPositionsRef.current = updatedNotificationPositions;
+        await saveLastNotifiedPositions(updatedNotificationPositions);
+      }
 
-  await addNotification({
-    title:
-      currentPosition === 1
-        ? 'You Are Next'
-        : 'Almost Your Turn',
-    message:
-      currentPosition === 1
-        ? `Please proceed to ${
-            appointment.departmentName ||
-            'the clinic'
-          }. You are next in the queue.`
-        : `You are now number 2 in the ${
-            appointment.departmentName ||
-            'clinic'
-          } queue. Please prepare to proceed.`,
-    type: 'queue',
-  });
-
-setLastNotifiedPositions(previous => {
-  const updated = {
-    ...previous,
-    [appointment.id]: currentPosition,
-  };
-
-  saveLastNotifiedPositions(updated);
-
-  return updated;
-});}
+      setAppointments(pendingAppointments);
       setQueueStatuses(statuses);
-    } catch (error) {
-      console.error('Failed to fetch queue data:', error);
+    } catch {
       setAppointments([]);
       setQueueStatuses({});
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [saveLastNotifiedPositions]);
 
-useEffect(() => {
-  loadLastNotifiedPositions();
-  fetchData();
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
 
-  const interval = setInterval(() => {
-    fetchData();
-  }, 30000);
+    const initialise = async () => {
+      await loadLastNotifiedPositions();
+      if (cancelled) {
+        return;
+      }
+      await fetchData();
+      if (!cancelled) {
+        intervalId = setInterval(fetchData, QUEUE_REFRESH_INTERVAL_MS);
+      }
+    };
 
-  return () => clearInterval(interval);
-}, []);  const onRefresh = useCallback(() => {
+    void initialise();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [fetchData, loadLastNotifiedPositions]);
+
+  const onRefresh = useCallback(() => {
     lightTap();
     setRefreshing(true);
-    fetchData();
-  }, [lightTap]);
+    void fetchData();
+  }, [fetchData, lightTap]);
 
   const handleCancel = (appointmentId: string) => {
     lightTap();
@@ -202,26 +190,18 @@ useEffect(() => {
       'Leave Queue',
       'Are you sure you want to cancel this appointment and leave the queue?',
       [
-        {
-          text: 'No',
-          style: 'cancel',
-        },
+        { text: 'No', style: 'cancel' },
         {
           text: 'Yes, Leave',
           style: 'destructive',
           onPress: async () => {
             warningNotification();
-
             try {
-              await api.put(
-                `/appointments/${appointmentId}/cancel`
-              );
-
+              await api.put(`/appointments/${appointmentId}/cancel`);
               Alert.alert(
                 'Queue Left',
                 'Your appointment has been cancelled.'
               );
-
               await fetchData();
             } catch (error: any) {
               Alert.alert(

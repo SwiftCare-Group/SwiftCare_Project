@@ -15,12 +15,12 @@ spring:
             - id: clinical-admin-doctors
               uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
               predicates:
-                - Path=/api/v1/admin/doctors
+                - Path=/api/v1/admin/doctors,/api/v1/admin/staff
 
             - id: appointment-admin
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
               predicates:
-                - Path=/api/v1/admin/departments
+                - Path=/api/v1/admin/departments,/api/v1/admin/stats
 
             - id: appointment
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
@@ -30,7 +30,7 @@ spring:
             - id: clinical
               uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
               predicates:
-                - Path=/api/v1/consultations/**,/api/v1/doctors/**,/api/v1/clinical-records/**,/api/v1/prescriptions/**,/api/v1/lab-results/**
+                - Path=/api/v1/consultations/**,/api/v1/doctors/**,/api/v1/clinical-records/**,/api/v1/prescriptions/**,/api/v1/lab-orders/**
 
             - id: symptoms
               uri: ${SYMPTOM_SERVICE_URL:http://localhost:8084}
@@ -50,11 +50,26 @@ spring:
                 - Path=/api/v1/notifications/**
 
           globalcors:
+            add-to-simple-url-handler-mapping: true
             cors-configurations:
               "[/**]":
-                allowedOrigins: "*"
-                allowedMethods: "*"
-                allowedHeaders: "*"
+                allowedOriginPatterns:
+                  - ${CORS_ALLOWED_ORIGIN_PATTERN:http://localhost:[*]}
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders:
+                  - Authorization
+                  - Content-Type
+                  - Accept
+                  - X-Requested-With
+                exposedHeaders:
+                  - Location
+                maxAge: 3600
 
 server:
   port: ${SERVER_PORT:8080}
