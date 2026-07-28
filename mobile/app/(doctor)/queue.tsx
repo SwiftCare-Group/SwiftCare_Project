@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
@@ -21,7 +22,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../../constants/colors';
-import api, { logoutSession } from '../../services/api';
+import api from '../../services/api';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 type Department = {
   id: string;
@@ -480,8 +482,13 @@ export default function DoctorQueueScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await logoutSession();
-              router.replace('/(auth)/staff-login');
+              await AsyncStorage.multiRemove([
+                'accessToken',
+                'refreshToken',
+                'userRole',
+              ]);
+
+              router.replace('/(auth)/login');
             } catch {
               Alert.alert(
                 'Logout failed',
@@ -809,9 +816,11 @@ export default function DoctorQueueScreen() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <View
-            style={styles.headerTextContainer}
-          >
+          <View style={styles.headerIdentity}>
+            <SwiftCareLogo size={46} compact />
+            <View
+              style={styles.headerTextContainer}
+            >
             <Text style={styles.headerTitle}>
               Patient Queue
             </Text>
@@ -820,6 +829,7 @@ export default function DoctorQueueScreen() {
               Live queue ordered by medical
               urgency
             </Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -1806,6 +1816,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
 
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerTextContainer: {
     flex: 1,
     marginRight: 15,

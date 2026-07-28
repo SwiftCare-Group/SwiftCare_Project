@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/colors";
 import { useHaptics } from "../../hooks/useHaptics";
 import api from "../../services/api";
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -187,9 +188,7 @@ export default function LoginScreen() {
         style={styles.headerGradient}
       >
         <View style={styles.brandContainer}>
-          <View style={styles.headerLogo}>
-            <Ionicons name="medical-outline" size={52} color={Colors.primary} />
-          </View>
+          <SwiftCareLogo size={92} />
 
           <Text style={styles.appName}>
             SwiftCare

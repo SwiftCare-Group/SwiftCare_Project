@@ -12,8 +12,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import api, { logoutSession } from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -46,8 +48,8 @@ export default function AdminDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await logoutSession();
-    router.replace('/(auth)/staff-login');
+    await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'userRole']);
+    router.replace('/(auth)/login');
   };
 
   if (loading) {
@@ -72,9 +74,12 @@ export default function AdminDashboard() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>Admin Dashboard</Text>
-            <Text style={styles.headerSubtitle}>SwiftCare Hospital System</Text>
+          <View style={styles.headerIdentity}>
+            <SwiftCareLogo size={46} compact />
+            <View>
+              <Text style={styles.headerTitle}>Admin Dashboard</Text>
+              <Text style={styles.headerSubtitle}>SwiftCare Hospital System</Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color={Colors.white} />
@@ -133,6 +138,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
   logoutBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },

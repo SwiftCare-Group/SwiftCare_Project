@@ -67,15 +67,41 @@ const getBackendMessage = (
 ): string => {
   const responseData = error?.response?.data;
 
-  if (typeof responseData?.message === 'string') {
+  if (
+    responseData?.errors &&
+    typeof responseData.errors === 'object'
+  ) {
+    const validationMessages = Object.values(
+      responseData.errors
+    ).filter(
+      (message): message is string =>
+        typeof message === 'string' &&
+        message.trim().length > 0
+    );
+
+    if (validationMessages.length > 0) {
+      return validationMessages.join('\n');
+    }
+  }
+
+  if (
+    typeof responseData?.message === 'string' &&
+    responseData.message.trim()
+  ) {
     return responseData.message;
   }
 
-  if (typeof responseData?.error === 'string') {
+  if (
+    typeof responseData?.error === 'string' &&
+    responseData.error.trim()
+  ) {
     return responseData.error;
   }
 
-  if (typeof responseData === 'string') {
+  if (
+    typeof responseData === 'string' &&
+    responseData.trim()
+  ) {
     return responseData;
   }
 
@@ -89,7 +115,6 @@ const getBackendMessage = (
 
   return fallbackMessage;
 };
-
 
 const splitEntries = (value: string): string[] =>
   Array.from(
@@ -308,6 +333,10 @@ export default function ConsultationScreen() {
           'The consultation could not be completed. Please try again.'
         )
       );
+      console.log(
+  'CONSULTATION COMPLETION ERROR:',
+  JSON.stringify(error?.response?.data, null, 2)
+);
     } finally {
       setCompleting(false);
     }

@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import api from "../../services/api";
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -56,15 +57,19 @@ export default function ForgotPasswordScreen() {
       >
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(auth)/login');
+            }
+          }}
         >
           <MaterialIcons name="arrow-back" size={24} color="#0B8FAC" />
         </TouchableOpacity>
 
         <View style={styles.content}>
-          <View style={styles.iconContainer}>
-            <MaterialIcons name="lock-reset" size={38} color="#0B8FAC" />
-          </View>
+          <SwiftCareLogo size={88} />
 
           <Text style={styles.title}>Forgot Password?</Text>
 

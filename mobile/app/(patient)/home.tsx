@@ -20,6 +20,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useHaptics } from "../../hooks/useHaptics";
 import api from "../../services/api";
 import { getUnreadNotificationCount } from "../../services/notificationStorage";
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 type Patient = {
   id: string;
@@ -95,7 +96,6 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadUnreadNotifications = useCallback(async () => {
     try {
@@ -107,7 +107,6 @@ export default function HomeScreen() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    setLoadError(null);
     try {
       const [
         patientResponse,
@@ -201,9 +200,7 @@ export default function HomeScreen() {
       );
 
       setUpcomingConsultation(upcoming ?? null);
-    } catch (error: any) {
-      setLoadError(error?.response?.data?.message || 'Your dashboard could not be loaded. Check your connection and try again.');
-    } finally {
+    } catch (error: any) {    } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -306,25 +303,6 @@ export default function HomeScreen() {
     );
   }
 
-  if (loadError && !patient) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background, paddingHorizontal: 28 }]}> 
-        <Ionicons name="cloud-offline-outline" size={46} color={colors.textDisabled} />
-        <Text style={[styles.loadErrorTitle, { color: colors.textPrimary }]}>Unable to load dashboard</Text>
-        <Text style={[styles.loadErrorText, { color: colors.textSecondary }]}>{loadError}</Text>
-        <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            setLoading(true);
-            void fetchData();
-          }}
-        >
-          <Text style={[styles.retryButtonText, { color: colors.white }]}>Try Again</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <SafeAreaView
       style={[
@@ -363,9 +341,7 @@ export default function HomeScreen() {
         >
           <View style={styles.headerTop}>
             <View style={styles.brandGreetingRow}>
-              <View style={styles.headerLogo}>
-                <Ionicons name="medical-outline" size={28} color={colors.primary} />
-              </View>
+              <SwiftCareLogo size={48} compact />
 
               <View style={styles.greetingContainer}>
                 <Text style={styles.brandName}>
@@ -1430,35 +1406,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 13,
     marginTop: 12,
-  },
-
-  loadErrorTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    marginTop: 14,
-    textAlign: "center",
-  },
-
-  loadErrorText: {
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
-    textAlign: "center",
-  },
-
-  retryButton: {
-    minHeight: 48,
-    minWidth: 140,
-    borderRadius: 14,
-    marginTop: 18,
-    paddingHorizontal: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
   },
 
   header: {

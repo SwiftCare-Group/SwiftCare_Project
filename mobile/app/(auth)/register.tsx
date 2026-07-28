@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -89,9 +90,8 @@ const handleRegister = async () => {
           <Ionicons name="arrow-back-outline" size={22} color={Colors.white} />
         </TouchableOpacity>
 <View style={styles.logoContainer}>
-  <View style={styles.headerLogo}>
-    <Ionicons name="medical-outline" size={52} color={Colors.primary} />
-  </View>          <Text style={styles.appName}>Create Account</Text>
+  <SwiftCareLogo size={92} />
+          <Text style={styles.appName}>Create Account</Text>
           <Text style={styles.appTagline}>Join SwiftCare to manage your healthcare</Text>
         </View>
       </LinearGradient>

@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 const getErrorMessage = (
   error: any
@@ -179,7 +180,13 @@ export default function StaffLoginScreen() {
       >
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(auth)/login');
+            }
+          }}
           disabled={loading}
           activeOpacity={0.8}
         >
@@ -191,13 +198,7 @@ export default function StaffLoginScreen() {
         </TouchableOpacity>
 
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Ionicons
-              name="medical-outline"
-              size={32}
-              color={Colors.white}
-            />
-          </View>
+          <SwiftCareLogo size={92} />
 
           <Text style={styles.appName}>
             Staff Login

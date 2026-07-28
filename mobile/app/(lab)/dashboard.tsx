@@ -6,8 +6,11 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../../constants/colors';
 import api, { logoutSession } from '../../services/api';
+import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 
 type LabOrder = {
   id: string;
@@ -127,9 +131,12 @@ export default function LabDashboard() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Laboratory Queue</Text>
-            <Text style={styles.subtitle}>{orders.length} pending order(s)</Text>
+          <View style={styles.headerIdentity}>
+            <SwiftCareLogo size={46} compact />
+            <View>
+              <Text style={styles.title}>Laboratory Queue</Text>
+              <Text style={styles.subtitle}>{orders.length} pending order(s)</Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Ionicons name="log-out-outline" size={21} color={Colors.white} />
@@ -210,53 +217,67 @@ export default function LabDashboard() {
         animationType="slide"
         onRequestClose={() => setSelectedOrder(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        >
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Record laboratory result</Text>
-            <Text style={styles.modalSubtitle}>{selectedOrder?.testName}</Text>
+            <ScrollView
+              contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Text style={styles.modalTitle}>Record laboratory result</Text>
+              <Text style={styles.modalSubtitle}>{selectedOrder?.testName}</Text>
 
-            <TextInput
-              style={[styles.input, styles.multiline]}
-              value={result}
-              onChangeText={setResult}
-              placeholder="Result"
-              multiline
-            />
-            <TextInput
-              style={styles.input}
-              value={interpretation}
-              onChangeText={setInterpretation}
-              placeholder="Interpretation (optional)"
-            />
-            <TextInput
-              style={styles.input}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Notes (optional)"
-            />
+              <TextInput
+                style={[styles.input, styles.multiline]}
+                value={result}
+                onChangeText={setResult}
+                placeholder="Result"
+                multiline
+                returnKeyType="default"
+              />
+              <TextInput
+                style={styles.input}
+                value={interpretation}
+                onChangeText={setInterpretation}
+                placeholder="Interpretation (optional)"
+                returnKeyType="next"
+              />
+              <TextInput
+                style={styles.input}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Notes (optional)"
+                returnKeyType="done"
+              />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setSelectedOrder(null)}
-                disabled={updatingId !== null}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={() => void submitResult()}
-                disabled={updatingId !== null}
-              >
-                {updatingId ? (
-                  <ActivityIndicator color={Colors.white} />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save Result</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setSelectedOrder(null)}
+                  disabled={updatingId !== null}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={() => void submitResult()}
+                  disabled={updatingId !== null}
+                >
+                  {updatingId ? (
+                    <ActivityIndicator color={Colors.white} />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save Result</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -267,6 +288,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   title: { color: Colors.white, fontSize: 22, fontWeight: '800' },
   subtitle: { color: 'rgba(255,255,255,0.78)', marginTop: 3 },
   logoutButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' },
@@ -290,7 +312,8 @@ const styles = StyleSheet.create({
   emptyTitle: { marginTop: 16, fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
   emptyText: { marginTop: 6, color: Colors.textSecondary, textAlign: 'center' },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalCard: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, paddingBottom: 34 },
+  modalCard: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '82%', overflow: 'hidden' },
+  modalContent: { padding: 22, paddingBottom: 34 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
   modalSubtitle: { color: Colors.textSecondary, marginTop: 3, marginBottom: 16 },
   input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 11, color: Colors.textPrimary, marginBottom: 10 },
