@@ -13,10 +13,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { goBackOrReplace } from '../utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import api from '../services/api';
 import { useTheme } from '../context/ThemeContext';
+import { getApiErrorMessage } from '../utils/errors';
 
 type PatientProfile = {
   id: string;
@@ -40,12 +42,15 @@ export default function EditProfileScreen() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadProfile();
   }, []);
 
   const loadProfile = async () => {
+    setLoadError(null);
+    setLoading(true);
     try {
       const response = await api.get('/patients/me');
 
@@ -54,10 +59,12 @@ export default function EditProfileScreen() {
       setProfile(patient);
       setName(patient.name || '');
       setPhone(patient.phone || '');
-    } catch (error: any) {
-      Alert.alert(
-        'Profile Error',
-        'Your profile could not be loaded.'
+    } catch (error: unknown) {
+      setProfile(null);
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Your profile could not be loaded.',
+        })
       );
     } finally {
       setLoading(false);
@@ -83,7 +90,9 @@ export default function EditProfileScreen() {
       return false;
     }
 
-    if (phone.trim().length < 10) {
+    const normalizedPhone = phone.trim().replace(/[\s()-]/g, '');
+
+    if (!/^\+?\d{7,15}$/.test(normalizedPhone)) {
       Alert.alert(
         'Invalid Phone',
         'Please enter a valid phone number.'
@@ -96,6 +105,10 @@ export default function EditProfileScreen() {
   };
 
   const handleSave = async () => {
+    if (saving || !profile) {
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -116,15 +129,16 @@ export default function EditProfileScreen() {
         [
           {
             text: 'OK',
-            onPress: () => router.back(),
+            onPress: () => goBackOrReplace(router, '/(patient)/profile'),
           },
         ]
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert(
         'Update Failed',
-        error.response?.data?.message ||
-          'Your profile could not be updated.'
+        getApiErrorMessage(error, {
+          fallback: 'Your profile could not be updated.',
+        })
       );
     } finally {
       setSaving(false);
@@ -146,6 +160,47 @@ export default function EditProfileScreen() {
           color={colors.primary}
         />
       </View>
+    );
+  }
+
+  if (loadError || !profile) {
+    return (
+      <SafeAreaView
+        style={[styles.safeArea, { backgroundColor: colors.background }]}
+        edges={['top']}
+      >
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => goBackOrReplace(router, '/(patient)/profile')}
+          >
+            <Ionicons name="chevron-back" size={25} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Edit Profile</Text>
+          <View style={styles.headerPlaceholder} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="cloud-offline-outline" size={42} color={colors.textSecondary} />
+          <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Unable to load profile</Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+            {loadError || 'Your profile information is unavailable.'}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={() => void loadProfile()}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -171,7 +226,7 @@ export default function EditProfileScreen() {
         <TouchableOpacity
           style={styles.headerButton}
           activeOpacity={0.7}
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, '/(patient)/profile')}
         >
           <Ionicons
             name="chevron-back"
@@ -486,6 +541,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  errorTitle: { fontSize: 19, fontWeight: '700', marginTop: 14 },
+  errorText: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
+  retryButton: { marginTop: 20, minWidth: 132, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  retryButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   header: {
     height: 60,

@@ -1,87 +1,296 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
+  BarcodeScanningResult,
+  CameraView,
+  useCameraPermissions,
+} from 'expo-camera';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../../services/api';
-import { Colors } from '../../constants/colors';
+
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import { Colors } from '../../constants/colors';
+import api, { logoutSession } from '../../services/api';
+import { getApiErrorMessage } from '../../utils/errors';
+
+const PHARMACY_NAME_KEY = 'swiftcarePharmacyName';
+const UUID_PATTERN =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+
+type DispensationStatus = 'PENDING' | 'DISPENSED' | 'UNAVAILABLE';
+
+type DispensationRecord = {
+  id?: string;
+  drugName: string;
+  status?: DispensationStatus;
+};
+
+type Prescription = {
+  id: string;
+  issuedAt?: string;
+  drugs?: string[];
+  dispensationRecords?: DispensationRecord[];
+};
+
+const extractPrescriptionId = (rawValue: string): string | null => {
+  const raw = rawValue.trim();
+  if (!raw) {
+    return null;
+  }
+
+  const directMatch = raw.match(UUID_PATTERN)?.[0];
+  if (directMatch) {
+    return directMatch;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    for (const key of ['prescriptionId', 'id', 'reference']) {
+      const value = parsed[key];
+      if (typeof value === 'string') {
+        const match = value.match(UUID_PATTERN)?.[0];
+        if (match) {
+          return match;
+        }
+      }
+    }
+  } catch {
+    // The QR payload may be a URL or plain prescription ID.
+  }
+
+  try {
+    const decoded = decodeURIComponent(raw);
+    return decoded.match(UUID_PATTERN)?.[0] ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const getHttpStatus = (error: unknown): number | undefined =>
+  (error as { response?: { status?: number } })?.response?.status;
 
 export default function DispenseScreen() {
   const router = useRouter();
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+
   const [qrCode, setQrCode] = useState('');
-  const [prescription, setPrescription] = useState<any>(null);
-  const [remaining, setRemaining] = useState<any[]>([]);
+  const [prescription, setPrescription] = useState<Prescription | null>(null);
+  const [remaining, setRemaining] = useState<DispensationRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [dispensing, setDispensing] = useState<string | null>(null);
   const [pharmacyName, setPharmacyName] = useState('');
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scannerLocked, setScannerLocked] = useState(false);
 
-  const handleLookup = async () => {
-    if (!qrCode.trim()) {
-      Alert.alert('Error', 'Please enter the prescription ID');
+  useEffect(() => {
+    AsyncStorage.getItem(PHARMACY_NAME_KEY)
+      .then(value => {
+        if (value) {
+          setPharmacyName(value);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const loadRemaining = async (prescriptionId: string) => {
+    const response = await api.get(`/prescriptions/${prescriptionId}/remaining`);
+    setRemaining(Array.isArray(response.data) ? response.data : []);
+  };
+
+  const lookupPrescription = async (candidate?: string) => {
+    if (loading) {
       return;
     }
+
+    const enteredValue = (candidate ?? qrCode).trim();
+    if (!enteredValue) {
+      Alert.alert(
+        'Prescription code required',
+        'Scan a SwiftCare prescription QR code or enter the prescription UUID.',
+      );
+      return;
+    }
+
+    const extractedId = extractPrescriptionId(enteredValue);
     setLoading(true);
+    setQrCode(extractedId ?? enteredValue);
+
     try {
-      const response = await api.get(`/prescriptions/${qrCode.trim()}`);
+      let response;
+
+      try {
+        // QR codes may contain an opaque lookup token or a structured payload.
+        // Preserve the complete scanned value and use the backend's QR lookup endpoint.
+        response = await api.post<Prescription>('/prescriptions/lookup', {
+          code: enteredValue,
+        });
+      } catch (lookupError: unknown) {
+        // Manual entry commonly uses the prescription UUID. If the QR lookup
+        // endpoint does not recognize it, fall back to the protected UUID route.
+        if (getHttpStatus(lookupError) === 404 && extractedId) {
+          response = await api.get<Prescription>(
+            `/prescriptions/${extractedId}`,
+          );
+        } else {
+          throw lookupError;
+        }
+      }
+
+      if (!response.data?.id) {
+        throw new Error('The prescription response is incomplete.');
+      }
+
+      setQrCode(response.data.id);
       setPrescription(response.data);
-      const remainingRes = await api.get(`/prescriptions/${qrCode.trim()}/remaining`);
-      setRemaining(remainingRes.data);
-    } catch {
-      Alert.alert('Not Found', 'Prescription not found. Please check the ID and try again.');
+      await loadRemaining(response.data.id);
+    } catch (error: unknown) {
+      setPrescription(null);
+      setRemaining([]);
+      Alert.alert(
+        'Prescription unavailable',
+        getApiErrorMessage(error, {
+          fallback: 'The prescription could not be loaded.',
+          notFound:
+            'This QR code does not match a prescription in SwiftCare. Ask the patient to refresh the prescription QR code and scan it again.',
+          forbidden: 'You are not authorized to access this prescription.',
+        }),
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDispense = async (drugName: string, status: 'DISPENSED' | 'UNAVAILABLE') => {
-    if (!pharmacyName.trim()) {
-      Alert.alert('Error', 'Please enter your pharmacy name first');
+  const openScanner = async () => {
+    if (!cameraPermission?.granted) {
+      const result = await requestCameraPermission();
+      if (!result.granted) {
+        Alert.alert(
+          'Camera permission required',
+          'Allow camera access in your device settings to scan prescription QR codes.',
+        );
+        return;
+      }
+    }
+
+    setScannerLocked(false);
+    setScannerVisible(true);
+  };
+
+  const handleBarcodeScanned = (scan: BarcodeScanningResult) => {
+    if (scannerLocked) {
       return;
     }
+
+    const scannedValue = scan.data?.trim();
+    if (!scannedValue) {
+      return;
+    }
+
+    setScannerLocked(true);
+    setScannerVisible(false);
+    setQrCode(extractPrescriptionId(scannedValue) ?? scannedValue);
+
+    // Let the camera modal finish closing before presenting any lookup result
+    // or alert. This prevents the black scanner background from remaining visible.
+    setTimeout(() => {
+      void lookupPrescription(scannedValue);
+    }, 350);
+  };
+
+  const handleDispense = async (
+    drugName: string,
+    status: Exclude<DispensationStatus, 'PENDING'>,
+  ) => {
+    if (!prescription || dispensing) {
+      return;
+    }
+
+    const cleanedPharmacyName = pharmacyName.trim();
+    if (!cleanedPharmacyName) {
+      Alert.alert('Pharmacy required', 'Enter the pharmacy name before dispensing.');
+      return;
+    }
+
     setDispensing(drugName);
+
     try {
+      await AsyncStorage.setItem(PHARMACY_NAME_KEY, cleanedPharmacyName);
       await api.patch(`/prescriptions/${prescription.id}/dispense`, {
-        drugName, status, pharmacyName: pharmacyName.trim(),
+        drugName,
+        status,
+        pharmacyName: cleanedPharmacyName,
       });
-      const remainingRes = await api.get(`/prescriptions/${prescription.id}/remaining`);
-      setRemaining(remainingRes.data);
-      Alert.alert('Updated', status === 'DISPENSED' ? `${drugName} dispensed` : `${drugName} marked unavailable`);
-    } catch {
-      Alert.alert('Error', 'Failed to update dispensation status');
+      await loadRemaining(prescription.id);
+
+      Alert.alert(
+        'Prescription updated',
+        status === 'DISPENSED'
+          ? `${drugName} was marked as dispensed.`
+          : `${drugName} was marked as unavailable.`,
+      );
+    } catch (error: unknown) {
+      Alert.alert(
+        'Update failed',
+        getApiErrorMessage(error, {
+          fallback: 'The medication status could not be updated.',
+          conflict: 'This medication has already been processed. Refresh the prescription.',
+          validation: 'Review the pharmacy and medication details and try again.',
+        }),
+      );
     } finally {
       setDispensing(null);
     }
   };
 
-  const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure?', [
+  const resetLookup = () => {
+    setPrescription(null);
+    setRemaining([]);
+    setQrCode('');
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.multiRemove([
-            'accessToken',
-            'refreshToken',
-            'userRole',
-          ]);
-          router.replace('/(auth)/login');
+          await logoutSession();
+          router.replace('/(auth)/staff-login');
         },
       },
     ]);
   };
+
+  const formattedIssuedDate = (() => {
+    if (!prescription?.issuedAt) {
+      return 'Date unavailable';
+    }
+
+    const date = new Date(prescription.issuedAt);
+    return Number.isNaN(date.getTime())
+      ? 'Date unavailable'
+      : date.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+  })();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -92,9 +301,11 @@ export default function DispenseScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerIdentity}>
             <SwiftCareLogo size={46} compact />
-            <View>
+            <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>Dispense Medication</Text>
-              <Text style={styles.headerSubtitle}>Scan or enter a prescription ID</Text>
+              <Text style={styles.headerSubtitle}>
+                Scan or enter a prescription ID
+              </Text>
             </View>
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -103,164 +314,256 @@ export default function DispenseScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {!prescription ? (
-          <View style={styles.lookupCard}>
-            <View style={styles.lookupIcon}>
-              <Ionicons name="qr-code-outline" size={40} color={Colors.primary} />
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        >
+          {!prescription ? (
+            <View style={styles.lookupCard}>
+              <View style={styles.lookupIcon}>
+                <Ionicons name="qr-code-outline" size={40} color={Colors.primary} />
+              </View>
+              <Text style={styles.lookupTitle}>Scan or Enter Prescription ID</Text>
+              <Text style={styles.lookupSubtitle}>
+                Scan the patient&apos;s QR code or enter the complete prescription UUID.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.scanButton}
+                onPress={() => void openScanner()}
+                disabled={loading}
+              >
+                <Ionicons name="camera-outline" size={20} color={Colors.primary} />
+                <Text style={styles.scanButtonText}>Scan QR Code</Text>
+              </TouchableOpacity>
+
+              <View style={styles.orRow}>
+                <View style={styles.orDivider} />
+                <Text style={styles.orText}>OR</Text>
+                <View style={styles.orDivider} />
+              </View>
+
+              <Text style={styles.label}>Prescription ID</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                placeholderTextColor={Colors.textDisabled}
+                value={qrCode}
+                onChangeText={setQrCode}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                returnKeyType="search"
+                onSubmitEditing={() => void lookupPrescription()}
+              />
+
+              <TouchableOpacity
+                style={[styles.lookupButton, loading && styles.buttonDisabled]}
+                onPress={() => void lookupPrescription()}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <>
+                    <Ionicons name="search-outline" size={18} color={Colors.white} />
+                    <Text style={styles.lookupButtonText}>Look Up Prescription</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-            <Text style={styles.lookupTitle}>Scan or Enter Prescription ID</Text>
-            <Text style={styles.lookupSubtitle}>
-              Enter the prescription ID from the patient's QR code
-            </Text>
-
-            <Text style={styles.label}>Prescription ID</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter prescription ID"
-              placeholderTextColor={Colors.textDisabled}
-              value={qrCode}
-              onChangeText={setQrCode}
-              autoCapitalize="none"
-            />
-
-            <TouchableOpacity
-              style={[styles.lookupButton, loading && styles.buttonDisabled]}
-              onPress={handleLookup}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={Colors.white} />
-              ) : (
-                <>
-                  <Ionicons name="search-outline" size={18} color={Colors.white} />
-                  <Text style={styles.lookupButtonText}>Look Up Prescription</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Prescription Header */}
-            <View style={styles.prescCard}>
-              <View style={styles.prescHeader}>
-                <View style={styles.rxBadge}>
-                  <Text style={styles.rxText}>Rx</Text>
+          ) : (
+            <>
+              <View style={styles.prescCard}>
+                <View style={styles.prescHeader}>
+                  <View style={styles.rxBadge}>
+                    <Text style={styles.rxText}>Rx</Text>
+                  </View>
+                  <View style={styles.prescInfo}>
+                    <Text style={styles.prescId}>
+                      #{prescription.id.slice(0, 8).toUpperCase()}
+                    </Text>
+                    <Text style={styles.prescDate}>{formattedIssuedDate}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.newScanBtn} onPress={resetLookup}>
+                    <Text style={styles.newScanText}>New Scan</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.prescInfo}>
-                  <Text style={styles.prescId}>#{prescription.id.slice(0, 8).toUpperCase()}</Text>
-                  <Text style={styles.prescDate}>
-                    {new Date(prescription.issuedAt).toLocaleDateString('en-GB', {
-                      day: 'numeric', month: 'short', year: 'numeric'
-                    })}
+
+                <View
+                  style={[
+                    styles.statusRow,
+                    {
+                      backgroundColor:
+                        remaining.length === 0
+                          ? Colors.successLight
+                          : Colors.warningLight,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      remaining.length === 0
+                        ? 'checkmark-circle-outline'
+                        : 'time-outline'
+                    }
+                    size={16}
+                    color={remaining.length === 0 ? Colors.success : Colors.warning}
+                  />
+                  <Text
+                    style={[
+                      styles.statusText,
+                      {
+                        color:
+                          remaining.length === 0 ? Colors.success : Colors.warning,
+                      },
+                    ]}
+                  >
+                    {remaining.length === 0
+                      ? 'Fully processed'
+                      : `${remaining.length} drug(s) pending`}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.newScanBtn}
-                  onPress={() => { setPrescription(null); setRemaining([]); setQrCode(''); }}
-                >
-                  <Text style={styles.newScanText}>New Scan</Text>
-                </TouchableOpacity>
               </View>
 
-              <View style={[
-                styles.statusRow,
-                { backgroundColor: remaining.length === 0 ? Colors.successLight : Colors.warningLight }
-              ]}>
-                <Ionicons
-                  name={remaining.length === 0 ? 'checkmark-circle-outline' : 'time-outline'}
-                  size={16}
-                  color={remaining.length === 0 ? Colors.success : Colors.warning}
-                />
-                <Text style={[
-                  styles.statusText,
-                  { color: remaining.length === 0 ? Colors.success : Colors.warning }
-                ]}>
-                  {remaining.length === 0 ? 'Fully dispensed' : `${remaining.length} drug(s) pending`}
-                </Text>
-              </View>
-            </View>
+              <Text style={styles.label}>Pharmacy Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. KNUST Hospital Pharmacy"
+                placeholderTextColor={Colors.textDisabled}
+                value={pharmacyName}
+                onChangeText={setPharmacyName}
+                editable={!dispensing}
+                returnKeyType="done"
+              />
 
-            {/* Pharmacy Name */}
-            <Text style={styles.label}>Your Pharmacy Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. KNUST Pharmacy"
-              placeholderTextColor={Colors.textDisabled}
-              value={pharmacyName}
-              onChangeText={setPharmacyName}
-            />
+              <Text style={styles.sectionTitle}>Drugs to Dispense</Text>
 
-            {/* Drugs */}
-            <Text style={styles.sectionTitle}>Drugs to Dispense</Text>
-
-            {remaining.length === 0 ? (
-              <View style={styles.allDoneCard}>
-                <Ionicons name="checkmark-circle" size={40} color={Colors.success} />
-                <Text style={styles.allDoneText}>All drugs dispensed</Text>
-              </View>
-            ) : (
-              remaining.map((record: any) => (
-                <View key={record.id} style={styles.drugCard}>
-                  <View style={styles.drugHeader}>
-                    <View style={styles.drugIcon}>
-                      <Ionicons name="medical-outline" size={18} color={Colors.primary} />
-                    </View>
-                    <Text style={styles.drugName}>{record.drugName}</Text>
-                  </View>
-                  <View style={styles.drugActions}>
-                    <TouchableOpacity
-                      style={[styles.dispenseButton, dispensing === record.drugName && styles.buttonDisabled]}
-                      onPress={() => handleDispense(record.drugName, 'DISPENSED')}
-                      disabled={dispensing === record.drugName}
-                    >
-                      {dispensing === record.drugName ? (
-                        <ActivityIndicator color={Colors.white} size="small" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-outline" size={14} color={Colors.white} />
-                          <Text style={styles.dispenseButtonText}>Dispense</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.unavailableButton, dispensing === record.drugName && styles.buttonDisabled]}
-                      onPress={() => handleDispense(record.drugName, 'UNAVAILABLE')}
-                      disabled={dispensing === record.drugName}
-                    >
-                      <Ionicons name="close-outline" size={14} color={Colors.textSecondary} />
-                      <Text style={styles.unavailableButtonText}>Unavailable</Text>
-                    </TouchableOpacity>
-                  </View>
+              {remaining.length === 0 ? (
+                <View style={styles.allDoneCard}>
+                  <Ionicons name="checkmark-circle" size={40} color={Colors.success} />
+                  <Text style={styles.allDoneText}>All drugs have been processed</Text>
                 </View>
-              ))
-            )}
-          </>
-        )}
-      </ScrollView>
+              ) : (
+                remaining.map(record => (
+                  <View key={record.id ?? record.drugName} style={styles.drugCard}>
+                    <View style={styles.drugHeader}>
+                      <View style={styles.drugIcon}>
+                        <Ionicons name="medical-outline" size={18} color={Colors.primary} />
+                      </View>
+                      <Text style={styles.drugName}>{record.drugName}</Text>
+                    </View>
+                    <View style={styles.drugActions}>
+                      <TouchableOpacity
+                        style={[
+                          styles.dispenseButton,
+                          dispensing !== null && styles.buttonDisabled,
+                        ]}
+                        onPress={() =>
+                          void handleDispense(record.drugName, 'DISPENSED')
+                        }
+                        disabled={dispensing !== null}
+                      >
+                        {dispensing === record.drugName ? (
+                          <ActivityIndicator color={Colors.white} size="small" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-outline" size={14} color={Colors.white} />
+                            <Text style={styles.dispenseButtonText}>Dispense</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.unavailableButton,
+                          dispensing !== null && styles.buttonDisabled,
+                        ]}
+                        onPress={() =>
+                          void handleDispense(record.drugName, 'UNAVAILABLE')
+                        }
+                        disabled={dispensing !== null}
+                      >
+                        <Ionicons name="close-outline" size={14} color={Colors.textSecondary} />
+                        <Text style={styles.unavailableButtonText}>Unavailable</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <Modal
+        visible={scannerVisible}
+        animationType="slide"
+        onRequestClose={() => setScannerVisible(false)}
+      >
+        <SafeAreaView style={styles.scannerSafeArea} edges={['top', 'bottom']}>
+          <View style={styles.scannerHeader}>
+            <TouchableOpacity
+              style={styles.scannerCloseButton}
+              onPress={() => setScannerVisible(false)}
+            >
+              <Ionicons name="close" size={24} color={Colors.white} />
+            </TouchableOpacity>
+            <Text style={styles.scannerTitle}>Scan Prescription QR</Text>
+            <View style={styles.scannerHeaderSpacer} />
+          </View>
+
+          <View style={styles.cameraContainer}>
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={scannerLocked ? undefined : handleBarcodeScanned}
+            />
+            <View style={styles.scannerOverlay}>
+              <View style={styles.scanFrame} />
+              <Text style={styles.scannerHint}>
+                Position the prescription QR code inside the frame
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.headerGradientStart },
+  keyboardView: { flex: 1 },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, paddingBottom: 40 },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
+  headerTextContainer: { flex: 1 },
+  headerTitle: { fontSize: 21, fontWeight: '700', color: Colors.white },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
   logoutBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   lookupCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   lookupIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   lookupTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8, textAlign: 'center' },
-  lookupSubtitle: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
+  lookupSubtitle: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  scanButton: { width: '100%', minHeight: 50, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  scanButtonText: { color: Colors.primary, fontSize: 15, fontWeight: '700' },
+  orRow: { width: '100%', flexDirection: 'row', alignItems: 'center', marginVertical: 18 },
+  orDivider: { flex: 1, height: 1, backgroundColor: Colors.border },
+  orText: { marginHorizontal: 12, color: Colors.textDisabled, fontSize: 11, fontWeight: '700' },
   label: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8, marginTop: 4, alignSelf: 'flex-start', width: '100%' },
   input: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: Colors.textPrimary, width: '100%', marginBottom: 16 },
   lookupButton: { backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' },
   lookupButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
-  buttonDisabled: { opacity: 0.6 },
+  buttonDisabled: { opacity: 0.55 },
   prescCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
   prescHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   rxBadge: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
@@ -284,4 +587,13 @@ const styles = StyleSheet.create({
   dispenseButtonText: { color: Colors.white, fontWeight: '700', fontSize: 13 },
   unavailableButton: { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   unavailableButtonText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  scannerSafeArea: { flex: 1, backgroundColor: Colors.black },
+  scannerHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.headerDark },
+  scannerCloseButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
+  scannerTitle: { color: Colors.white, fontSize: 17, fontWeight: '700' },
+  scannerHeaderSpacer: { width: 42 },
+  cameraContainer: { flex: 1 },
+  scannerOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.18)' },
+  scanFrame: { width: 260, height: 260, borderWidth: 3, borderColor: Colors.white, borderRadius: 24, backgroundColor: 'transparent' },
+  scannerHint: { marginTop: 26, maxWidth: 300, color: Colors.white, fontSize: 14, lineHeight: 20, textAlign: 'center', fontWeight: '600' },
 });

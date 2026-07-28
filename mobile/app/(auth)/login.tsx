@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -20,8 +19,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors } from "../../constants/colors";
 import { useHaptics } from "../../hooks/useHaptics";
-import api from "../../services/api";
-import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import api, { clearLocalSession } from "../../services/api";
+import { homeRouteForRole, normalizeRole } from "../../utils/auth";
+import { getApiErrorMessage } from "../../utils/errors";
+import SwiftCareLogo from "../../components/branding/SwiftCareLogo";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -38,7 +41,6 @@ export default function LoginScreen() {
   } = useHaptics();
 
   const handleLogin = async () => {
-    // Prevent repeated requests when the button is tapped quickly.
     if (loading) {
       return;
     }
@@ -47,130 +49,60 @@ export default function LoginScreen() {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Validate before enabling the loading indicator.
-    if (!cleanEmail || !password.trim()) {
+    if (!EMAIL_PATTERN.test(cleanEmail) || !password) {
       errorNotification();
-
       Alert.alert(
-        "Missing details",
-        "Email and password are required.",
+        'Check your details',
+        !cleanEmail || !password
+          ? 'Email and password are required.'
+          : 'Enter a valid email address.',
       );
-
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await api.post("/auth/login", {
+      const response = await api.post('/auth/login', {
         email: cleanEmail,
         password,
       });
 
-      const {
-        accessToken,
-        refreshToken,
-        role,
-      } = response.data ?? {};
+      const accessToken = response.data?.accessToken;
+      const refreshToken = response.data?.refreshToken;
+      const role = normalizeRole(response.data?.role) ?? 'PATIENT';
 
-      if (!accessToken) {
-        throw new Error(
-          "No access token was returned by the server.",
-        );
+      if (typeof accessToken !== 'string' || !accessToken.trim()) {
+        throw new Error('The server did not return a valid access token.');
       }
+
+      await clearLocalSession();
 
       const storageEntries: [string, string][] = [
-        ["accessToken", accessToken],
+        ['accessToken', accessToken],
+        ['userRole', role],
       ];
 
-      if (refreshToken) {
-        storageEntries.push([
-          "refreshToken",
-          refreshToken,
-        ]);
-      }
-
-      if (role) {
-        storageEntries.push([
-          "userRole",
-          String(role),
-        ]);
-      } else {
-        storageEntries.push([
-          "userRole",
-          "PATIENT",
-        ]);
+      if (typeof refreshToken === 'string' && refreshToken.trim()) {
+        storageEntries.push(['refreshToken', refreshToken]);
       }
 
       await AsyncStorage.multiSet(storageEntries);
-
       successNotification();
-
-      switch (role) {
-        case "ADMIN":
-          router.replace("/(admin)/dashboard");
-          break;
-
-        case "DOCTOR":
-          router.replace("/(doctor)/queue");
-          break;
-
-        case "PHARMACIST":
-          router.replace("/(pharmacist)/dispense");
-          break;
-
-        case "LAB_TECHNICIAN":
-          router.replace("/(lab)/dashboard");
-          break;
-
-        default:
-          router.replace("/(patient)/home");
-          break;
-      }
+      router.replace(homeRouteForRole(role));
     } catch (error: unknown) {
       errorNotification();
-
-      let alertMessage =
-        "Unable to sign in. Please try again.";
-
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status;
-        const responseData = error.response?.data;
-
-        if (status === 400) {
-          alertMessage =
-            responseData?.message ||
-            responseData?.error ||
-            "Please check the information you entered.";
-        } else if (status === 401 || status === 403) {
-          alertMessage =
-            "Invalid email or password.";
-        } else if (status === 404) {
-          alertMessage =
-            "The login service could not be found.";
-        } else if (status && status >= 500) {
-          alertMessage =
-            "The server encountered an error. Please try again later.";
-        } else if (error.code === "ECONNABORTED") {
-          alertMessage =
-            "The request timed out. Check your connection and try again.";
-        } else if (!error.response) {
-          alertMessage =
-            "Unable to connect to the server. Check your network connection.";
-        } else {
-          alertMessage =
-            responseData?.message ||
-            responseData?.error ||
-            error.message ||
-            alertMessage;
-        }
-      } else if (error instanceof Error) {
-        alertMessage = error.message;
-      }
-
-      Alert.alert("Login Failed", alertMessage);
+      Alert.alert(
+        'Login Failed',
+        getApiErrorMessage(error, {
+          fallback: 'Unable to sign in. Please try again.',
+          unauthorized: 'Invalid email or password.',
+          forbidden: 'This account is not allowed to sign in here.',
+          notFound: 'The login service could not be found.',
+          validation: 'Please check the email and password you entered.',
+        }),
+      );
     } finally {
-      // This always runs, whether login succeeds or fails.
       setLoading(false);
     }
   };

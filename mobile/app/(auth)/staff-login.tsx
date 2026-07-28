@@ -17,45 +17,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import api from '../../services/api';
+import api, { clearLocalSession } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import { homeRouteForRole, isStaffRole, normalizeRole } from '../../utils/auth';
+import { getApiErrorMessage } from '../../utils/errors';
+import { goBackOrReplace } from '../../utils/navigation';
 
-const getErrorMessage = (
-  error: any
-): string => {
-  const responseData = error?.response?.data;
-
-  if (typeof responseData?.message === 'string') {
-    return responseData.message;
-  }
-
-  if (typeof responseData?.error === 'string') {
-    return responseData.error;
-  }
-
-  if (typeof responseData === 'string') {
-    return responseData;
-  }
-
-  if (error?.code === 'ECONNABORTED') {
-    return 'The login request took too long. Please check your connection and try again.';
-  }
-
-  if (!error?.response) {
-    return 'The server could not be reached. Check that the backend is running and your phone is connected to the same network.';
-  }
-
-  if (error?.response?.status === 401) {
-    return 'Invalid staff email or password.';
-  }
-
-  if (error?.response?.status === 403) {
-    return 'You do not have permission to access the staff portal.';
-  }
-
-  return 'Unable to sign in. Please try again.';
-};
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function StaffLoginScreen() {
   const router = useRouter();
@@ -73,14 +42,14 @@ export default function StaffLoginScreen() {
       return;
     }
 
-    const cleanedEmail = email
-      .trim()
-      .toLowerCase();
+    const cleanedEmail = email.trim().toLowerCase();
 
-    if (!cleanedEmail || !password) {
+    if (!EMAIL_PATTERN.test(cleanedEmail) || !password) {
       Alert.alert(
-        'Missing information',
-        'Email and password are required.'
+        'Check your details',
+        !cleanedEmail || !password
+          ? 'Email and password are required.'
+          : 'Enter a valid staff email address.',
       );
       return;
     }
@@ -96,70 +65,45 @@ export default function StaffLoginScreen() {
         },
         {
           timeout: 15000,
-        }
+        },
       );
 
       const accessToken =
-        response.data?.accessToken ??
-        response.data?.token;
-
-      const role = response.data?.role;
+        response.data?.accessToken ?? response.data?.token;
+      const role = normalizeRole(response.data?.role);
       const refreshToken = response.data?.refreshToken;
 
-      if (!accessToken) {
-        throw new Error(
-          'The server did not return an access token.'
-        );
+      if (typeof accessToken !== 'string' || !accessToken.trim()) {
+        throw new Error('The server did not return a valid access token.');
       }
 
-      if (
-        role !== 'DOCTOR' &&
-        role !== 'PHARMACIST' &&
-        role !== 'ADMIN' &&
-        role !== 'LAB_TECHNICIAN'
-      ) {
-        throw new Error(
-          'This account is not authorized for staff access.'
-        );
+      if (!role || !isStaffRole(role)) {
+        throw new Error('This account is not authorized for staff access.');
       }
+
+      await clearLocalSession();
 
       const storageEntries: [string, string][] = [
         ['accessToken', accessToken],
         ['userRole', role],
       ];
 
-      if (typeof refreshToken === 'string' && refreshToken) {
+      if (typeof refreshToken === 'string' && refreshToken.trim()) {
         storageEntries.push(['refreshToken', refreshToken]);
       }
 
       await AsyncStorage.multiSet(storageEntries);
-
-      if (role === 'DOCTOR') {
-        router.replace('/(doctor)/queue' as any);
-        return;
-      }
-
-      if (role === 'PHARMACIST') {
-        router.replace('/(pharmacist)/dispense' as any);
-        return;
-      }
-
-      if (role === 'ADMIN') {
-        router.replace('/(admin)/dashboard' as any);
-        return;
-      }
-
-      router.replace('/(lab)/dashboard' as any);
-    } catch (error: any) {
-      await AsyncStorage.multiRemove([
-        'accessToken',
-        'userRole',
-        'refreshToken',
-      ]);
-
+      router.replace(homeRouteForRole(role));
+    } catch (error: unknown) {
+      await clearLocalSession();
       Alert.alert(
         'Login failed',
-        getErrorMessage(error)
+        getApiErrorMessage(error, {
+          fallback: 'Unable to sign in. Please try again.',
+          unauthorized: 'Invalid staff email or password.',
+          forbidden: 'You do not have permission to access the staff portal.',
+          validation: 'Please check the email and password you entered.',
+        }),
       );
     } finally {
       setLoading(false);
@@ -180,13 +124,7 @@ export default function StaffLoginScreen() {
       >
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(auth)/login');
-            }
-          }}
+          onPress={() => goBackOrReplace(router, '/(auth)/login')}
           disabled={loading}
           activeOpacity={0.8}
         >
@@ -350,7 +288,7 @@ export default function StaffLoginScreen() {
 
             <TouchableOpacity
               style={styles.linkButton}
-              onPress={() => router.back()}
+              onPress={() => router.replace('/(auth)/login')}
               disabled={loading}
               activeOpacity={0.8}
             >

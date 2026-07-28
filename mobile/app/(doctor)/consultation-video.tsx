@@ -20,6 +20,7 @@ import { WebView } from 'react-native-webview';
 
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type ConsultationStatus =
   | 'SCHEDULED'
@@ -60,6 +61,7 @@ export default function DoctorConsultationScreen() {
   const [sessionUrl, setSessionUrl] = useState<string | null>(null);
   const [showSession, setShowSession] = useState(false);
   const [showClinicalForm, setShowClinicalForm] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const [diagnosis, setDiagnosis] = useState('');
   const [consultationNotes, setConsultationNotes] = useState('');
@@ -108,10 +110,10 @@ export default function DoctorConsultationScreen() {
         : [];
 
       setConsultations(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert(
         'Unable to load consultations',
-        getErrorMessage(error, 'Please try again.')
+        getApiErrorMessage(error, { fallback: 'Please try again.' })
       );
     } finally {
       setLoading(false);
@@ -144,11 +146,15 @@ export default function DoctorConsultationScreen() {
 
       const updatedConsultation: Consultation = response.data;
 
-      if (!updatedConsultation.sessionUrl) {
-        throw new Error('The server did not return a consultation session URL.');
+      if (
+        typeof updatedConsultation.sessionUrl !== 'string' ||
+        !/^https?:\/\//i.test(updatedConsultation.sessionUrl)
+      ) {
+        throw new Error('The server did not return a valid consultation session URL.');
       }
 
       setActiveConsultation(updatedConsultation);
+      setSessionError(null);
       setSessionUrl(updatedConsultation.sessionUrl);
       setShowSession(true);
 
@@ -159,10 +165,10 @@ export default function DoctorConsultationScreen() {
             : item
         )
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert(
         'Unable to join session',
-        getErrorMessage(error, 'Failed to join the consultation.')
+        getApiErrorMessage(error, { fallback: 'Failed to join the consultation.' })
       );
     } finally {
       setJoining(null);
@@ -235,6 +241,19 @@ export default function DoctorConsultationScreen() {
       return false;
     }
 
+    const validationMessage =
+      validateOptionalRange('Temperature', temperature, 30, 45) ??
+      validateBloodPressure(bloodPressure) ??
+      validateOptionalRange('Pulse rate', pulseRate, 20, 250) ??
+      validateOptionalRange('Respiratory rate', respiratoryRate, 5, 80) ??
+      validateOptionalRange('Oxygen saturation', oxygenSaturation, 0, 100) ??
+      validateOptionalRange('Weight', weight, 1, 500);
+
+    if (validationMessage) {
+      Alert.alert('Check vital signs', validationMessage);
+      return false;
+    }
+
     return true;
   };
 
@@ -260,7 +279,7 @@ export default function DoctorConsultationScreen() {
           diagnosis: diagnosis.trim(),
           consultationNotes: toNullableText(consultationNotes),
           temperatureCelsius: toNullableNumber(temperature),
-          bloodPressure: toNullableText(bloodPressure),
+          bloodPressure: toNullableText(bloodPressure.replace(/\s+/g, '')),
           pulseRate: toNullableNumber(pulseRate),
           respiratoryRate: toNullableNumber(respiratoryRate),
           oxygenSaturation: toNullableNumber(oxygenSaturation),
@@ -290,13 +309,14 @@ export default function DoctorConsultationScreen() {
           },
         ]
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       Alert.alert(
         'Could not complete consultation',
-        getErrorMessage(
-          error,
-          'One of the consultation records could not be saved.'
-        )
+        getApiErrorMessage(error, {
+          fallback: 'One of the consultation records could not be saved.',
+          validation: 'Review the consultation fields and try again.',
+          conflict: 'This consultation was already completed or changed.',
+        })
       );
     } finally {
       setSubmitting(false);
@@ -578,7 +598,12 @@ export default function DoctorConsultationScreen() {
             </TouchableOpacity>
           </View>
 
-          {sessionUrl ? (
+          {sessionError ? (
+            <View style={styles.webviewLoader}>
+              <Ionicons name="warning-outline" size={48} color={Colors.danger} />
+              <Text style={styles.webviewLoadingText}>{sessionError}</Text>
+            </View>
+          ) : sessionUrl ? (
             <WebView
               source={{ uri: sessionUrl }}
               style={styles.webview}
@@ -587,6 +612,10 @@ export default function DoctorConsultationScreen() {
               javaScriptEnabled
               domStorageEnabled
               startInLoadingState
+              onError={() => setSessionError('The video session could not be loaded.')}
+              onHttpError={event =>
+                setSessionError(`The video provider returned status ${event.nativeEvent.statusCode}.`)
+              }
               renderLoading={() => (
                 <View style={styles.webviewLoader}>
                   <ActivityIndicator
@@ -1051,32 +1080,30 @@ function toNullableNumber(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function getErrorMessage(error: any, fallback: string) {
-  const responseData = error?.response?.data;
+function validateOptionalRange(
+  label: string,
+  value: string,
+  minimum: number,
+  maximum: number,
+): string | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum
+    ? null
+    : `${label} must be between ${minimum} and ${maximum}.`;
+}
 
-  if (typeof responseData === 'string' && responseData.trim()) {
-    return responseData;
-  }
-
-  if (
-    responseData?.message &&
-    typeof responseData.message === 'string'
-  ) {
-    return responseData.message;
-  }
-
-  if (
-    responseData?.error &&
-    typeof responseData.error === 'string'
-  ) {
-    return responseData.error;
-  }
-
-  if (error?.message && typeof error.message === 'string') {
-    return error.message;
-  }
-
-  return fallback;
+function validateBloodPressure(value: string): string | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const match = /^(\d{2,3})\s*\/\s*(\d{2,3})$/.exec(normalized);
+  if (!match) return 'Blood pressure must use the format 120/80.';
+  const systolic = Number(match[1]);
+  const diastolic = Number(match[2]);
+  return systolic >= 60 && systolic <= 260 && diastolic >= 30 &&
+    diastolic <= 160 && systolic > diastolic
+    ? null
+    : 'Enter a plausible blood pressure reading.';
 }
 
 function formatConsultationDate(value: string) {

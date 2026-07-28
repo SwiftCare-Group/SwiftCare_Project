@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type Department = {
   id: string;
@@ -23,9 +24,6 @@ type Department = {
   queueCapacity: number;
   isActive: boolean;
 };
-
-const getErrorMessage = (error: any, fallback: string) =>
-  error?.response?.data?.message || fallback;
 
 export default function DepartmentsScreen() {
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -52,7 +50,7 @@ export default function DepartmentsScreen() {
     } catch (error) {
       Alert.alert(
         'Unable to load departments',
-        getErrorMessage(error, 'Check your connection and try again.'),
+        getApiErrorMessage(error, { fallback: 'Check your connection and try again.' }),
       );
     } finally {
       setLoading(false);
@@ -67,6 +65,10 @@ export default function DepartmentsScreen() {
   };
 
   const handleCreate = async () => {
+    if (submitting) {
+      return;
+    }
+
     const normalizedName = name.trim();
     const normalizedHours = operatingHours.trim();
     const parsedCapacity = Number.parseInt(queueCapacity, 10);
@@ -101,7 +103,7 @@ export default function DepartmentsScreen() {
     } catch (error) {
       Alert.alert(
         'Unable to create department',
-        getErrorMessage(error, 'Review the details and try again.'),
+        getApiErrorMessage(error, { fallback: 'Review the details and try again.' }),
       );
     } finally {
       setSubmitting(false);

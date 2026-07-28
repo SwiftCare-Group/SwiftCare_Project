@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -11,10 +11,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { goBackOrReplace } from '../../utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import api from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
+import { getApiErrorMessage } from '../../utils/errors';
 
 type AppointmentStatus =
   | 'PENDING'
@@ -45,17 +47,19 @@ export default function MedicalHistoryScreen() {
   const [filter, setFilter] = useState<FilterType>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchMedicalHistory();
-  }, []);
-
-  const fetchMedicalHistory = async () => {
+  const fetchMedicalHistory = useCallback(async () => {
+    setLoadError(null);
     try {
       const [appointmentsResult, recordsResult] = await Promise.allSettled([
         api.get('/appointments'),
         api.get('/clinical-records/patient/me'),
       ]);
+
+      if (appointmentsResult.status === 'rejected' && recordsResult.status === 'rejected') {
+        throw appointmentsResult.reason ?? recordsResult.reason;
+      }
 
       const appointments =
         appointmentsResult.status === 'fulfilled' &&
@@ -114,13 +118,21 @@ export default function MedicalHistoryScreen() {
             new Date(first.scheduledTime).getTime()
         )
       );
-    } catch {
-      setRecords([]);
+    } catch (error: unknown) {
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Your medical history could not be loaded.',
+        })
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchMedicalHistory();
+  }, [fetchMedicalHistory]);
 
   const filteredRecords = useMemo(() => {
     if (filter === 'ALL') {
@@ -132,7 +144,7 @@ export default function MedicalHistoryScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMedicalHistory();
+    void fetchMedicalHistory();
   };
 
   const formatDate = (value: string) => {
@@ -201,7 +213,7 @@ export default function MedicalHistoryScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(patient)/home')}
           >
             <Ionicons
               name="chevron-back"
@@ -325,7 +337,26 @@ export default function MedicalHistoryScreen() {
           )}
         </View>
 
-        {filteredRecords.length === 0 ? (
+        {loadError ? (
+          <View
+            style={[
+              styles.emptyState,
+              { backgroundColor: colors.surface, borderColor: colors.danger },
+            ]}
+          >
+            <View style={[styles.emptyIcon, { backgroundColor: colors.dangerLight }]}> 
+              <Ionicons name="cloud-offline-outline" size={38} color={colors.danger} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Unable to load history</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{loadError}</Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={() => void fetchMedicalHistory()}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredRecords.length === 0 ? (
           <View
             style={[
               styles.emptyState,
@@ -818,4 +849,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  retryButton: { marginTop: 18, minWidth: 130, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  retryButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 });

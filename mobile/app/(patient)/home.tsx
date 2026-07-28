@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +20,8 @@ import { useTheme } from "../../context/ThemeContext";
 import { useHaptics } from "../../hooks/useHaptics";
 import api from "../../services/api";
 import { getUnreadNotificationCount } from "../../services/notificationStorage";
-import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
+import SwiftCareLogo from "../../components/branding/SwiftCareLogo";
+import { getApiErrorMessage } from "../../utils/errors";
 
 type Patient = {
   id: string;
@@ -95,6 +96,7 @@ export default function HomeScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadUnreadNotifications = useCallback(async () => {
@@ -107,6 +109,8 @@ export default function HomeScreen() {
   }, []);
 
   const fetchData = useCallback(async () => {
+    setLoadError(null);
+
     try {
       const [
         patientResponse,
@@ -200,21 +204,25 @@ export default function HomeScreen() {
       );
 
       setUpcomingConsultation(upcoming ?? null);
-    } catch (error: any) {    } finally {
+    } catch (error: unknown) {
+      if (!patient) {
+        setLoadError(
+          getApiErrorMessage(error, {
+            fallback: 'Your dashboard could not be loaded.',
+          }),
+        );
+      }
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-    loadUnreadNotifications();
-  }, [fetchData, loadUnreadNotifications]);
-
   useFocusEffect(
     useCallback(() => {
-      loadUnreadNotifications();
-    }, [loadUnreadNotifications])
+      void fetchData();
+      void loadUnreadNotifications();
+    }, [fetchData, loadUnreadNotifications])
   );
 
   const onRefresh = useCallback(() => {
@@ -299,6 +307,36 @@ export default function HomeScreen() {
         >
           Loading your dashboard...
         </Text>
+      </View>
+    );
+  }
+
+  if (loadError && !patient) {
+    return (
+      <View
+        style={[
+          styles.errorContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <Ionicons name="cloud-offline-outline" size={48} color={colors.textDisabled} />
+        <Text style={[styles.loadErrorTitle, { color: colors.textPrimary }]}>
+          Unable to load your dashboard
+        </Text>
+        <Text style={[styles.loadErrorText, { color: colors.textSecondary }]}>
+          {loadError}
+        </Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            setLoading(true);
+            void fetchData();
+          }}
+        >
+          <Text style={[styles.retryButtonText, { color: colors.white }]}>
+            Try Again
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -1385,6 +1423,37 @@ function BenefitItem({
 }
 
 const styles = StyleSheet.create({
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  loadErrorTitle: {
+    marginTop: 16,
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  loadErrorText: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  retryButton: {
+    minWidth: 150,
+    minHeight: 48,
+    marginTop: 22,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
   safeArea: {
     flex: 1,
   },
