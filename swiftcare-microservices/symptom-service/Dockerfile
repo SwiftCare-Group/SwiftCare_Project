@@ -1,10 +1,19 @@
-FROM gradle:8.14.3-jdk21 AS build
-WORKDIR /workspace
-COPY . .
-RUN gradle :symptom-service:bootJar --no-daemon
+FROM eclipse-temurin:24-jdk AS build
 
-FROM eclipse-temurin:21-jre
+WORKDIR /workspace
+
+COPY . .
+
+RUN sed -i 's/\r$//' gradlew \
+    && chmod +x gradlew \
+    && ./gradlew :symptom-service:bootJar --no-daemon
+
+FROM eclipse-temurin:24-jdk
+
 WORKDIR /app
+
 COPY --from=build /workspace/symptom-service/build/libs/*.jar app.jar
-EXPOSE 8080
+
+EXPOSE 10000
+
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
