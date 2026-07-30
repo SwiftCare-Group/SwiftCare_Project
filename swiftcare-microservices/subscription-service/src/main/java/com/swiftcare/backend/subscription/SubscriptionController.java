@@ -10,10 +10,11 @@ import com.swiftcare.backend.subscription.dto.SubscriptionUpgradeRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @RestController
@@ -31,31 +32,34 @@ public class SubscriptionController {
 
     @PostMapping("/upgrade")
     public PaymentInitializationResponse upgrade(
-            @AuthenticationPrincipal String email,
+            Authentication authentication,
             @Valid @RequestBody SubscriptionUpgradeRequest request
     ) {
-        return subscriptionService.initializePayment(getPatientId(email), request);
+        return subscriptionService.initializePayment(
+                getPatientId(authentication),
+                request
+        );
     }
 
     @PostMapping("/verify")
     public SubscriptionResponse verify(
-            @AuthenticationPrincipal String email,
+            Authentication authentication,
             @Valid @RequestBody PaymentVerificationRequest request
     ) {
         return subscriptionService.verifyPayment(
-                getPatientId(email),
+                getPatientId(authentication),
                 request.getReference()
         );
     }
 
     @GetMapping("/status")
-    public SubscriptionResponse getStatus(@AuthenticationPrincipal String email) {
-        return subscriptionService.getStatus(getPatientId(email));
+    public SubscriptionResponse getStatus(Authentication authentication) {
+        return subscriptionService.getStatus(getPatientId(authentication));
     }
 
     @PutMapping("/cancel")
-    public SubscriptionResponse cancel(@AuthenticationPrincipal String email) {
-        return subscriptionService.cancel(getPatientId(email));
+    public SubscriptionResponse cancel(Authentication authentication) {
+        return subscriptionService.cancel(getPatientId(authentication));
     }
 
     @PostMapping("/webhook")
@@ -67,16 +71,27 @@ public class SubscriptionController {
         return ResponseEntity.ok().build();
     }
 
-    private UUID getPatientId(String email) {
-        if (email == null || email.isBlank()) {
-            throw new IllegalStateException("Authenticated patient email is unavailable");
-        }
+    private UUID getPatientId(Authentication authentication) {
+        String email = authenticatedEmail(authentication);
 
         return patientRepository
-                .findByEmailIgnoreCaseAndIsDeletedFalse(email.trim())
+                .findByEmailIgnoreCaseAndIsDeletedFalse(email)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Authenticated patient account not found"
                 ))
                 .getId();
+    }
+
+    private String authenticatedEmail(Authentication authentication) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getName() == null
+                || authentication.getName().isBlank()) {
+            throw new IllegalStateException(
+                    "Authenticated patient email is unavailable"
+            );
+        }
+
+        return authentication.getName().trim().toLowerCase(Locale.ROOT);
     }
 }

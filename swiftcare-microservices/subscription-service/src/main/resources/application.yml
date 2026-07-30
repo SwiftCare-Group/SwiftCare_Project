@@ -10,14 +10,15 @@ spring:
     username: ${DB_USERNAME:swiftcare}
     password: ${DB_PASSWORD:swiftcare}
     driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+
   flyway:
     enabled: false
 
@@ -28,11 +29,15 @@ server:
 
 app:
   jwt:
+    # Every JWT-validating SwiftCare service must receive the same JWT_SECRET.
     secret: ${JWT_SECRET:change-this-development-secret-key-minimum-32-characters}
     expiry-ms: ${JWT_EXPIRY_MS:86400000}
 
 paystack:
   secret-key: ${PAYSTACK_SECRET_KEY:}
+  callback-url: ${PAYSTACK_CALLBACK_URL:swiftcare://subscription/callback}
+  monthly-price-pesewas: ${PAYSTACK_MONTHLY_PRICE_PESEWAS:10000}
+  yearly-price-pesewas: ${PAYSTACK_YEARLY_PRICE_PESEWAS:100000}
 
 management:
   endpoints:

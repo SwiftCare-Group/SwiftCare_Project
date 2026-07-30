@@ -1,5 +1,6 @@
 package com.swiftcare.backend.common.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +33,22 @@ public class SecurityConfig {
                                 SessionCreationPolicy.STATELESS
                         )
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) ->
+                                writeSecurityError(
+                                        response,
+                                        HttpServletResponse.SC_UNAUTHORIZED,
+                                        "Authentication required or session expired"
+                                )
+                        )
+                        .accessDeniedHandler((request, response, exception) ->
+                                writeSecurityError(
+                                        response,
+                                        HttpServletResponse.SC_FORBIDDEN,
+                                        "You do not have permission to perform this action"
+                                )
+                        )
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/actuator/health/**",
@@ -49,10 +66,20 @@ public class SecurityConfig {
                         .requestMatchers("/subscriptions/webhook")
                         .permitAll()
                         .requestMatchers(
+                                HttpMethod.GET,
+                                "/subscriptions/plans"
+                        ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
                                 "/subscriptions/upgrade",
-                                "/subscriptions/verify",
-                                "/subscriptions/status",
-                                "/subscriptions/plans",
+                                "/subscriptions/verify"
+                        ).hasRole("PATIENT")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/subscriptions/status"
+                        ).hasRole("PATIENT")
+                        .requestMatchers(
+                                HttpMethod.PUT,
                                 "/subscriptions/cancel"
                         ).hasRole("PATIENT")
 
@@ -272,4 +299,24 @@ public class SecurityConfig {
     ) throws Exception {
         return configuration.getAuthenticationManager();
     }
+    private static void writeSecurityError(
+            HttpServletResponse response,
+            int status,
+            String message
+    ) throws java.io.IOException {
+        response.setStatus(status);
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json");
+        response.getWriter().write(
+                "{\"status\":" + status
+                        + ",\"error\":\""
+                        + (status == HttpServletResponse.SC_UNAUTHORIZED
+                        ? "Unauthorized"
+                        : "Forbidden")
+                        + "\",\"message\":\""
+                        + message
+                        + "\"}"
+        );
+    }
+
 }
