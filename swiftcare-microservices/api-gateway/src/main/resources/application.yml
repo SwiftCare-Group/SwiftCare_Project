@@ -10,7 +10,8 @@ spring:
             connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:60000}
             response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:240s}
 
-          # Retry safe read-only requests when a Render service is waking up.
+          # Retry safe read-only requests while a Render service is waking.
+          # POST requests such as login are not retried here.
           default-filters:
             - name: Retry
               args:
@@ -31,36 +32,43 @@ spring:
                 timeout: 150s
 
           routes:
-            # Login and refresh route.
-            # This route is evaluated before the broader identity route.
-            - id: identity-session
+            # ============================================================
+            # IDENTITY SERVICE
+            # ============================================================
+
+            # Public GET endpoint used by the mobile app to wake and check
+            # the identity service before submitting login credentials.
+            #
+            # Incoming:
+            # GET /api/v1/system/identity-health
+            #
+            # Forwarded to:
+            # GET /api/v1/actuator/health
+            - id: identity-health
               order: -1
               uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
               predicates:
-                - Path=/api/v1/auth/login,/api/v1/auth/refresh
+                - Path=/api/v1/system/identity-health
+                - Method=GET
               filters:
-                - name: Retry
+                - name: SetPath
                   args:
-                    retries: 4
-                    statuses:
-                      - BAD_GATEWAY
-                      - SERVICE_UNAVAILABLE
-                      - GATEWAY_TIMEOUT
-                    methods:
-                      - POST
-                    backoff:
-                      firstBackoff: 15s
-                      maxBackoff: 40s
-                      factor: 2
-                      basedOnPreviousValue: false
-                    timeout: 150s
+                    template: /api/v1/actuator/health
 
-            # Authentication and patient profile routes.
+            # Single route for login, registration, token refresh,
+            # patient details and profile operations.
+            #
+            # This replaces the previous duplicate identity-session and
+            # identity-service route arrangement.
             - id: identity-service
               order: 0
               uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/api/v1/auth,/api/v1/auth/**,/api/v1/patients,/api/v1/patients/**,/api/v1/profile,/api/v1/profile/**
+
+            # ============================================================
+            # CLINICAL SERVICE ADMIN ROUTES
+            # ============================================================
 
             # Admin staff and doctor management.
             - id: clinical-admin
@@ -68,41 +76,66 @@ spring:
               predicates:
                 - Path=/api/v1/admin/doctors,/api/v1/admin/doctors/**,/api/v1/admin/staff,/api/v1/admin/staff/**
 
+            # ============================================================
+            # APPOINTMENT SERVICE ADMIN ROUTES
+            # ============================================================
+
             # Admin department configuration and statistics.
             - id: appointment-admin
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
               predicates:
                 - Path=/api/v1/admin/departments,/api/v1/admin/departments/**,/api/v1/admin/stats,/api/v1/admin/stats/**
 
-            # Appointments, departments, slots and queue.
+            # ============================================================
+            # APPOINTMENT SERVICE
+            # ============================================================
+
+            # Appointments, departments, slots and queue operations.
             - id: appointment-service
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
               predicates:
                 - Path=/api/v1/appointments,/api/v1/appointments/**,/api/v1/departments,/api/v1/departments/**,/api/v1/queue,/api/v1/queue/**
 
-            # Consultations, doctors, records, prescriptions and lab orders.
+            # ============================================================
+            # CLINICAL SERVICE
+            # ============================================================
+
+            # Doctors, consultations, records, prescriptions and labs.
             - id: clinical-service
               uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
               predicates:
                 - Path=/api/v1/consultations,/api/v1/consultations/**,/api/v1/doctors,/api/v1/doctors/**,/api/v1/clinical-records,/api/v1/clinical-records/**,/api/v1/prescriptions,/api/v1/prescriptions/**,/api/v1/lab-orders,/api/v1/lab-orders/**
 
-            # Symptom checker.
+            # ============================================================
+            # SYMPTOM SERVICE
+            # ============================================================
+
             - id: symptom-service
               uri: ${SYMPTOM_SERVICE_URL:http://localhost:8084}
               predicates:
                 - Path=/api/v1/symptoms,/api/v1/symptoms/**
 
-            # Subscription and payment routes.
+            # ============================================================
+            # SUBSCRIPTION SERVICE
+            # ============================================================
+
             - id: subscription-service
               uri: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8085}
               predicates:
                 - Path=/api/v1/subscriptions,/api/v1/subscriptions/**
 
-            # Push-notification routes.
+            # ============================================================
+            # NOTIFICATION SERVICE
+            # ============================================================
+
             - id: notification-service
               uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
               predicates:
                 - Path=/api/v1/notifications,/api/v1/notifications/**
+
+          # ==============================================================
+          # CORS
+          # ==============================================================
 
           globalcors:
             add-to-simple-url-handler-mapping: true
