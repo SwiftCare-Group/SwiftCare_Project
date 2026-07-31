@@ -289,8 +289,7 @@ export default function DoctorQueueScreen() {
         }
 
         const response = await api.get(
-          `/departments/${departmentId}/queue`,
-          { timeout: 15000 }
+          `/departments/${departmentId}/queue`
         );
 
         const queueData: QueuePatient[] =
@@ -405,10 +404,6 @@ export default function DoctorQueueScreen() {
   );
 
   useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
-
-  useEffect(() => {
     if (!selectedDept) {
       return;
     }
@@ -422,20 +417,22 @@ export default function DoctorQueueScreen() {
    */
   useFocusEffect(
     useCallback(() => {
-      if (!selectedDept) {
-        return undefined;
+      void fetchDepartments();
+
+      if (selectedDept) {
+        void fetchQueue(selectedDept);
       }
 
       const intervalId = setInterval(() => {
-        if (!processingPatientIdRef.current) {
-          fetchQueue(selectedDept);
+        if (selectedDept && !processingPatientIdRef.current) {
+          void fetchQueue(selectedDept);
         }
       }, LIVE_REFRESH_INTERVAL_MS);
 
       return () => {
         clearInterval(intervalId);
       };
-    }, [fetchQueue, selectedDept])
+    }, [fetchDepartments, fetchQueue, selectedDept])
   );
 
   const handleSelectDepartment = useCallback(

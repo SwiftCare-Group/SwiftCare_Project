@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -17,6 +17,7 @@ import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useTheme } from '../../context/ThemeContext';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 type DispensationRecord = {
   drugName?: string;
@@ -48,9 +49,7 @@ export default function PrescriptionScreen() {
   const [expandedQr, setExpandedQr] =
     useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useRefreshOnFocus(() => fetchData());
 
   const fetchData = async () => {
     setLoadError(null);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -54,14 +54,11 @@ export default function ProfileScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [plans, setPlans] = useState<SubscriptionPlanData[]>([]);
 
-  useEffect(() => {
-    void fetchPlans();
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       void fetchProfile();
       void fetchSubscription();
+      void fetchPlans();
     }, [])
   );
 

@@ -8,13 +8,14 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 type Department = {
   id: string;
@@ -35,10 +36,6 @@ export default function DepartmentsScreen() {
   const [queueCapacity, setQueueCapacity] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    void fetchDepartments();
-  }, []);
-
   const fetchDepartments = async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
       setRefreshing(true);
@@ -57,6 +54,8 @@ export default function DepartmentsScreen() {
       setRefreshing(false);
     }
   };
+
+  useRefreshOnFocus(() => fetchDepartments());
 
   const resetForm = () => {
     setName('');

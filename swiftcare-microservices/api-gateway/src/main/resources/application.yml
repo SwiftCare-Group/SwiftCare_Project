@@ -6,48 +6,57 @@ spring:
     gateway:
       server:
         webflux:
+          httpclient:
+            # Render free services may need time to wake before responding.
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:60000}
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:240s}
+
           routes:
-            - id: identity-auth
+            # Authentication, patient profile and health profile.
+            - id: identity-service
               uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
               predicates:
-                - Path=/api/v1/auth/**,/api/v1/patients/**,/api/v1/profile/**
+                - Path=/api/v1/auth,/api/v1/auth/**,/api/v1/patients,/api/v1/patients/**,/api/v1/profile,/api/v1/profile/**
 
-            - id: clinical-admin-doctors
+            # Admin staff management belongs to the clinical service.
+            - id: clinical-admin
               uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
               predicates:
-                - Path=/api/v1/admin/doctors,/api/v1/admin/staff
+                - Path=/api/v1/admin/doctors,/api/v1/admin/doctors/**,/api/v1/admin/staff,/api/v1/admin/staff/**
 
+            # Admin department statistics and configuration belong to appointments.
             - id: appointment-admin
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
               predicates:
-                - Path=/api/v1/admin/departments,/api/v1/admin/stats
+                - Path=/api/v1/admin/departments,/api/v1/admin/departments/**,/api/v1/admin/stats,/api/v1/admin/stats/**
 
-            - id: appointment
+            # Appointments, departments, slots and queue operations.
+            - id: appointment-service
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
               predicates:
-                - Path=/api/v1/appointments/**,/api/v1/departments/**,/api/v1/queue/**
+                - Path=/api/v1/appointments,/api/v1/appointments/**,/api/v1/departments,/api/v1/departments/**,/api/v1/queue,/api/v1/queue/**
 
-            - id: clinical
+            # Doctors, consultations, records, prescriptions, pharmacy and labs.
+            - id: clinical-service
               uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
               predicates:
-                - Path=/api/v1/consultations/**,/api/v1/doctors/**,/api/v1/clinical-records/**,/api/v1/prescriptions/**,/api/v1/lab-orders/**
+                - Path=/api/v1/consultations,/api/v1/consultations/**,/api/v1/doctors,/api/v1/doctors/**,/api/v1/clinical-records,/api/v1/clinical-records/**,/api/v1/prescriptions,/api/v1/prescriptions/**,/api/v1/lab-orders,/api/v1/lab-orders/**
 
-            - id: symptoms
+            - id: symptom-service
               uri: ${SYMPTOM_SERVICE_URL:http://localhost:8084}
               predicates:
-                - Path=/api/v1/symptoms/**
+                - Path=/api/v1/symptoms,/api/v1/symptoms/**
 
-            - id: subscriptions
+            - id: subscription-service
               uri: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8085}
               predicates:
-                - Path=/api/v1/subscriptions/**
+                - Path=/api/v1/subscriptions,/api/v1/subscriptions/**
 
-            # Patient-facing notification endpoints.
-            # Example: POST /api/v1/notifications/devices
-            - id: notifications
+            # Only patient-facing notification endpoints are exposed to mobile.
+            - id: notification-service
               uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
               predicates:
-                - Path=/api/v1/notifications/**
+                - Path=/api/v1/notifications,/api/v1/notifications/**
 
           globalcors:
             add-to-simple-url-handler-mapping: true
@@ -72,10 +81,15 @@ spring:
                 maxAge: 3600
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
+  address: 0.0.0.0
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true

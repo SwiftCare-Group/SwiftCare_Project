@@ -4,10 +4,10 @@ import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
-import api, { clearLocalSession } from '../services/api';
+import api, { clearLocalSession, wakeGateway } from '../services/api';
 import { registerForPushNotifications } from '../services/notifications';
 import {
   homeRouteForRole,
@@ -72,6 +72,23 @@ export default function RootLayout() {
     },
     [router],
   );
+
+  useEffect(() => {
+    void wakeGateway();
+
+    const appStateSubscription = AppState.addEventListener(
+      'change',
+      nextState => {
+        if (nextState === 'active') {
+          void wakeGateway();
+        }
+      },
+    );
+
+    return () => {
+      appStateSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const receivedSubscription =

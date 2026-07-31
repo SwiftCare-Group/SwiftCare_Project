@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ import api, { logoutSession } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => { fetchStats(); }, []);
+  useRefreshOnFocus(fetchStats);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

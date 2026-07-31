@@ -62,10 +62,7 @@ export default function StaffLoginScreen() {
         {
           email: cleanedEmail,
           password,
-        },
-        {
-          timeout: 15000,
-        },
+        }
       );
 
       const accessToken =

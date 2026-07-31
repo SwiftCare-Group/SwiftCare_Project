@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
 
 import { addNotification } from '../../services/notificationStorage';
 import api from '../../services/api';
@@ -109,7 +110,6 @@ export default function QueueScreen() {
           try {
             const queueResponse = await api.get(
               `/appointments/${appointment.id}/queue`,
-              { timeout: 10_000 }
             );
             statuses[appointment.id] = queueResponse.data;
           } catch {
@@ -169,30 +169,33 @@ export default function QueueScreen() {
     }
   }, [saveLastNotifiedPositions]);
 
-  useEffect(() => {
-    let cancelled = false;
-    let intervalId: ReturnType<typeof setInterval> | undefined;
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      let intervalId: ReturnType<typeof setInterval> | undefined;
 
-    const initialise = async () => {
-      await loadLastNotifiedPositions();
-      if (cancelled) {
-        return;
-      }
-      await fetchData();
-      if (!cancelled) {
-        intervalId = setInterval(fetchData, QUEUE_REFRESH_INTERVAL_MS);
-      }
-    };
+      const initialise = async () => {
+        await loadLastNotifiedPositions();
+        if (cancelled) {
+          return;
+        }
 
-    void initialise();
+        await fetchData();
+        if (!cancelled) {
+          intervalId = setInterval(fetchData, QUEUE_REFRESH_INTERVAL_MS);
+        }
+      };
 
-    return () => {
-      cancelled = true;
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [fetchData, loadLastNotifiedPositions]);
+      void initialise();
+
+      return () => {
+        cancelled = true;
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
+    }, [fetchData, loadLastNotifiedPositions]),
+  );
 
   const onRefresh = useCallback(() => {
     lightTap();

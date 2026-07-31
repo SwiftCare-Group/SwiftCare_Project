@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,7 @@ import { Colors } from '../../constants/colors';
 import api, { logoutSession } from '../../services/api';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 type LabOrder = {
   id: string;
@@ -64,9 +65,7 @@ export default function LabDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    void fetchOrders();
-  }, [fetchOrders]);
+  useRefreshOnFocus(fetchOrders);
 
   const startOrder = async (order: LabOrder) => {
     setUpdatingId(order.id);

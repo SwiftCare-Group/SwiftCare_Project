@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../../utils/navigation';
 import {
   useCallback,
-  useEffect,
   useState,
 } from 'react';
 import {
@@ -186,12 +185,7 @@ export default function ConsultationScreen() {
       try {
         setLoading(true);
         setLoadFailed(false);
-        const response = await api.get(
-          `/queue/${id}`,
-          {
-            timeout: 15000,
-          }
-        );
+        const response = await api.get(`/queue/${id}`);
 
         setPatient(response.data);
       } catch (error: any) {
@@ -210,32 +204,29 @@ export default function ConsultationScreen() {
     []
   );
 
-  useEffect(() => {
-    if (!isValidRouteId(queueEntryId)) {
-      setLoading(false);
-      setLoadFailed(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isValidRouteId(queueEntryId)) {
+        setLoading(false);
+        setLoadFailed(true);
 
-      Alert.alert(
-        'Unable to open consultation',
-        'A valid queue entry ID was not provided.',
-        [
-          {
-            text: 'Go back',
-            onPress: () => goBackOrReplace(router, '/(doctor)/queue'),
-          },
-        ]
-      );
+        Alert.alert(
+          'Unable to open consultation',
+          'A valid queue entry ID was not provided.',
+          [
+            {
+              text: 'Go back',
+              onPress: () => goBackOrReplace(router, '/(doctor)/queue'),
+            },
+          ],
+        );
 
-      return;
-    }
+        return;
+      }
 
-    fetchPatientDetails(queueEntryId);
-  }, [
-    fetchPatientDetails,
-    queueEntryId,
-    routePatientId,
-    router,
-  ]);
+      void fetchPatientDetails(queueEntryId);
+    }, [fetchPatientDetails, queueEntryId, router]),
+  );
 
   const completeConsultation = async () => {
     if (completing) {
@@ -311,9 +302,6 @@ export default function ConsultationScreen() {
           referralNotes: referralNotes.trim() || null,
           drugs,
           labOrders,
-        },
-        {
-          timeout: 30000,
         }
       );
 

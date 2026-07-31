@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 type AppointmentStatus =
   | 'PENDING'
@@ -130,9 +131,7 @@ export default function MedicalHistoryScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    void fetchMedicalHistory();
-  }, [fetchMedicalHistory]);
+  useRefreshOnFocus(fetchMedicalHistory);
 
   const filteredRecords = useMemo(() => {
     if (filter === 'ALL') {

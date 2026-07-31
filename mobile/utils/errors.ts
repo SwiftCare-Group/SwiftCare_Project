@@ -65,11 +65,11 @@ export function getApiErrorMessage(
   }
 
   if (error.code === 'ECONNABORTED') {
-    return 'The request took too long. Check your connection and try again.';
+    return 'The SwiftCare service is taking longer than usual to start. Wait a moment and try again.';
   }
 
   if (!error.response) {
-    return 'The server could not be reached. Check your internet connection and the SwiftCare server address.';
+    return 'The SwiftCare service could not be reached. Check your internet connection; the free server may still be starting.';
   }
 
   if (status === 400 || status === 422) {
@@ -94,6 +94,10 @@ export function getApiErrorMessage(
 
   if (status === 429) {
     return 'Too many requests were sent. Wait a moment and try again.';
+  }
+
+  if (status === 502 || status === 503 || status === 504) {
+    return 'The SwiftCare service is starting up. Wait a moment and try again.';
   }
 
   if (status && status >= 500) {

@@ -19,6 +19,7 @@ import api from '../../services/api';
 import { useHaptics } from '../../hooks/useHaptics';
 import { useTheme } from '../../context/ThemeContext';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 const { width } = Dimensions.get('window');
 
@@ -106,10 +107,10 @@ export default function AppointmentsScreen() {
     CANCELLED: colors.danger,
   };
 
-  useEffect(() => {
-    fetchAppointments();
-    fetchDepartments();
-  }, []);
+  useRefreshOnFocus(() => {
+    void fetchAppointments();
+    void fetchDepartments();
+  });
 
   useEffect(() => {
     const resolvedDepartment = Array.isArray(preSelectedDept)

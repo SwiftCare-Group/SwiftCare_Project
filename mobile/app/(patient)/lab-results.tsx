@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../utils/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 type LabResult = {
   result?: string;
@@ -61,9 +62,7 @@ export default function PatientLabResultsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadOrders();
-  }, [loadOrders]);
+  useRefreshOnFocus(loadOrders);
 
   const formatDate = (value?: string) => {
     if (!value) return 'Date unavailable';

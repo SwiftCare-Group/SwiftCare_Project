@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ import { WebView } from 'react-native-webview';
 import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 type ConsultationStatus =
   | 'SCHEDULED'
@@ -78,10 +79,6 @@ export default function DoctorConsultationScreen() {
     { id: createLocalId(), value: '' },
   ]);
 
-  useEffect(() => {
-    fetchConsultations();
-  }, []);
-
   const validDrugList = useMemo(
     () =>
       drugs
@@ -120,6 +117,8 @@ export default function DoctorConsultationScreen() {
       setRefreshing(false);
     }
   };
+
+  useRefreshOnFocus(() => fetchConsultations());
 
   const handleJoin = async (consultation: Consultation) => {
     if (submitting || joining) {
@@ -288,9 +287,6 @@ export default function DoctorConsultationScreen() {
           referralNotes: toNullableText(referralNotes),
           drugs: validDrugList,
           labOrders,
-        },
-        {
-          timeout: 30000,
         }
       );
 

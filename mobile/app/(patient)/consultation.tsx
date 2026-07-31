@@ -8,7 +8,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +17,7 @@ import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 
 const SCHEDULE_OPTIONS = [
@@ -41,7 +42,7 @@ export default function ConsultationScreen() {
   const [showSession, setShowSession] = useState(false);
   const { mediumTap, successNotification, errorNotification } = useHaptics();
 
-  useEffect(() => { fetchData(); }, []);
+  useRefreshOnFocus(() => fetchData());
 
   const fetchData = async () => {
     setLoadError(null);

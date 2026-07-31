@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/colors';
 import api from '../../services/api';
 import { getApiErrorMessage } from '../../utils/errors';
+import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
 
 type StaffRole = 'DOCTOR' | 'PHARMACIST' | 'LAB_TECHNICIAN';
 
@@ -114,9 +115,7 @@ export default function StaffScreen() {
     [loadDepartments, loadStaff],
   );
 
-  useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
+  useRefreshOnFocus(fetchData);
 
   const validationMessage = useMemo(() => {
     if (!name.trim()) return 'Enter the staff member’s full name.';
