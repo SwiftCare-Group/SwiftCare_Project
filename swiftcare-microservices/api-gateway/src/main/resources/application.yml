@@ -7,52 +7,98 @@ spring:
       server:
         webflux:
           httpclient:
-            # Render free services may need time to wake before responding.
             connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:60000}
             response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:240s}
 
+          # Retry safe read-only requests when a Render service is waking up.
+          default-filters:
+            - name: Retry
+              args:
+                retries: 4
+                statuses:
+                  - BAD_GATEWAY
+                  - SERVICE_UNAVAILABLE
+                  - GATEWAY_TIMEOUT
+                methods:
+                  - GET
+                  - HEAD
+                  - OPTIONS
+                backoff:
+                  firstBackoff: 15s
+                  maxBackoff: 40s
+                  factor: 2
+                  basedOnPreviousValue: false
+                timeout: 150s
+
           routes:
-            # Authentication, patient profile and health profile.
+            # Login and refresh route.
+            # This route is evaluated before the broader identity route.
+            - id: identity-session
+              order: -1
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/auth/login,/api/v1/auth/refresh
+              filters:
+                - name: Retry
+                  args:
+                    retries: 4
+                    statuses:
+                      - BAD_GATEWAY
+                      - SERVICE_UNAVAILABLE
+                      - GATEWAY_TIMEOUT
+                    methods:
+                      - POST
+                    backoff:
+                      firstBackoff: 15s
+                      maxBackoff: 40s
+                      factor: 2
+                      basedOnPreviousValue: false
+                    timeout: 150s
+
+            # Authentication and patient profile routes.
             - id: identity-service
+              order: 0
               uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/api/v1/auth,/api/v1/auth/**,/api/v1/patients,/api/v1/patients/**,/api/v1/profile,/api/v1/profile/**
 
-            # Admin staff management belongs to the clinical service.
+            # Admin staff and doctor management.
             - id: clinical-admin
               uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
               predicates:
                 - Path=/api/v1/admin/doctors,/api/v1/admin/doctors/**,/api/v1/admin/staff,/api/v1/admin/staff/**
 
-            # Admin department statistics and configuration belong to appointments.
+            # Admin department configuration and statistics.
             - id: appointment-admin
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
               predicates:
                 - Path=/api/v1/admin/departments,/api/v1/admin/departments/**,/api/v1/admin/stats,/api/v1/admin/stats/**
 
-            # Appointments, departments, slots and queue operations.
+            # Appointments, departments, slots and queue.
             - id: appointment-service
               uri: ${APPOINTMENT_SERVICE_URL:http://localhost:8082}
               predicates:
                 - Path=/api/v1/appointments,/api/v1/appointments/**,/api/v1/departments,/api/v1/departments/**,/api/v1/queue,/api/v1/queue/**
 
-            # Doctors, consultations, records, prescriptions, pharmacy and labs.
+            # Consultations, doctors, records, prescriptions and lab orders.
             - id: clinical-service
               uri: ${CLINICAL_SERVICE_URL:http://localhost:8083}
               predicates:
                 - Path=/api/v1/consultations,/api/v1/consultations/**,/api/v1/doctors,/api/v1/doctors/**,/api/v1/clinical-records,/api/v1/clinical-records/**,/api/v1/prescriptions,/api/v1/prescriptions/**,/api/v1/lab-orders,/api/v1/lab-orders/**
 
+            # Symptom checker.
             - id: symptom-service
               uri: ${SYMPTOM_SERVICE_URL:http://localhost:8084}
               predicates:
                 - Path=/api/v1/symptoms,/api/v1/symptoms/**
 
+            # Subscription and payment routes.
             - id: subscription-service
               uri: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8085}
               predicates:
                 - Path=/api/v1/subscriptions,/api/v1/subscriptions/**
 
-            # Only patient-facing notification endpoints are exposed to mobile.
+            # Push-notification routes.
             - id: notification-service
               uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
               predicates:
@@ -63,7 +109,7 @@ spring:
             cors-configurations:
               "[/**]":
                 allowedOriginPatterns:
-                  - ${CORS_ALLOWED_ORIGIN_PATTERN:http://localhost:[*]}
+                  - "${CORS_ALLOWED_ORIGIN_PATTERN:http://localhost:[*]}"
                 allowedMethods:
                   - GET
                   - POST
@@ -81,15 +127,22 @@ spring:
                 maxAge: 3600
 
 server:
-  port: ${PORT:${SERVER_PORT:8080}}
+  port: ${PORT:8080}
   address: 0.0.0.0
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include:
+          - health
+          - info
+          - gateway
+
   endpoint:
     health:
       probes:
         enabled: true
+
+    gateway:
+      access: read-only
