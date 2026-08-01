@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
@@ -15,7 +15,7 @@ import {
   normalizeRole,
   type SwiftCareRole,
 } from '../utils/auth';
-import { isAuthenticationError, isNetworkError } from '../utils/errors';
+import { isAuthenticationError } from '../utils/errors';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // The splash screen may already be controlled elsewhere.
@@ -43,6 +43,7 @@ const PATIENT_NOTIFICATION_ROUTES = new Set([
 export default function RootLayout() {
   const router = useRouter();
   const [appReady, setAppReady] = useState(false);
+  const startupRoleRef = useRef<SwiftCareRole | null>(null);
 
   const routeNotification = useCallback(
     async (data: NotificationData | undefined) => {
@@ -74,6 +75,7 @@ export default function RootLayout() {
   );
 
   useEffect(() => {
+    // Warming Render is useful, but it must never block app startup.
     void wakeGateway();
 
     const appStateSubscription = AppState.addEventListener(
@@ -110,6 +112,118 @@ export default function RootLayout() {
   }, [routeNotification]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const bootstrapFromLocalSession = async () => {
+      try {
+        const stored = await AsyncStorage.multiGet([
+          'accessToken',
+          'userRole',
+        ]);
+
+        const token = stored.find(([key]) => key === 'accessToken')?.[1];
+        const role = normalizeRole(
+          stored.find(([key]) => key === 'userRole')?.[1],
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (token && role) {
+          startupRoleRef.current = role;
+          router.replace(homeRouteForRole(role));
+
+          if (role === 'PATIENT') {
+            // Push setup is optional and must not delay navigation.
+            void registerForPushNotifications().catch(() => null);
+          }
+        } else {
+          if (token || role) {
+            await clearLocalSession().catch(() => undefined);
+          }
+
+          if (isMounted) {
+            router.replace('/(auth)/login');
+          }
+        }
+      } catch {
+        await clearLocalSession().catch(() => undefined);
+
+        if (isMounted) {
+          router.replace('/(auth)/login');
+        }
+      } finally {
+        if (isMounted) {
+          setAppReady(true);
+        }
+      }
+    };
+
+    void bootstrapFromLocalSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (!appReady) {
+      return;
+    }
+
+    // Hide the native splash as soon as local navigation is decided.
+    // Server validation runs separately and can never trap the user here.
+    const frame = requestAnimationFrame(() => {
+      SplashScreen.hideAsync().catch(() => {
+        // Ignore the error if the splash screen is already hidden.
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [appReady]);
+
+  useEffect(() => {
+    if (!appReady || !startupRoleRef.current) {
+      return;
+    }
+
+    let isMounted = true;
+    const role = startupRoleRef.current;
+    const endpoint = isStaffRole(role) ? '/doctors/me' : '/patients/me';
+
+    const validateSessionInBackground = async () => {
+      try {
+        const response = await api.get(endpoint);
+        const resolvedRole = normalizeRole(response.data?.role) ?? role;
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (resolvedRole !== role) {
+          startupRoleRef.current = resolvedRole;
+          await AsyncStorage.setItem('userRole', resolvedRole);
+          router.replace(homeRouteForRole(resolvedRole));
+        }
+      } catch (error) {
+        // Only a definite authentication failure should sign the user out.
+        // Render cold starts and temporary 5xx responses keep the local session.
+        if (isMounted && isAuthenticationError(error)) {
+          await clearLocalSession().catch(() => undefined);
+          router.replace('/(auth)/login');
+        }
+      }
+    };
+
+    void validateSessionInBackground();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appReady, router]);
+
+  useEffect(() => {
     if (!appReady) {
       return;
     }
@@ -132,133 +246,6 @@ export default function RootLayout() {
 
     void handleInitialNotification();
   }, [appReady, routeNotification]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const goToLogin = async () => {
-      await clearLocalSession().catch(() => undefined);
-      if (isMounted) {
-        router.replace('/(auth)/login');
-      }
-    };
-
-    const registerPatientNotifications = async () => {
-      await registerForPushNotifications().catch(() => null);
-    };
-
-    const persistAndRoute = async (role: SwiftCareRole) => {
-      await AsyncStorage.setItem('userRole', role);
-      if (!isMounted) {
-        return;
-      }
-
-      router.replace(homeRouteForRole(role));
-      if (role === 'PATIENT') {
-        void registerPatientNotifications();
-      }
-    };
-
-    const validateKnownRole = async (
-      role: SwiftCareRole,
-    ): Promise<boolean> => {
-      const endpoint = isStaffRole(role)
-        ? '/doctors/me'
-        : '/patients/me';
-
-      try {
-        const response = await api.get(endpoint);
-        const resolvedRole =
-          normalizeRole(response.data?.role) ?? role;
-        await persistAndRoute(resolvedRole);
-        return true;
-      } catch (error) {
-        if (isAuthenticationError(error)) {
-          return false;
-        }
-
-        // Keep a valid locally stored session usable during a temporary outage.
-        if (isNetworkError(error) || !isAuthenticationError(error)) {
-          await persistAndRoute(role);
-          return true;
-        }
-
-        return false;
-      }
-    };
-
-    const discoverRole = async (): Promise<SwiftCareRole | null> => {
-      try {
-        const patientResponse = await api.get('/patients/me');
-        return normalizeRole(patientResponse.data?.role) ?? 'PATIENT';
-      } catch (patientError) {
-        if (isNetworkError(patientError)) {
-          return null;
-        }
-      }
-
-      try {
-        const staffResponse = await api.get('/doctors/me');
-        return normalizeRole(staffResponse.data?.role);
-      } catch {
-        return null;
-      }
-    };
-
-    const checkAuthentication = async () => {
-      try {
-        const stored = await AsyncStorage.multiGet([
-          'accessToken',
-          'userRole',
-        ]);
-        const token = stored.find(([key]) => key === 'accessToken')?.[1];
-        const storedRole = normalizeRole(
-          stored.find(([key]) => key === 'userRole')?.[1],
-        );
-
-        if (!token) {
-          if (isMounted) {
-            router.replace('/(auth)/login');
-          }
-          return;
-        }
-
-        if (storedRole && (await validateKnownRole(storedRole))) {
-          return;
-        }
-
-        const discoveredRole = await discoverRole();
-        if (discoveredRole) {
-          await persistAndRoute(discoveredRole);
-          return;
-        }
-
-        await goToLogin();
-      } catch {
-        await goToLogin();
-      } finally {
-        if (isMounted) {
-          setAppReady(true);
-        }
-      }
-    };
-
-    void checkAuthentication();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    if (!appReady) {
-      return;
-    }
-
-    SplashScreen.hideAsync().catch(() => {
-      // Ignore the error if the splash screen is already hidden.
-    });
-  }, [appReady]);
 
   return (
     <ThemeProvider>

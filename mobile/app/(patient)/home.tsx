@@ -112,76 +112,64 @@ export default function HomeScreen() {
     setLoadError(null);
 
     try {
-      const [
-        patientResponse,
-        appointmentsResponse,
-        consultationsResponse,
-        departmentsResponse,
-      ] = await Promise.all([
-        api.get("/patients/me"),
-
-        api
-          .get("/appointments")
-          .catch(() => ({ data: [] })),
-
-        api
-          .get("/consultations")
-          .catch(() => ({ data: [] })),
-
-        api
-          .get("/departments")
-          .catch(() => ({ data: [] })),
-      ]);
-
+      // Load the signed-in patient first. This keeps the dashboard from
+      // waiting on every sleeping microservice before it can render.
+      const patientResponse = await api.get('/patients/me');
       const patientData = patientResponse.data as Patient;
 
-      const appointments = Array.isArray(
-        appointmentsResponse.data
-      )
-        ? (appointmentsResponse.data as Appointment[])
-        : [];
-
-      const consultations = Array.isArray(
-        consultationsResponse.data
-      )
-        ? (consultationsResponse.data as Consultation[])
-        : [];
-
-      const departmentList = Array.isArray(
-        departmentsResponse.data
-      )
-        ? (departmentsResponse.data as Department[])
-        : [];
-
       setPatient(patientData);
-      setAppointmentCount(appointments.length);
-      setDepartments(departmentList);
+      setLoading(false);
 
-      try {
-        const prescriptionResponse =
-          await api.get("/prescriptions/my");
+      const [
+        appointmentsResult,
+        consultationsResult,
+        departmentsResult,
+        prescriptionsResult,
+      ] = await Promise.allSettled([
+        api.get('/appointments'),
+        api.get('/consultations'),
+        api.get('/departments'),
+        api.get('/prescriptions/my'),
+      ]);
 
-        const prescriptions = Array.isArray(
-          prescriptionResponse.data
-        )
-          ? prescriptionResponse.data
+      const appointments =
+        appointmentsResult.status === 'fulfilled' &&
+        Array.isArray(appointmentsResult.value.data)
+          ? (appointmentsResult.value.data as Appointment[])
           : [];
 
-        setPrescriptionCount(prescriptions.length);
-      } catch {
-        setPrescriptionCount(0);
-      }
+      const consultations =
+        consultationsResult.status === 'fulfilled' &&
+        Array.isArray(consultationsResult.value.data)
+          ? (consultationsResult.value.data as Consultation[])
+          : [];
+
+      const departmentList =
+        departmentsResult.status === 'fulfilled' &&
+        Array.isArray(departmentsResult.value.data)
+          ? (departmentsResult.value.data as Department[])
+          : [];
+
+      const prescriptions =
+        prescriptionsResult.status === 'fulfilled' &&
+        Array.isArray(prescriptionsResult.value.data)
+          ? prescriptionsResult.value.data
+          : [];
+
+      setAppointmentCount(appointments.length);
+      setPrescriptionCount(prescriptions.length);
+      setDepartments(departmentList);
 
       const pendingAppointment = appointments.find(
         appointment =>
-          appointment.status === "PENDING" ||
-          appointment.status === "CONFIRMED"
+          appointment.status === 'PENDING' ||
+          appointment.status === 'CONFIRMED',
       );
 
       if (pendingAppointment?.id) {
         try {
           const queueResponse = await api.get(
-            `/appointments/${pendingAppointment.id}/queue`
+            `/appointments/${pendingAppointment.id}/queue`,
           );
 
           setQueueStatus({
@@ -189,7 +177,7 @@ export default function HomeScreen() {
             departmentName:
               pendingAppointment.departmentName ||
               queueResponse.data?.departmentName ||
-              "Hospital Department",
+              'Hospital Department',
           });
         } catch {
           setQueueStatus(null);
@@ -199,24 +187,23 @@ export default function HomeScreen() {
       }
 
       const upcoming = consultations.find(
-        consultation =>
-          consultation.status === "SCHEDULED"
+        consultation => consultation.status === 'SCHEDULED',
       );
 
       setUpcomingConsultation(upcoming ?? null);
     } catch (error: unknown) {
-      if (!patient) {
-        setLoadError(
-          getApiErrorMessage(error, {
-            fallback: 'Your dashboard could not be loaded.',
-          }),
-        );
-      }
+      setPatient(null);
+      setLoadError(
+        getApiErrorMessage(error, {
+          fallback: 'Your dashboard could not be loaded.',
+        }),
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
+
 
   useFocusEffect(
     useCallback(() => {

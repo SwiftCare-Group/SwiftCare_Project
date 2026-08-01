@@ -10,9 +10,9 @@ import { Platform } from 'react-native';
 const API_PATH = '/api/v1';
 const DEFAULT_TIMEOUT_MS = 240_000;
 const AUTH_TIMEOUT_MS = 240_000;
-const WAKE_TIMEOUT_MS = 240_000;
-const MAX_COLD_START_RETRIES = 2;
-const COLD_START_RETRY_DELAY_MS = 12_000;
+const WAKE_TIMEOUT_MS = 120_000;
+const MAX_MOBILE_COLD_START_RETRIES = 1;
+const MOBILE_COLD_START_RETRY_DELAY_MS = 15_000;
 const GATEWAY_WARM_TTL_MS = 10 * 60_000;
 
 const SESSION_STORAGE_KEYS = [
@@ -58,25 +58,21 @@ const getExpoHost = (): string | null => {
     return null;
   }
 
-  // Expo commonly returns a value such as 192.168.1.4:8081.
   return hostUri.split(':')[0] || null;
 };
 
 const resolveApiBaseUrl = (): string => {
   const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
-  // Production and shared-device testing must use the public API gateway.
   if (configuredUrl) {
     return withApiPath(configuredUrl);
   }
 
-  // Local Expo Go fallback for a gateway running on the same computer.
   const expoHost = getExpoHost();
   if (expoHost && expoHost !== 'localhost') {
     return `http://${expoHost}:8080${API_PATH}`;
   }
 
-  // Android emulators reach the host machine through 10.0.2.2.
   if (Platform.OS === 'android') {
     return `http://10.0.2.2:8080${API_PATH}`;
   }
@@ -87,8 +83,23 @@ const resolveApiBaseUrl = (): string => {
 const delay = (milliseconds: number): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, milliseconds));
 
-const isSafeToRetry = (method?: string): boolean =>
+const isSafeMethod = (method?: string): boolean =>
   ['get', 'head', 'options'].includes(String(method ?? '').toLowerCase());
+
+const isLoginOrRefreshRequest = (
+  config: RetryableRequestConfig,
+): boolean => {
+  const method = String(config.method ?? '').toLowerCase();
+  const url = String(config.url ?? '');
+
+  return (
+    method === 'post' &&
+    (url.includes('/auth/login') || url.includes('/auth/refresh'))
+  );
+};
+
+const canRetryColdStart = (config: RetryableRequestConfig): boolean =>
+  isSafeMethod(config.method) || isLoginOrRefreshRequest(config);
 
 const isPossibleColdStart = (error: AxiosError): boolean => {
   const status = error.response?.status;
@@ -143,18 +154,27 @@ let gatewayWakePromise: Promise<boolean> | null = null;
 let lastGatewayResponseAt = 0;
 
 export const wakeGateway = async (): Promise<boolean> => {
+  if (!IS_RENDER_GATEWAY) {
+    return true;
+  }
+
   if (gatewayWakePromise) {
     return gatewayWakePromise;
   }
 
-  const wakePromise = (async () => {
+  gatewayWakePromise = (async () => {
     try {
-      // Any response proves that Render received the request and woke the gateway.
-      await gatewayClient.get('/actuator/health/liveness', {
-        validateStatus: () => true,
-      });
-      lastGatewayResponseAt = Date.now();
-      return true;
+      const response = await gatewayClient.get(
+        '/actuator/health/liveness',
+        { validateStatus: () => true },
+      );
+
+      const isReady = response.status >= 200 && response.status < 400;
+      if (isReady) {
+        lastGatewayResponseAt = Date.now();
+      }
+
+      return isReady;
     } catch (error) {
       if (__DEV__) {
         console.warn('[SwiftCare API] Gateway wake-up failed:', error);
@@ -165,8 +185,7 @@ export const wakeGateway = async (): Promise<boolean> => {
     }
   })();
 
-  gatewayWakePromise = wakePromise;
-  return wakePromise;
+  return gatewayWakePromise;
 };
 
 export const logoutSession = async (): Promise<void> => {
@@ -233,7 +252,9 @@ api.interceptors.request.use(
       IS_RENDER_GATEWAY &&
       Date.now() - lastGatewayResponseAt > GATEWAY_WARM_TTL_MS
     ) {
-      await wakeGateway();
+      // Do not await this call. The real feature request must still be sent
+      // immediately so it can wake Render by itself.
+      void wakeGateway();
     }
 
     const accessToken = await AsyncStorage.getItem('accessToken');
@@ -259,6 +280,8 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   response => {
+    lastGatewayResponseAt = Date.now();
+
     if (__DEV__) {
       console.log(
         `[SwiftCare API ←] ${response.status} ` +
@@ -282,16 +305,16 @@ api.interceptors.response.use(
 
     if (
       originalRequest &&
-      isSafeToRetry(originalRequest.method) &&
+      canRetryColdStart(originalRequest) &&
       isPossibleColdStart(error)
     ) {
       const retryCount = originalRequest._coldStartRetryCount ?? 0;
 
-      if (retryCount < MAX_COLD_START_RETRIES) {
+      if (retryCount < MAX_MOBILE_COLD_START_RETRIES) {
         originalRequest._coldStartRetryCount = retryCount + 1;
 
-        await wakeGateway();
-        await delay(COLD_START_RETRY_DELAY_MS * (retryCount + 1));
+        void wakeGateway();
+        await delay(MOBILE_COLD_START_RETRY_DELAY_MS);
 
         return api(originalRequest);
       }

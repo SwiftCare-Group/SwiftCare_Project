@@ -331,8 +331,9 @@ const handleLogout = async () => {
     styles.content,
     styles.scrollContent,
   ]}
->        {/* Account details */}
-        <View
+>
+  {/* Account details */}
+          <View
           style={[
             styles.card,
             {

@@ -9,10 +9,21 @@ type ErrorMessageOptions = {
   validation?: string;
 };
 
+const HTML_PATTERN = /<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]/i;
+
+const isUsableMessage = (value: string): boolean => {
+  const trimmed = value.trim();
+
+  return (
+    trimmed.length > 0 &&
+    trimmed.length <= 500 &&
+    !HTML_PATTERN.test(trimmed)
+  );
+};
+
 const collectMessages = (value: unknown): string[] => {
   if (typeof value === 'string') {
-    const message = value.trim();
-    return message ? [message] : [];
+    return isUsableMessage(value) ? [value.trim()] : [];
   }
 
   if (Array.isArray(value)) {
@@ -20,7 +31,9 @@ const collectMessages = (value: unknown): string[] => {
   }
 
   if (value && typeof value === 'object') {
-    return Object.values(value as Record<string, unknown>).flatMap(collectMessages);
+    return Object.values(value as Record<string, unknown>).flatMap(
+      collectMessages,
+    );
   }
 
   return [];
@@ -31,12 +44,34 @@ export function getApiErrorMessage(
   options: ErrorMessageOptions,
 ): string {
   if (!axios.isAxiosError(error)) {
-    return error instanceof Error && error.message.trim()
-      ? error.message
-      : options.fallback;
+    if (error instanceof Error && isUsableMessage(error.message)) {
+      return error.message.trim();
+    }
+
+    return options.fallback;
   }
 
   const status = error.response?.status;
+
+  // Handle infrastructure failures before reading the response body.
+  // Render often returns a full HTML page for 502/503 responses, and that
+  // must never be shown inside the mobile UI.
+  if (error.code === 'ECONNABORTED') {
+    return 'The SwiftCare service is taking longer than usual to start. Keep this screen open, then try again.';
+  }
+
+  if (!error.response) {
+    return 'The SwiftCare service could not be reached. Check your internet connection and try again.';
+  }
+
+  if (status === 502 || status === 503 || status === 504) {
+    return 'The SwiftCare service is waking up. Please wait about a minute, then tap Try Again.';
+  }
+
+  if (status && status >= 500) {
+    return 'The SwiftCare server encountered a temporary problem. Please try again shortly.';
+  }
+
   const data = error.response?.data as
     | Record<string, unknown>
     | string
@@ -64,14 +99,6 @@ export function getApiErrorMessage(
     return directMessages[0];
   }
 
-  if (error.code === 'ECONNABORTED') {
-    return 'The SwiftCare service is taking longer than usual to start. Wait a moment and try again.';
-  }
-
-  if (!error.response) {
-    return 'The SwiftCare service could not be reached. Check your internet connection; the free server may still be starting.';
-  }
-
   if (status === 400 || status === 422) {
     return options.validation ?? 'Please review the information and try again.';
   }
@@ -96,22 +123,28 @@ export function getApiErrorMessage(
     return 'Too many requests were sent. Wait a moment and try again.';
   }
 
-  if (status === 502 || status === 503 || status === 504) {
-    return 'The SwiftCare service is starting up. Wait a moment and try again.';
-  }
-
-  if (status && status >= 500) {
-    return 'The SwiftCare server encountered a problem. Please try again shortly.';
-  }
-
   return options.fallback;
 }
 
 export function isAuthenticationError(error: unknown): boolean {
-  return axios.isAxiosError(error) &&
-    (error.response?.status === 401 || error.response?.status === 403);
+  return (
+    axios.isAxiosError(error) &&
+    (error.response?.status === 401 || error.response?.status === 403)
+  );
 }
 
 export function isNetworkError(error: unknown): boolean {
-  return axios.isAxiosError(error) && !error.response;
+  if (!axios.isAxiosError(error)) {
+    return false;
+  }
+
+  const status = error.response?.status;
+
+  return (
+    !error.response ||
+    error.code === 'ECONNABORTED' ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
 }
