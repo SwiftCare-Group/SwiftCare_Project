@@ -68,11 +68,9 @@ spring:
 # SWIFTCARE APPLICATION SETTINGS
 # ==============================================================
 app:
-  # JwtUtil reads app.jwt.secret.
-  # This maps it to the JWT_SECRET variable already on Render.
   jwt:
     secret: ${JWT_SECRET}
-    expiration: ${JWT_EXPIRATION_MS:86400000}
+    expiry-ms: ${JWT_EXPIRY_MS:86400000}
 
   password-reset:
     expiry-minutes: ${PASSWORD_RESET_EXPIRY_MINUTES:15}
@@ -80,7 +78,6 @@ app:
 
   mail:
     from: ${MAIL_FROM:}
-
 # ==============================================================
 # INTERNAL SERVICE COMMUNICATION
 # ==============================================================
