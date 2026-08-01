@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -31,6 +32,7 @@ public class PatientController {
     }
 
     @PutMapping("/me")
+    @Transactional
     public ResponseEntity<Map<String, Object>> updateMe(
             @AuthenticationPrincipal String email,
             @Valid @RequestBody UpdatePatientRequest request
@@ -39,12 +41,13 @@ public class PatientController {
         patient.setName(request.getName().trim());
         patient.setPhone(request.getPhone().trim());
 
-        return ResponseEntity.ok(
-                toResponse(patientRepository.save(patient))
-        );
+        Patient savedPatient = patientRepository.save(patient);
+
+        return ResponseEntity.ok(toResponse(savedPatient));
     }
 
     @PutMapping("/me/password")
+    @Transactional
     public ResponseEntity<Map<String, String>> changePassword(
             @AuthenticationPrincipal String email,
             @Valid @RequestBody ChangePasswordRequest request
@@ -72,9 +75,10 @@ public class PatientController {
         patient.setPasswordHash(
                 passwordEncoder.encode(request.getNewPassword())
         );
+
         patientRepository.save(patient);
 
-        // Force every existing session to authenticate again.
+        // Invalidates all refresh tokens after a password change.
         refreshTokenRepository.deleteByPatientId(patient.getId());
 
         return ResponseEntity.ok(
