@@ -47,6 +47,11 @@ type QueuePatient = {
   status?: string;
   isEmergency?: boolean;
   premium?: boolean;
+  appointmentId?: string;
+  symptomAssessmentId?: string;
+  symptomSubmissionId?: string;
+  currentPosition?: number;
+  emergency?: boolean;
 };
 
 const LIVE_REFRESH_INTERVAL_MS = 15000;
@@ -252,6 +257,11 @@ export default function DoctorQueueScreen() {
     setProcessingPatientId,
   ] = useState<string | null>(null);
 
+  const [
+    viewingPatientId,
+    setViewingPatientId,
+  ] = useState<string | null>(null);
+
   const isMountedRef = useRef(true);
   const queueRequestInFlightRef = useRef(false);
   const processingPatientIdRef = useRef<string | null>(null);
@@ -292,10 +302,21 @@ export default function DoctorQueueScreen() {
           `/departments/${departmentId}/queue`
         );
 
-        const queueData: QueuePatient[] =
+        const rawQueueData: QueuePatient[] =
           Array.isArray(response.data)
             ? response.data
             : response.data?.queue ?? [];
+
+        const queueData = rawQueueData.map(patient => ({
+          ...patient,
+          queuePosition:
+            patient.queuePosition ??
+            patient.currentPosition,
+          isEmergency:
+            patient.isEmergency ??
+            patient.emergency ??
+            false,
+        }));
 
         const statusPriority: Record<string, number> = {
           IN_CONSULTATION: 0,
@@ -670,33 +691,99 @@ export default function DoctorQueueScreen() {
     );
   };
 
-  const handleViewPatient = (
+  const handleViewPatient = async (
     patient: QueuePatient
   ) => {
-    router.push({
-      pathname:
-        '/(doctor)/patient-details' as any,
-      params: {
-        patientId: String(patient.patientId ?? ''),
-        queueEntryId: String(patient.id ?? ''),
-        patientName: String(patient.patientName ?? ''),
-        phone: String(patient.patientNumber ?? ''),
-        age: String(patient.age ?? ''),
-        severityScore: String(
-          patient.severityScore ?? ''
-        ),
-        complaint: String(
-          patient.chiefComplaint ??
-            'No complaint information provided'
-        ),
-        appointmentTime: String(
-          patient.scheduledTime ?? ''
-        ),
-        queuePosition: String(
-          patient.queuePosition ?? ''
-        ),
-      },
-    });
+    if (!patient.id || viewingPatientId) {
+      return;
+    }
+
+    setViewingPatientId(patient.id);
+
+    try {
+      /*
+       * Load the detailed queue entry before navigation. The detailed
+       * response contains the symptom-assessment ID linked to the
+       * appointment without adding extra requests to every queue refresh.
+       */
+      const response = await api.get(
+        `/queue/${patient.id}`
+      );
+
+      const details: QueuePatient =
+        response.data ?? patient;
+
+      router.push({
+        pathname:
+          '/(doctor)/patient-details' as any,
+        params: {
+          patientId: String(
+            details.patientId ??
+              patient.patientId ??
+              ''
+          ),
+          queueEntryId: String(patient.id),
+          appointmentId: String(
+            details.appointmentId ??
+              patient.appointmentId ??
+              ''
+          ),
+          symptomAssessmentId: String(
+            details.symptomAssessmentId ??
+              details.symptomSubmissionId ??
+              patient.symptomAssessmentId ??
+              patient.symptomSubmissionId ??
+              ''
+          ),
+          patientName: String(
+            details.patientName ??
+              patient.patientName ??
+              ''
+          ),
+          phone: String(
+            details.patientNumber ??
+              patient.patientNumber ??
+              ''
+          ),
+          age: String(
+            details.age ??
+              patient.age ??
+              ''
+          ),
+          severityScore: String(
+            details.severityScore ??
+              patient.severityScore ??
+              ''
+          ),
+          complaint: String(
+            details.chiefComplaint ??
+              patient.chiefComplaint ??
+              'No complaint information provided'
+          ),
+          appointmentTime: String(
+            details.scheduledTime ??
+              patient.scheduledTime ??
+              ''
+          ),
+          queuePosition: String(
+            details.queuePosition ??
+              details.currentPosition ??
+              patient.queuePosition ??
+              ''
+          ),
+        },
+      });
+    } catch (error: any) {
+      Alert.alert(
+        'Unable to open patient',
+        getBackendErrorMessage(
+          error,
+          'The patient details could not be loaded.'
+        )
+      );
+    } finally {
+      setViewingPatientId(null);
+    }
   };
 
   const selectedDepartment = useMemo(
@@ -1575,24 +1662,36 @@ export default function DoctorQueueScreen() {
                       styles.viewPatientButton
                     }
                     onPress={() =>
-                      handleViewPatient(patient)
+                      void handleViewPatient(patient)
                     }
                     activeOpacity={0.8}
-                    disabled={isProcessing}
+                    disabled={
+                      isProcessing ||
+                      viewingPatientId === patient.id
+                    }
                   >
-                    <Ionicons
-                      name="person-outline"
-                      size={17}
-                      color={Colors.primary}
-                    />
+                    {viewingPatientId === patient.id ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors.primary}
+                      />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="person-outline"
+                          size={17}
+                          color={Colors.primary}
+                        />
 
-                    <Text
-                      style={
-                        styles.viewPatientButtonText
-                      }
-                    >
-                      View patient
-                    </Text>
+                        <Text
+                          style={
+                            styles.viewPatientButtonText
+                          }
+                        >
+                          View patient
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
 
                   {isWaiting ? (

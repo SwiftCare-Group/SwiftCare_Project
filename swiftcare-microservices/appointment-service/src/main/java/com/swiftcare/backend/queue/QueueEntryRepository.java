@@ -16,29 +16,8 @@ import java.util.UUID;
 public interface QueueEntryRepository
         extends JpaRepository<QueueEntry, UUID> {
 
-    @Query("""
-        SELECT q
-        FROM QueueEntry q
-        WHERE q.appointment.id = :appointmentId
-        """)
     Optional<QueueEntry> findByAppointmentId(
-            @Param("appointmentId") UUID appointmentId
-    );
-
-    List<QueueEntry>
-    findByDepartmentIdAndStatusOrderBySeverityScoreDescPremiumDescScheduledTimeAsc(
-            UUID departmentId,
-            QueueStatus status
-    );
-
-    List<QueueEntry>
-    findByDepartmentIdOrderBySeverityScoreDescPremiumDescScheduledTimeAsc(
-            UUID departmentId
-    );
-
-    List<QueueEntry>
-    findByStatusOrderByCurrentPositionAsc(
-            QueueStatus status
+            UUID appointmentId
     );
 
     List<QueueEntry>
@@ -47,18 +26,18 @@ public interface QueueEntryRepository
             List<QueueStatus> statuses
     );
 
-    boolean existsByDepartmentIdAndStatusIn(
-            UUID departmentId,
-            List<QueueStatus> statuses
-    );
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-        SELECT q
-        FROM QueueEntry q
-        WHERE q.departmentId = :departmentId
-          AND q.status IN :statuses
-        """)
+            SELECT entry
+            FROM QueueEntry entry
+            WHERE entry.departmentId = :departmentId
+              AND entry.status IN :statuses
+            ORDER BY
+                entry.severityScore DESC,
+                entry.premium DESC,
+                entry.scheduledTime ASC,
+                entry.createdAt ASC
+            """)
     List<QueueEntry> findAndLockDepartmentQueue(
             @Param("departmentId") UUID departmentId,
             @Param("statuses") List<QueueStatus> statuses

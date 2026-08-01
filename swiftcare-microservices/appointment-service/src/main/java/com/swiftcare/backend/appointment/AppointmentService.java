@@ -65,6 +65,7 @@ public class AppointmentService {
                 .toLocalDate()
                 .atStartOfDay();
         LocalDateTime dayEnd = dayStart.plusDays(1);
+
         long bookedForDay = appointmentRepository
                 .countByDepartmentIdAndScheduledTimeBetweenAndStatusIn(
                         department.getId(),
@@ -98,20 +99,23 @@ public class AppointmentService {
             );
         }
 
+        int severityScore = request.getSeverityScore();
+
         int queuePosition = calculateQueuePosition(
                 patient,
                 request.getDepartmentId(),
-                request.getSeverityScore()
+                severityScore
         );
 
-        boolean emergency = request.getSeverityScore() >= 4;
+        boolean emergency = severityScore >= 4;
         boolean premium = patient.getTier() == Tier.PREMIUM;
 
         Appointment appointment = Appointment.builder()
                 .patient(patient)
                 .department(department)
+                .symptomAssessmentId(request.getSymptomAssessmentId())
                 .scheduledTime(request.getScheduledTime())
-                .severityScore(request.getSeverityScore())
+                .severityScore(severityScore)
                 .queuePosition(queuePosition)
                 .isEmergency(emergency)
                 .status(AppointmentStatus.PENDING)
@@ -140,11 +144,9 @@ public class AppointmentService {
                 .departmentId(department.getId())
 
                 // Queue priority information
-                .severityScore(request.getSeverityScore())
+                .severityScore(severityScore)
                 .severityLabel(
-                        calculateSeverityLabel(
-                                request.getSeverityScore()
-                        )
+                        calculateSeverityLabel(severityScore)
                 )
                 .premium(premium)
                 .emergency(emergency)
@@ -191,7 +193,7 @@ public class AppointmentService {
         return mapToResponse(appointment);
     }
 
-@Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public QueueStatusResponse getQueueStatus(UUID appointmentId) {
         QueueEntry entry = queueEntryRepository
                 .findByAppointmentId(appointmentId)
@@ -296,6 +298,7 @@ public class AppointmentService {
             LocalDateTime scheduledTime
     ) {
         String operatingHours = department.getOperatingHours();
+
         if (operatingHours == null || operatingHours.isBlank()) {
             throw new IllegalStateException(
                     "Department operating hours are not configured"
@@ -335,10 +338,6 @@ public class AppointmentService {
             startingTime = LocalDateTime.now();
         }
 
-        /*
-         * When operating hours are unavailable or incorrectly formatted,
-         * use the appointment time instead of crashing the request.
-         */
         if (department.getOperatingHours() == null
                 || department.getOperatingHours().isBlank()) {
             return startingTime.plusMinutes(
@@ -443,6 +442,9 @@ public class AppointmentService {
                 .isEmergency(appointment.isEmergency())
                 .status(appointment.getStatus())
                 .createdAt(appointment.getCreatedAt())
+                .symptomAssessmentId(
+                        appointment.getSymptomAssessmentId()
+                )
                 .build();
     }
 
@@ -473,9 +475,17 @@ public class AppointmentService {
             );
         }
 
+        if (request.getSymptomAssessmentId() == null) {
+            throw new IllegalArgumentException(
+                    "Submit your symptoms before booking an appointment."
+            );
+        }
+
         Integer severityScore = request.getSeverityScore();
 
-        if (severityScore == null || severityScore < 1 || severityScore > 4) {
+        if (severityScore == null
+                || severityScore < 1
+                || severityScore > 4) {
             throw new IllegalArgumentException(
                     "Severity score must be between 1 and 4."
             );

@@ -22,20 +22,34 @@ public class SymptomSubmission {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "patient_id", nullable = false)
     private Patient patient;
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String symptoms;
 
-    @Column
+    /**
+     * Severity selected by the patient. This remains the primary score
+     * used for the appointment and queue.
+     */
+    @Column(nullable = false)
     private Integer severityScore;
 
-    @Column
+    @Column(nullable = false, length = 20)
     private String severityLabel;
 
-    @Column
+    /**
+     * Separate AI recommendation. AI must not silently overwrite the
+     * severity selected by the patient.
+     */
+    @Column(name = "ai_recommended_severity_score")
+    private Integer aiRecommendedSeverityScore;
+
+    @Column(name = "ai_status", length = 30)
+    private String aiStatus;
+
+    @Column(nullable = false)
     private Boolean isEmergency;
 
     @Column(columnDefinition = "TEXT")
@@ -44,12 +58,21 @@ public class SymptomSubmission {
     @Column(columnDefinition = "TEXT")
     private String aiRawResponse;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.isEmergency = false;
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+
+        /*
+         * Do not overwrite a true emergency value supplied by the service.
+         * The previous implementation always reset it to false.
+         */
+        if (isEmergency == null) {
+            isEmergency = false;
+        }
     }
 }

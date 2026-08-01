@@ -14,6 +14,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AppointmentResponse {
+
     private UUID id;
     private UUID patientId;
     private UUID departmentId;
@@ -24,4 +25,16 @@ public class AppointmentResponse {
     private boolean isEmergency;
     private AppointmentStatus status;
     private LocalDateTime createdAt;
+
+    /*
+     * Symptom fields are included so patient and doctor appointment views
+     * can show the submitted assessment without making a second request.
+     */
+    private UUID symptomAssessmentId;
+    private String symptoms;
+    private String symptomSeverityLabel;
+    private Integer aiRecommendedSeverityScore;
+    private String aiStatus;
+    private String firstAidContent;
+    private LocalDateTime symptomSubmittedAt;
 }

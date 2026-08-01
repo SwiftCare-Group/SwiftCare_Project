@@ -45,6 +45,7 @@ export default function RootLayout() {
   const [appReady, setAppReady] = useState(false);
   const startupRoleRef = useRef<SwiftCareRole | null>(null);
 
+  
   const routeNotification = useCallback(
     async (data: NotificationData | undefined) => {
       if (!data) {

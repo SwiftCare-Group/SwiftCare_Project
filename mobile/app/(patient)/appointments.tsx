@@ -54,6 +54,57 @@ type Appointment = {
   severityScore?: number;
 };
 
+type SavedSymptomAssessment = {
+  assessmentId?: string;
+  symptoms: string;
+  severityScore: number;
+  severityLabel?: string;
+  submittedAt?: string;
+};
+
+type AppointmentBookingDraft = {
+  selectedDept?: string;
+  selectedDate?: string;
+  selectedTime?: string;
+  activeTab?: 'hospital' | 'online';
+};
+
+const LAST_SYMPTOM_ASSESSMENT_KEY = 'lastSymptomAssessment';
+const APPOINTMENT_BOOKING_DRAFT_KEY = 'appointmentBookingDraft';
+
+const normalizeSeverityScore = (value: unknown): number | null => {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  const rounded = Math.round(parsed);
+
+  if (rounded >= 1 && rounded <= 4) {
+    return rounded;
+  }
+
+  // Keep compatibility with assessments saved by the older 1–10 UI.
+  if (rounded >= 1 && rounded <= 10) {
+    if (rounded <= 2) {
+      return 1;
+    }
+
+    if (rounded <= 5) {
+      return 2;
+    }
+
+    if (rounded <= 8) {
+      return 3;
+    }
+
+    return 4;
+  }
+
+  return null;
+};
+
 export default function AppointmentsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -61,9 +112,10 @@ export default function AppointmentsScreen() {
   const { mediumTap, successNotification, errorNotification } =
     useHaptics();
 
-  const { preSelectedDept } =
+  const { preSelectedDept, resumeBooking } =
     useLocalSearchParams<{
       preSelectedDept?: string;
+      resumeBooking?: string;
     }>();
 
   const [appointments, setAppointments] = useState<
@@ -97,6 +149,107 @@ export default function AppointmentsScreen() {
   const [activeTab, setActiveTab] =
     useState<'hospital' | 'online'>('hospital');
 
+  const [symptomAssessment, setSymptomAssessment] =
+    useState<SavedSymptomAssessment | null>(null);
+
+  const loadSavedSymptomAssessment = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(
+        LAST_SYMPTOM_ASSESSMENT_KEY
+      );
+
+      if (!saved) {
+        setSymptomAssessment(null);
+        return;
+      }
+
+      const parsed = JSON.parse(saved) as Partial<SavedSymptomAssessment>;
+      const severityScore = normalizeSeverityScore(parsed.severityScore);
+
+      if (
+        !severityScore ||
+        typeof parsed.symptoms !== 'string' ||
+        !parsed.symptoms.trim()
+      ) {
+        setSymptomAssessment(null);
+        return;
+      }
+
+      setSymptomAssessment({
+        assessmentId:
+          typeof parsed.assessmentId === 'string'
+            ? parsed.assessmentId
+            : undefined,
+        symptoms: parsed.symptoms,
+        severityScore,
+        severityLabel:
+          typeof parsed.severityLabel === 'string'
+            ? parsed.severityLabel
+            : undefined,
+        submittedAt:
+          typeof parsed.submittedAt === 'string'
+            ? parsed.submittedAt
+            : undefined,
+      });
+    } catch {
+      setSymptomAssessment(null);
+    }
+  };
+
+  const saveBookingDraft = async () => {
+    const draft: AppointmentBookingDraft = {
+      selectedDept: selectedDept ?? undefined,
+      selectedDate: selectedDate.toISOString(),
+      selectedTime: selectedTime || undefined,
+      activeTab,
+    };
+
+    await AsyncStorage.setItem(
+      APPOINTMENT_BOOKING_DRAFT_KEY,
+      JSON.stringify(draft)
+    );
+  };
+
+  const restoreBookingDraft = async () => {
+    try {
+      const savedDraft = await AsyncStorage.getItem(
+        APPOINTMENT_BOOKING_DRAFT_KEY
+      );
+
+      if (!savedDraft) {
+        return;
+      }
+
+      const draft = JSON.parse(
+        savedDraft
+      ) as AppointmentBookingDraft;
+
+      if (draft.selectedDept) {
+        setSelectedDept(draft.selectedDept);
+      }
+
+      if (draft.selectedDate) {
+        const restoredDate = new Date(draft.selectedDate);
+
+        if (!Number.isNaN(restoredDate.getTime())) {
+          setSelectedDate(restoredDate);
+        }
+      }
+
+      if (draft.selectedTime) {
+        setSelectedTime(draft.selectedTime);
+      }
+
+      if (draft.activeTab) {
+        setActiveTab(draft.activeTab);
+      }
+    } catch {
+      await AsyncStorage.removeItem(
+        APPOINTMENT_BOOKING_DRAFT_KEY
+      );
+    }
+  };
+
   const statusColors: Record<
     AppointmentStatus,
     string
@@ -110,6 +263,7 @@ export default function AppointmentsScreen() {
   useRefreshOnFocus(() => {
     void fetchAppointments();
     void fetchDepartments();
+    void loadSavedSymptomAssessment();
   });
 
   useEffect(() => {
@@ -121,6 +275,20 @@ export default function AppointmentsScreen() {
       setShowBooking(true);
     }
   }, [preSelectedDept]);
+
+  useEffect(() => {
+    const resolvedResumeBooking = Array.isArray(resumeBooking)
+      ? resumeBooking[0]
+      : resumeBooking;
+
+    if (resolvedResumeBooking !== '1') {
+      return;
+    }
+
+    setShowBooking(true);
+    void loadSavedSymptomAssessment();
+    void restoreBookingDraft();
+  }, [resumeBooking]);
 
   useEffect(() => {
     if (!selectedDept) {
@@ -247,6 +415,21 @@ export default function AppointmentsScreen() {
     setSelectedTime(time);
   };
 
+  const handleOpenSymptoms = async () => {
+    mediumTap();
+
+    try {
+      await saveBookingDraft();
+    } catch {
+      // The symptom screen still works even if the draft cannot be cached.
+    }
+
+    router.push({
+      pathname: '/(patient)/symptoms',
+      params: { fromAppointment: '1' },
+    });
+  };
+
   const handleBook = async () => {
     if (booking) {
       return;
@@ -280,6 +463,22 @@ export default function AppointmentsScreen() {
       return;
     }
 
+    if (!symptomAssessment) {
+      errorNotification();
+      Alert.alert(
+        'Symptoms Required',
+        'Submit your symptoms and choose a severity score before confirming the appointment.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Submit Symptoms',
+            onPress: () => void handleOpenSymptoms(),
+          },
+        ]
+      );
+      return;
+    }
+
     setBooking(true);
 
     try {
@@ -306,43 +505,43 @@ export default function AppointmentsScreen() {
         return;
       }
 
-      const savedScore =
-        await AsyncStorage.getItem(
-          'lastSeverityScore'
+      const severityScore = normalizeSeverityScore(
+        symptomAssessment.severityScore
+      );
+
+      if (!severityScore) {
+        throw new Error(
+          'The submitted symptom assessment has an invalid severity score.'
         );
+      }
 
-const parsedSeverity = savedScore
-  ? Number.parseInt(savedScore, 10)
-  : 5;
+      const selectedSlot = availableSlots.find(
+        slot =>
+          slot.startsWith(dateKey(selectedDate)) &&
+          slot.slice(11, 16) === selectedTime
+      );
 
-const rawSeverity = Number.isNaN(parsedSeverity)
-  ? 5
-  : parsedSeverity;
+      if (!selectedSlot) {
+        throw new Error(
+          'The selected appointment time is no longer available.'
+        );
+      }
 
-// Convert the app's 1–10 score to the backend's 1–4 scale.
-const severityScore =
-  rawSeverity <= 2
-    ? 1
-    : rawSeverity <= 5
-      ? 2
-      : rawSeverity <= 8
-        ? 3
-        : 4;
-const selectedSlot = availableSlots.find(
-  slot =>
-    slot.startsWith(dateKey(selectedDate)) &&
-    slot.slice(11, 16) === selectedTime
-);
+      const payload: {
+        departmentId: string;
+        scheduledTime: string;
+        severityScore: number;
+        symptomAssessmentId?: string;
+      } = {
+        departmentId: selectedDept,
+        scheduledTime: selectedSlot,
+        severityScore,
+      };
 
-if (!selectedSlot) {
-  throw new Error('The selected appointment time is no longer available.');
-}
-
-const payload = {
-  departmentId: selectedDept,
-  scheduledTime: selectedSlot,
-  severityScore,
-};
+      if (symptomAssessment.assessmentId) {
+        payload.symptomAssessmentId =
+          symptomAssessment.assessmentId;
+      }
 
 
 await api.post('/appointments', payload);
@@ -383,6 +582,11 @@ await addNotification({
       setSelectedDate(new Date());
       setSelectedTime('');
       setAvailableSlots([]);
+      setSymptomAssessment(null);
+      await AsyncStorage.multiRemove([
+        LAST_SYMPTOM_ASSESSMENT_KEY,
+        APPOINTMENT_BOOKING_DRAFT_KEY,
+      ]);
 
       await fetchAppointments();
         } catch (error: any) {
@@ -1014,8 +1218,8 @@ await addNotification({
                   })}
                 </View>
 
-                {/* Symptom hint */}
-                <View
+                {/* Symptom assessment */}
+                <TouchableOpacity
                   style={[
                     styles.symptomHint,
                     {
@@ -1023,6 +1227,14 @@ await addNotification({
                         colors.primaryLight,
                     },
                   ]}
+                  activeOpacity={0.8}
+                  onPress={() => void handleOpenSymptoms()}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    symptomAssessment
+                      ? 'Review submitted symptoms'
+                      : 'Submit symptoms'
+                  }
                 >
                   <View
                     style={[
@@ -1034,7 +1246,11 @@ await addNotification({
                     ]}
                   >
                     <Ionicons
-                      name="pulse-outline"
+                      name={
+                        symptomAssessment
+                          ? 'checkmark-circle-outline'
+                          : 'pulse-outline'
+                      }
                       size={19}
                       color={colors.primary}
                     />
@@ -1050,7 +1266,9 @@ await addNotification({
                         },
                       ]}
                     >
-                      Symptom assessment
+                      {symptomAssessment
+                        ? 'Symptoms submitted'
+                        : 'Symptom assessment'}
                     </Text>
 
                     <Text
@@ -1062,11 +1280,18 @@ await addNotification({
                         },
                       ]}
                     >
-                      Submit your symptoms first for
-                      more accurate queue priority.
+                      {symptomAssessment
+                        ? `Severity ${symptomAssessment.severityScore}/4. Tap to review or update.`
+                        : 'Submit your symptoms and choose how severe they are before booking.'}
                     </Text>
                   </View>
-                </View>
+
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
               </>
             )}
 
@@ -1421,7 +1646,7 @@ await addNotification({
                       >
                         {appointment.severityScore ??
                           '—'}
-                        /10
+                        /4
                       </Text>
                     </View>
                   </View>
@@ -1950,4 +2175,4 @@ const styles = StyleSheet.create({
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 14 },
   errorBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
   retryText: { fontSize: 13, fontWeight: '700' },
-});
+})

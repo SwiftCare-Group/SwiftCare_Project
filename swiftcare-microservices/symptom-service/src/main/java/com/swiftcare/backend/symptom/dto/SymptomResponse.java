@@ -13,11 +13,23 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SymptomResponse {
+
     private UUID id;
     private UUID patientId;
     private String symptoms;
+
+    /**
+     * Patient-selected severity, from 1 to 4.
+     */
     private Integer severityScore;
     private String severityLabel;
+
+    /**
+     * AI recommendation is returned separately for transparency.
+     */
+    private Integer aiRecommendedSeverityScore;
+    private String aiStatus;
+
     private Boolean isEmergency;
     private String firstAidContent;
     private LocalDateTime createdAt;

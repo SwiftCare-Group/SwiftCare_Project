@@ -24,13 +24,20 @@ public class Appointment {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "patient_id", nullable = false)
     private Patient patient;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
+
+    /*
+     * Store only the symptom assessment UUID in appointment-service.
+     * Do not import the SymptomSubmission entity from symptom-service.
+     */
+    @Column(name = "symptom_submission_id", unique = true)
+    private UUID symptomAssessmentId;
 
     @Column(nullable = false)
     private LocalDateTime scheduledTime;
@@ -48,12 +55,17 @@ public class Appointment {
     @Column(nullable = false)
     private AppointmentStatus status;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.status = AppointmentStatus.PENDING;
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+
+        if (status == null) {
+            status = AppointmentStatus.PENDING;
+        }
     }
 }

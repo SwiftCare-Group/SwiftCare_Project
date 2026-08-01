@@ -36,12 +36,47 @@ const SAMPLE_SYMPTOMS = [
   'Dizziness and nausea',
 ];
 
+const SEVERITY_OPTIONS = [
+  {
+    score: 1,
+    label: 'MILD',
+    title: 'Mild',
+    description: 'Uncomfortable, but normal activities are still possible.',
+    icon: 'checkmark-circle-outline',
+  },
+  {
+    score: 2,
+    label: 'MODERATE',
+    title: 'Moderate',
+    description: 'Symptoms interfere with some normal activities.',
+    icon: 'alert-circle-outline',
+  },
+  {
+    score: 3,
+    label: 'SEVERE',
+    title: 'Severe',
+    description: 'Symptoms significantly affect daily activities.',
+    icon: 'warning-outline',
+  },
+  {
+    score: 4,
+    label: 'EMERGENCY',
+    title: 'Critical',
+    description: 'Extreme symptoms or possible emergency warning signs.',
+    icon: 'nuclear-outline',
+  },
+] as const;
+
+const LAST_SYMPTOM_ASSESSMENT_KEY = 'lastSymptomAssessment';
+
 export default function SymptomsScreen() {
   const router = useRouter();
   const [symptoms, setSymptoms] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [charCount, setCharCount] = useState(0);
+  const [selectedSeverity, setSelectedSeverity] =
+    useState<number | null>(null);
   const { mediumTap, successNotification, warningNotification } = useHaptics();
 
 
@@ -51,36 +86,114 @@ export default function SymptomsScreen() {
     }
 
     mediumTap();
-    if (!symptoms.trim()) {
-      Alert.alert('Error', 'Please describe your symptoms');
+
+    const trimmedSymptoms = symptoms.trim();
+
+    if (!trimmedSymptoms) {
+      Alert.alert('Symptoms Required', 'Please describe your symptoms.');
+      return;
+    }
+
+    if (!selectedSeverity) {
+      Alert.alert(
+        'Severity Required',
+        'Choose how severe your symptoms feel from 1 to 4.'
+      );
       return;
     }
 
     setLoading(true);
-    try {
-      const response = await api.post('/symptoms/submit', { symptoms: symptoms.trim() });
-      const severityScore = Number(response.data?.severityScore);
-      if (!Number.isFinite(severityScore) || severityScore < 1 || severityScore > 4) {
-        throw new Error('The symptom service returned an invalid severity score.');
-      }
-      setResult(response.data);
-      await AsyncStorage.setItem('lastSeverityScore', String(severityScore));
 
-      if (response.data.isEmergency) {
+    try {
+      const response = await api.post('/symptoms/submit', {
+        symptoms: trimmedSymptoms,
+        severityScore: selectedSeverity,
+      });
+
+      const returnedAiSeverity = Number(
+        response.data?.aiRecommendedSeverityScore
+      );
+
+      const aiRecommendedSeverityScore =
+        Number.isFinite(returnedAiSeverity) &&
+        returnedAiSeverity >= 1 &&
+        returnedAiSeverity <= 4
+          ? Math.round(returnedAiSeverity)
+          : undefined;
+
+      const selectedOption = SEVERITY_OPTIONS.find(
+        option => option.score === selectedSeverity
+      );
+
+      const assessmentId =
+        response.data?.assessmentId ??
+        response.data?.symptomAssessmentId ??
+        response.data?.id;
+
+      if (assessmentId == null || String(assessmentId).trim() === '') {
+        throw new Error(
+          'The symptom assessment was saved without an assessment ID.'
+        );
+      }
+
+      const isEmergency =
+        Boolean(response.data?.isEmergency) ||
+        selectedSeverity === 4;
+
+      const submittedAssessment = {
+        ...response.data,
+        assessmentId:
+          typeof assessmentId === 'string'
+            ? assessmentId
+            : assessmentId != null
+              ? String(assessmentId)
+              : undefined,
+        symptoms:
+          typeof response.data?.symptoms === 'string'
+            ? response.data.symptoms
+            : trimmedSymptoms,
+        severityScore: selectedSeverity,
+        patientSeverityScore: selectedSeverity,
+        severityLabel: selectedOption?.label ?? 'MILD',
+        aiRecommendedSeverityScore,
+        isEmergency,
+        submittedAt: new Date().toISOString(),
+      };
+
+      setResult(submittedAssessment);
+
+      await AsyncStorage.multiSet([
+        ['lastSeverityScore', String(selectedSeverity)],
+        [
+          LAST_SYMPTOM_ASSESSMENT_KEY,
+          JSON.stringify({
+            assessmentId: submittedAssessment.assessmentId,
+            symptoms: submittedAssessment.symptoms,
+            severityScore: selectedSeverity,
+            severityLabel: submittedAssessment.severityLabel,
+            submittedAt: submittedAssessment.submittedAt,
+            aiRecommendedSeverityScore,
+            aiStatus: response.data?.aiStatus,
+          }),
+        ],
+      ]);
+
+      if (isEmergency) {
         warningNotification();
         Alert.alert(
-          '🚨 EMERGENCY DETECTED',
-          'Your symptoms indicate a potential emergency. Please proceed to the hospital immediately or call emergency services.',
+          '🚨 EMERGENCY WARNING',
+          'You selected critical severity or the assessment detected a possible emergency. Please proceed to the hospital immediately or call emergency services.',
           [{ text: 'Understood', style: 'destructive' }]
         );
-      } else{
+      } else {
         successNotification();
       }
     } catch (error: unknown) {
       Alert.alert(
-        'Assessment unavailable',
+        'Submission Failed',
         getApiErrorMessage(error, {
-          fallback: 'Failed to submit your symptoms.',
+          fallback:
+            'Your symptoms could not be submitted. Please try again.',
         })
       );
     } finally {
@@ -95,7 +208,23 @@ export default function SymptomsScreen() {
     }
   };
 
-  const severityConfig = result ? SEVERITY_CONFIG[result.severityLabel] || SEVERITY_CONFIG.MILD : null;
+  const handleReturnToAppointment = () => {
+    mediumTap();
+
+    /*
+     * Always return to the appointment screen explicitly. Using router.back()
+     * inside a tab navigator can return to the Home tab instead of the screen
+     * that opened the symptom assessment.
+     */
+    router.replace({
+      pathname: '/(patient)/appointments',
+      params: { resumeBooking: '1' },
+    });
+  };
+
+  const severityConfig = result
+    ? SEVERITY_CONFIG[result.severityLabel] || SEVERITY_CONFIG.MILD
+    : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -137,6 +266,110 @@ export default function SymptomsScreen() {
                 <Text style={styles.charCount}>{charCount}/300</Text>
               </View>
 
+              <Text style={styles.severitySectionTitle}>
+                How severe are your symptoms?
+              </Text>
+              <Text style={styles.severitySectionSubtitle}>
+                Choose one score. This patient-selected score will be sent with your appointment.
+              </Text>
+
+              <View style={styles.severityOptions}>
+                {SEVERITY_OPTIONS.map(option => {
+                  const selected =
+                    selectedSeverity === option.score;
+                  const optionConfig =
+                    SEVERITY_CONFIG[option.label];
+
+                  return (
+                    <TouchableOpacity
+                      key={option.score}
+                      style={[
+                        styles.severityOption,
+                        {
+                          borderColor: selected
+                            ? optionConfig.color
+                            : Colors.border,
+                          backgroundColor: selected
+                            ? optionConfig.bg
+                            : Colors.surface,
+                        },
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        mediumTap();
+                        setSelectedSeverity(option.score);
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                    >
+                      <View
+                        style={[
+                          styles.severityNumber,
+                          {
+                            backgroundColor: selected
+                              ? optionConfig.color
+                              : Colors.surfaceSecondary,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.severityNumberText,
+                            {
+                              color: selected
+                                ? Colors.white
+                                : Colors.textPrimary,
+                            },
+                          ]}
+                        >
+                          {option.score}
+                        </Text>
+                      </View>
+
+                      <View style={styles.severityOptionContent}>
+                        <View style={styles.severityOptionTitleRow}>
+                          <Ionicons
+                            name={option.icon as any}
+                            size={18}
+                            color={optionConfig.color}
+                          />
+                          <Text
+                            style={[
+                              styles.severityOptionTitle,
+                              {
+                                color: selected
+                                  ? optionConfig.color
+                                  : Colors.textPrimary,
+                              },
+                            ]}
+                          >
+                            {option.title}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.severityOptionDescription}>
+                          {option.description}
+                        </Text>
+                      </View>
+
+                      <Ionicons
+                        name={
+                          selected
+                            ? 'radio-button-on'
+                            : 'radio-button-off'
+                        }
+                        size={20}
+                        color={
+                          selected
+                            ? optionConfig.color
+                            : Colors.textDisabled
+                        }
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               {/* Sample Symptoms */}
               <Text style={styles.samplesTitle}>Quick Select</Text>
               <View style={styles.samplesGrid}>
@@ -161,7 +394,7 @@ export default function SymptomsScreen() {
                 ) : (
                   <>
                     <Ionicons name="pulse-outline" size={20} color={Colors.white} />
-                    <Text style={styles.submitButtonText}>Assess Symptoms</Text>
+                    <Text style={styles.submitButtonText}>Submit Symptoms</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -184,7 +417,7 @@ export default function SymptomsScreen() {
                     color={severityConfig?.color}
                   />
                   <View style={styles.severityInfo}>
-                    <Text style={styles.severityTitle}>Severity Assessment</Text>
+                    <Text style={styles.severityTitle}>Patient-selected severity</Text>
                     <Text style={[styles.severityLabel, { color: severityConfig?.color }]}>
                       {result.severityLabel}
                     </Text>
@@ -229,7 +462,7 @@ export default function SymptomsScreen() {
               {/* Actions */}
               <TouchableOpacity
                 style={styles.bookButton}
-                onPress={() => router.push('/(patient)/appointments')}
+                onPress={handleReturnToAppointment}
               >
                 <LinearGradient
                   colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
@@ -238,13 +471,18 @@ export default function SymptomsScreen() {
                   end={{ x: 1, y: 0 }}
                 >
                   <Ionicons name="calendar-outline" size={18} color={Colors.white} />
-                  <Text style={styles.bookButtonText}>Book Appointment</Text>
+                  <Text style={styles.bookButtonText}>Use for Appointment</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.retryButton}
-                onPress={() => { setResult(null); setSymptoms(''); setCharCount(0); }}
+                onPress={() => {
+                  setResult(null);
+                  setSymptoms('');
+                  setCharCount(0);
+                  setSelectedSeverity(null);
+                }}
               >
                 <Ionicons name="refresh-outline" size={16} color={Colors.textSecondary} />
                 <Text style={styles.retryButtonText}>Check Again</Text>
@@ -269,6 +507,60 @@ const styles = StyleSheet.create({
   inputCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20 },
   input: { fontSize: 15, color: Colors.textPrimary, minHeight: 140, textAlignVertical: 'top' },
   charCount: { fontSize: 12, color: Colors.textDisabled, textAlign: 'right', marginTop: 8 },
+  severitySectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 5,
+  },
+  severitySectionSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  severityOptions: {
+    gap: 10,
+    marginBottom: 22,
+  },
+  severityOption: {
+    minHeight: 82,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  severityNumber: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  severityNumberText: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  severityOptionContent: {
+    flex: 1,
+  },
+  severityOptionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+  },
+  severityOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  severityOptionDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.textSecondary,
+  },
   samplesTitle: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary, marginBottom: 10 },
   samplesGrid: { gap: 8, marginBottom: 24 },
   sampleChip: { backgroundColor: Colors.surface, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.border },

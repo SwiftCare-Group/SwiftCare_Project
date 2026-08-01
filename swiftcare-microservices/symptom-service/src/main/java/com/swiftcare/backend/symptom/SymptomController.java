@@ -90,6 +90,8 @@ public class SymptomController {
     private boolean hasRole(Authentication authentication, String role) {
         return authentication != null
                 && authentication.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
+                .anyMatch(authority ->
+                        authority.getAuthority().equals("ROLE_" + role)
+                );
     }
 }

@@ -6,6 +6,7 @@ import com.swiftcare.backend.queue.dto.QueueEntryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.UUID;
 public class QueueController {
 
     private final QueueService queueService;
+    private final QueueEntryRepository queueEntryRepository;
     private final PatientRepository patientRepository;
 
     @GetMapping("/departments/{departmentId}/queue")
@@ -28,14 +30,18 @@ public class QueueController {
     }
 
     @GetMapping("/queue/{queueEntryId}")
+    @Transactional(readOnly = true)
     public ResponseEntity<QueueEntryResponse> getQueueEntry(
             @PathVariable UUID queueEntryId,
             Authentication authentication
     ) {
-        QueueEntryResponse response = queueService.getQueueEntry(queueEntryId);
+        QueueEntryResponse response =
+                queueService.getQueueEntry(queueEntryId);
 
-        if (!hasRole(authentication, "DOCTOR") && !hasRole(authentication, "ADMIN")) {
+        if (!hasRole(authentication, "DOCTOR")
+                && !hasRole(authentication, "ADMIN")) {
             UUID patientId = resolvePatientId(authentication);
+
             if (!patientId.equals(response.getPatientId())) {
                 throw new SecurityException(
                         "You cannot access another patient's queue entry"
@@ -43,35 +49,66 @@ public class QueueController {
             }
         }
 
+        /*
+         * QueueService continues to provide its existing response.
+         * These linked appointment identifiers are added here so the
+         * doctor app can load the exact submitted symptom assessment.
+         */
+        QueueEntry queueEntry = queueEntryRepository
+                .findById(queueEntryId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Queue entry not found"
+                ));
+
+        if (queueEntry.getAppointment() != null) {
+            response.setAppointmentId(
+                    queueEntry.getAppointment().getId()
+            );
+            response.setSymptomAssessmentId(
+                    queueEntry.getAppointment()
+                            .getSymptomAssessmentId()
+            );
+        }
+
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/queue/{queueEntryId}/call")
-    public ResponseEntity<Void> callPatient(@PathVariable UUID queueEntryId) {
+    public ResponseEntity<Void> callPatient(
+            @PathVariable UUID queueEntryId
+    ) {
         queueService.callPatient(queueEntryId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/queue/{queueEntryId}/skip")
-    public ResponseEntity<Void> skipPatient(@PathVariable UUID queueEntryId) {
+    public ResponseEntity<Void> skipPatient(
+            @PathVariable UUID queueEntryId
+    ) {
         queueService.skipPatient(queueEntryId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/queue/{queueEntryId}/start")
-    public ResponseEntity<Void> startConsultation(@PathVariable UUID queueEntryId) {
+    public ResponseEntity<Void> startConsultation(
+            @PathVariable UUID queueEntryId
+    ) {
         queueService.startConsultation(queueEntryId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/queue/{queueEntryId}/complete")
-    public ResponseEntity<Void> completeConsultation(@PathVariable UUID queueEntryId) {
+    public ResponseEntity<Void> completeConsultation(
+            @PathVariable UUID queueEntryId
+    ) {
         queueService.completeConsultation(queueEntryId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/queue/{queueEntryId}/cancel")
-    public ResponseEntity<Void> cancelQueueEntry(@PathVariable UUID queueEntryId) {
+    public ResponseEntity<Void> cancelQueueEntry(
+            @PathVariable UUID queueEntryId
+    ) {
         queueService.cancelQueueEntry(queueEntryId);
         return ResponseEntity.noContent().build();
     }
@@ -86,16 +123,24 @@ public class QueueController {
         }
 
         return patientRepository
-                .findByEmailIgnoreCaseAndIsDeletedFalse(authentication.getName().trim())
+                .findByEmailIgnoreCaseAndIsDeletedFalse(
+                        authentication.getName().trim()
+                )
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Authenticated patient account was not found"
                 ))
                 .getId();
     }
 
-    private boolean hasRole(Authentication authentication, String role) {
+    private boolean hasRole(
+            Authentication authentication,
+            String role
+    ) {
         return authentication != null
                 && authentication.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
+                .anyMatch(authority ->
+                        authority.getAuthority()
+                                .equals("ROLE_" + role)
+                );
     }
 }

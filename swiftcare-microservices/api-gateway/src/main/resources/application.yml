@@ -56,7 +56,7 @@ spring:
             # ------------------------------------------------------------
             - id: identity-health
               order: -100
-              uri: ${IDENTITY_SERVICE_URL:https://swiftcare-identity-service.onrender.com}
+              uri: http://localhost:8081
               predicates:
                 - Path=/api/v1/system/identity-health
                 - Method=GET
