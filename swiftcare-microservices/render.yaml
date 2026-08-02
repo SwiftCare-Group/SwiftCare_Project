@@ -1,0 +1,363 @@
+# Exported and extended for SwiftCare
+version: "1"
+
+projects:
+  - name: My project
+    environments:
+      - name: Production
+        services:
+          # =========================================================
+          # 1. IDENTITY SERVICE — ALREADY DEPLOYED
+          # Keep this exact name because it matches the live service.
+          # =========================================================
+          - type: web
+            name: SwiftCare_Project
+            runtime: docker
+            repo: https://github.com/SwiftCare-Group/SwiftCare_Project
+            branch: swiftcare-render
+            plan: free
+            region: virginia
+            dockerContext: swiftcare-microservices
+            dockerfilePath: swiftcare-microservices/identity-service/Dockerfile
+            autoDeployTrigger: commit
+
+            envVars:
+              - key: DB_URL
+                sync: false
+
+              - key: DB_USERNAME
+                sync: false
+
+              - key: DB_PASSWORD
+                sync: false
+
+              - key: JWT_SECRET
+                sync: false
+
+              - key: INTERNAL_SERVICE_KEY
+                generateValue: true
+
+              - key: BOOTSTRAP_ADMIN_EMAIL
+                sync: false
+
+              - key: BOOTSTRAP_ADMIN_PASSWORD
+                sync: false
+
+              - key: BOOTSTRAP_ADMIN_NAME
+                sync: false
+
+              - key: MAIL_USERNAME
+                sync: false
+
+              - key: MAIL_PASSWORD
+                sync: false
+
+              - key: MAIL_FROM
+                sync: false
+
+          # =========================================================
+          # 2. APPOINTMENT AND QUEUE SERVICE — ALREADY DEPLOYED
+          #
+          # IMPORTANT:
+          # Change this name if your existing Render appointment
+          # service has a different name.
+          # =========================================================
+          - type: web
+            name: swiftcare-appointment-service
+            runtime: docker
+            repo: https://github.com/SwiftCare-Group/SwiftCare_Project
+            branch: swiftcare-render
+            plan: free
+            region: virginia
+            dockerContext: swiftcare-microservices
+            dockerfilePath: swiftcare-microservices/appointment-service/Dockerfile
+            autoDeployTrigger: commit
+
+            envVars:
+              - key: DB_URL
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_URL
+
+              - key: DB_USERNAME
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_USERNAME
+
+              - key: DB_PASSWORD
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_PASSWORD
+
+              - key: JWT_SECRET
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: JWT_SECRET
+
+              - key: INTERNAL_SERVICE_KEY
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: INTERNAL_SERVICE_KEY
+
+              - key: NOTIFICATION_SERVICE_URL
+                fromService:
+                  type: web
+                  name: swiftcare-notification-service
+                  envVarKey: RENDER_EXTERNAL_URL
+
+          # =========================================================
+          # 3. CLINICAL SERVICE
+          # Consultations, prescriptions, pharmacy and laboratory
+          # =========================================================
+          - type: web
+            name: swiftcare-clinical-service
+            runtime: docker
+            repo: https://github.com/SwiftCare-Group/SwiftCare_Project
+            branch: swiftcare-render
+            plan: free
+            region: virginia
+            dockerContext: swiftcare-microservices
+            dockerfilePath: swiftcare-microservices/clinical-service/Dockerfile
+            autoDeployTrigger: commit
+
+            envVars:
+              - key: DB_URL
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_URL
+
+              - key: DB_USERNAME
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_USERNAME
+
+              - key: DB_PASSWORD
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_PASSWORD
+
+              - key: JWT_SECRET
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: JWT_SECRET
+
+              - key: INTERNAL_SERVICE_KEY
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: INTERNAL_SERVICE_KEY
+
+              - key: NOTIFICATION_SERVICE_URL
+                fromService:
+                  type: web
+                  name: swiftcare-notification-service
+                  envVarKey: RENDER_EXTERNAL_URL
+
+          # =========================================================
+          # 4. SYMPTOM ASSESSMENT SERVICE
+          # =========================================================
+          - type: web
+            name: swiftcare-symptom-service
+            runtime: docker
+            repo: https://github.com/SwiftCare-Group/SwiftCare_Project
+            branch: swiftcare-render
+            plan: free
+            region: virginia
+            dockerContext: swiftcare-microservices
+            dockerfilePath: swiftcare-microservices/symptom-service/Dockerfile
+            autoDeployTrigger: commit
+
+            envVars:
+              - key: DB_URL
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_URL
+
+              - key: DB_USERNAME
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_USERNAME
+
+              - key: DB_PASSWORD
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_PASSWORD
+
+              - key: JWT_SECRET
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: JWT_SECRET
+
+              - key: AI_API_KEY
+                sync: false
+
+          # =========================================================
+          # 5. NOTIFICATION SERVICE
+          # Push notifications and internal notification delivery
+          # =========================================================
+          - type: web
+            name: swiftcare-notification-service
+            runtime: docker
+            repo: https://github.com/SwiftCare-Group/SwiftCare_Project
+            branch: swiftcare-render
+            plan: free
+            region: virginia
+            dockerContext: swiftcare-microservices
+            dockerfilePath: swiftcare-microservices/notification-service/Dockerfile
+            autoDeployTrigger: commit
+
+            envVars:
+              - key: DB_URL
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_URL
+
+              - key: DB_USERNAME
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_USERNAME
+
+              - key: DB_PASSWORD
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_PASSWORD
+
+              - key: JWT_SECRET
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: JWT_SECRET
+
+              - key: INTERNAL_SERVICE_KEY
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: INTERNAL_SERVICE_KEY
+
+          # =========================================================
+          # 6. SUBSCRIPTION AND PAYSTACK SERVICE
+          # =========================================================
+          - type: web
+            name: swiftcare-subscription-service
+            runtime: docker
+            repo: https://github.com/SwiftCare-Group/SwiftCare_Project
+            branch: swiftcare-render
+            plan: free
+            region: virginia
+            dockerContext: swiftcare-microservices
+            dockerfilePath: swiftcare-microservices/subscription-service/Dockerfile
+            autoDeployTrigger: commit
+
+            envVars:
+              - key: DB_URL
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_URL
+
+              - key: DB_USERNAME
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_USERNAME
+
+              - key: DB_PASSWORD
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: DB_PASSWORD
+
+              - key: JWT_SECRET
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: JWT_SECRET
+
+              - key: INTERNAL_SERVICE_KEY
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: INTERNAL_SERVICE_KEY
+
+              - key: PAYSTACK_SECRET_KEY
+                sync: false
+
+          # =========================================================
+          # 7. API GATEWAY
+          # Deploys all public mobile API routes
+          # =========================================================
+          - type: web
+            name: swiftcare-api-gateway
+            runtime: docker
+            repo: https://github.com/SwiftCare-Group/SwiftCare_Project
+            branch: swiftcare-render
+            plan: free
+            region: virginia
+            dockerContext: swiftcare-microservices
+            dockerfilePath: swiftcare-microservices/api-gateway/Dockerfile
+            autoDeployTrigger: commit
+
+            envVars:
+              - key: JWT_SECRET
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: JWT_SECRET
+
+              - key: INTERNAL_SERVICE_KEY
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: INTERNAL_SERVICE_KEY
+
+              - key: IDENTITY_SERVICE_URL
+                fromService:
+                  type: web
+                  name: SwiftCare_Project
+                  envVarKey: RENDER_EXTERNAL_URL
+
+              - key: APPOINTMENT_SERVICE_URL
+                fromService:
+                  type: web
+                  name: swiftcare-appointment-service
+                  envVarKey: RENDER_EXTERNAL_URL
+
+              - key: CLINICAL_SERVICE_URL
+                fromService:
+                  type: web
+                  name: swiftcare-clinical-service
+                  envVarKey: RENDER_EXTERNAL_URL
+
+              - key: SYMPTOM_SERVICE_URL
+                fromService:
+                  type: web
+                  name: swiftcare-symptom-service
+                  envVarKey: RENDER_EXTERNAL_URL
+
+              - key: NOTIFICATION_SERVICE_URL
+                fromService:
+                  type: web
+                  name: swiftcare-notification-service
+                  envVarKey: RENDER_EXTERNAL_URL
+
+              - key: SUBSCRIPTION_SERVICE_URL
+                fromService:
+                  type: web
+                  name: swiftcare-subscription-service
+                  envVarKey: RENDER_EXTERNAL_URL

@@ -1,0 +1,148 @@
+spring:
+  application:
+    name: identity-service
+
+  # ============================================================
+  # DATABASE
+  # ============================================================
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+    hikari:
+      pool-name: IdentityServicePool
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:5}
+      minimum-idle: ${DB_MIN_IDLE:1}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
+      validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:5000}
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:600000}
+      max-lifetime: ${DB_MAX_LIFETIME_MS:1800000}
+      keepalive-time: ${DB_KEEPALIVE_TIME_MS:120000}
+
+  # ============================================================
+  # JPA / HIBERNATE
+  # ============================================================
+  jpa:
+    open-in-view: false
+    show-sql: false
+
+    hibernate:
+      ddl-auto: validate
+
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+
+  # The database-migration-runner owns Flyway migrations.
+  # Identity service should only validate the existing schema.
+  flyway:
+    enabled: false
+
+  # ============================================================
+  # EMAIL
+  # ============================================================
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    default-encoding: UTF-8
+
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: ${MAIL_CONNECTION_TIMEOUT_MS:10000}
+          timeout: ${MAIL_TIMEOUT_MS:10000}
+          writetimeout: ${MAIL_WRITE_TIMEOUT_MS:10000}
+
+# ==============================================================
+# SWIFTCARE APPLICATION SETTINGS
+# ==============================================================
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiry-ms: ${JWT_EXPIRY_MS:86400000}
+
+  bootstrap-admin:
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    name: ${BOOTSTRAP_ADMIN_NAME:SwiftCare Administrator}
+
+  password-reset:
+    expiry-minutes: ${PASSWORD_RESET_EXPIRY_MINUTES:15}
+    reset-url: ${PASSWORD_RESET_URL:swiftcare://reset-password}
+
+  mail:
+    from: ${MAIL_FROM:${MAIL_USERNAME:}}
+
+# ==============================================================
+# INTERNAL SERVICE COMMUNICATION
+# ==============================================================
+internal:
+  service-key: ${INTERNAL_SERVICE_KEY:}
+
+services:
+  notification:
+    url: ${NOTIFICATION_SERVICE_URL:https://swiftcare-notification-service.onrender.com}
+
+# ==============================================================
+# SERVER
+# ==============================================================
+server:
+  port: ${PORT:8081}
+  address: 0.0.0.0
+  servlet:
+    context-path: /api/v1
+
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring.lifecycle.timeout-per-shutdown-phase: 30s
+
+# ==============================================================
+# ACTUATOR / HEALTH CHECK
+# ==============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+  health:
+    livenessstate:
+      enabled: true
+
+    readinessstate:
+      enabled: true
+
+    # Prevent SMTP availability from marking the entire identity
+    # service as unhealthy.
+    mail:
+      enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
+
+# ==============================================================
+# LOGGING
+# ==============================================================
+logging:
+  level:
+    root: INFO
+    com.swiftcare.backend: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN

@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: subscription-service
+
+  config:
+    import: optional:classpath:application-secrets.yml
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/swiftcare}
+    username: ${DB_USERNAME:swiftcare}
+    password: ${DB_PASSWORD:swiftcare}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: false
+
+server:
+  port: ${SERVER_PORT:8085}
+  servlet:
+    context-path: /api/v1
+
+app:
+  jwt:
+    # Every JWT-validating SwiftCare service must receive the same JWT_SECRET.
+    secret: ${JWT_SECRET}
+    expiry-ms: ${JWT_EXPIRY_MS:86400000}
+
+paystack:
+  secret-key: ${PAYSTACK_SECRET_KEY:}
+  callback-url: ${PAYSTACK_CALLBACK_URL:swiftcare://subscription/callback}
+  monthly-price-pesewas: ${PAYSTACK_MONTHLY_PRICE_PESEWAS:10000}
+  yearly-price-pesewas: ${PAYSTACK_YEARLY_PRICE_PESEWAS:100000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

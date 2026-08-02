@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "SwiftCare",
+    "slug": "swiftcare",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "swiftcare",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.swiftcare.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Allow SwiftCare to use your camera during secure video consultations and prescription scanning.",
+        "NSMicrophoneUsageDescription": "Allow SwiftCare to use your microphone during secure video consultations."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F5F7FA"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.swiftcare.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SwiftCare to use your camera for prescription scanning and secure video consultations.",
+          "microphonePermission": "Allow SwiftCare to use your microphone during secure video consultations.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#E8F8F3"
+        }
+      ],
+      "expo-font",
+      "expo-notifications"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "766e72be-596a-401b-9be5-3f83f0be9a23"
+      }
+    }
+  }
+}

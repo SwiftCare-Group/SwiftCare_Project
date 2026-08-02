@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: appointment-service
+
+  config:
+    import: optional:classpath:application-secrets.yml
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/swiftcare}
+    username: ${DB_USERNAME:swiftcare}
+    password: ${DB_PASSWORD:swiftcare}
+    driver-class-name: org.postgresql.Driver
+
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+      validation-timeout: 5000
+      idle-timeout: 300000
+      keepalive-time: 120000
+      max-lifetime: 600000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: false
+
+server:
+  port: ${SERVER_PORT:8082}
+  servlet:
+    context-path: /api/v1
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiry-ms: ${JWT_EXPIRY_MS:86400000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+services:
+  notification:
+    url: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
+
+internal:
+  service-key: ${INTERNAL_SERVICE_KEY}

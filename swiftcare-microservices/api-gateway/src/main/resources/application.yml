@@ -1,0 +1,278 @@
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # ============================================================
+          # HTTP CLIENT SETTINGS
+          # ============================================================
+          # These longer timeouts allow sleeping Render services enough
+          # time to wake before the gateway gives up.
+          httpclient:
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:60000}
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:240s}
+
+          # ============================================================
+          # DEFAULT RETRY FILTER
+          # ============================================================
+          # Only retry safe read-only requests.
+          # POST, PUT, PATCH and DELETE requests are not retried.
+          default-filters:
+            - name: Retry
+              args:
+                retries: 4
+                statuses:
+                  - BAD_GATEWAY
+                  - SERVICE_UNAVAILABLE
+                  - GATEWAY_TIMEOUT
+                methods:
+                  - GET
+                  - HEAD
+                  - OPTIONS
+                backoff:
+                  firstBackoff: 15s
+                  maxBackoff: 40s
+                  factor: 2
+                  basedOnPreviousValue: false
+                timeout: 150s
+
+          routes:
+            # ============================================================
+            # SERVICE HEALTH AND WAKE-UP ROUTES
+            # ============================================================
+            # The mobile app can call these endpoints when it starts.
+            #
+            # Gateway endpoint:
+            # /api/v1/system/{service}-health
+            #
+            # Downstream endpoint:
+            # /api/v1/actuator/health
+
+            # ------------------------------------------------------------
+            # Identity service health
+            # ------------------------------------------------------------
+            - id: identity-health
+              order: -100
+              uri: ${IDENTITY_SERVICE_URL:https://swiftcare-project.onrender.com}
+              predicates:
+                - Path=/api/v1/system/identity-health
+                - Method=GET
+              filters:
+                - name: SetPath
+                  args:
+                    template: /api/v1/actuator/health
+
+            # ------------------------------------------------------------
+            # Appointment service health
+            # ------------------------------------------------------------
+            - id: appointment-health
+              order: -100
+              uri: ${APPOINTMENT_SERVICE_URL:https://swiftcare-appointment-service.onrender.com}
+              predicates:
+                - Path=/api/v1/system/appointment-health
+                - Method=GET
+              filters:
+                - name: SetPath
+                  args:
+                    template: /api/v1/actuator/health
+
+            # ------------------------------------------------------------
+            # Clinical service health
+            # ------------------------------------------------------------
+            - id: clinical-health
+              order: -100
+              uri: ${CLINICAL_SERVICE_URL:https://swiftcare-clinical-service.onrender.com}
+              predicates:
+                - Path=/api/v1/system/clinical-health
+                - Method=GET
+              filters:
+                - name: SetPath
+                  args:
+                    template: /api/v1/actuator/health
+
+            # ------------------------------------------------------------
+            # Symptom service health
+            # ------------------------------------------------------------
+            - id: symptom-health
+              order: -100
+              uri: ${SYMPTOM_SERVICE_URL:https://swiftcare-symptom-service.onrender.com}
+              predicates:
+                - Path=/api/v1/system/symptom-health
+                - Method=GET
+              filters:
+                - name: SetPath
+                  args:
+                    template: /api/v1/actuator/health
+
+            # ------------------------------------------------------------
+            # Subscription service health
+            # ------------------------------------------------------------
+            - id: subscription-health
+              order: -100
+              uri: ${SUBSCRIPTION_SERVICE_URL:https://swiftcare-subscription-service.onrender.com}
+              predicates:
+                - Path=/api/v1/system/subscription-health
+                - Method=GET
+              filters:
+                - name: SetPath
+                  args:
+                    template: /api/v1/actuator/health
+
+            # ------------------------------------------------------------
+            # Notification service health
+            # ------------------------------------------------------------
+            - id: notification-health
+              order: -100
+              uri: ${NOTIFICATION_SERVICE_URL:https://swiftcare-notification-service.onrender.com}
+              predicates:
+                - Path=/api/v1/system/notification-health
+                - Method=GET
+              filters:
+                - name: SetPath
+                  args:
+                    template: /api/v1/actuator/health
+
+            # ============================================================
+            # IDENTITY SERVICE
+            # ============================================================
+            # Authentication, registration, token refresh, patient
+            # details and profile operations.
+            - id: identity-service
+              order: 0
+              uri: ${IDENTITY_SERVICE_URL:https://swiftcare-project.onrender.com}
+              predicates:
+                - Path=/api/v1/auth,/api/v1/auth/**,/api/v1/patients,/api/v1/patients/**,/api/v1/profile,/api/v1/profile/**
+
+            # ============================================================
+            # CLINICAL SERVICE ADMIN ROUTES
+            # ============================================================
+            # Admin staff and doctor management.
+            - id: clinical-admin
+              order: 0
+              uri: ${CLINICAL_SERVICE_URL:https://swiftcare-clinical-service.onrender.com}
+              predicates:
+                - Path=/api/v1/admin/doctors,/api/v1/admin/doctors/**,/api/v1/admin/staff,/api/v1/admin/staff/**
+
+            # ============================================================
+            # APPOINTMENT SERVICE ADMIN ROUTES
+            # ============================================================
+            # Admin department configuration and appointment statistics.
+            - id: appointment-admin
+              order: 0
+              uri: ${APPOINTMENT_SERVICE_URL:https://swiftcare-appointment-service.onrender.com}
+              predicates:
+                - Path=/api/v1/admin/departments,/api/v1/admin/departments/**,/api/v1/admin/stats,/api/v1/admin/stats/**
+
+            # ============================================================
+            # APPOINTMENT SERVICE
+            # ============================================================
+            # Appointments, departments, slots and queue operations.
+            - id: appointment-service
+              order: 0
+              uri: ${APPOINTMENT_SERVICE_URL:https://swiftcare-appointment-service.onrender.com}
+              predicates:
+                - Path=/api/v1/appointments,/api/v1/appointments/**,/api/v1/departments,/api/v1/departments/**,/api/v1/slots,/api/v1/slots/**,/api/v1/queue,/api/v1/queue/**
+
+            # ============================================================
+            # CLINICAL SERVICE
+            # ============================================================
+            # Doctors, consultations, clinical records, prescriptions,
+            # laboratory orders and laboratory results.
+            - id: clinical-service
+              order: 0
+              uri: ${CLINICAL_SERVICE_URL:https://swiftcare-clinical-service.onrender.com}
+              predicates:
+                - Path=/api/v1/consultations,/api/v1/consultations/**,/api/v1/doctors,/api/v1/doctors/**,/api/v1/clinical-records,/api/v1/clinical-records/**,/api/v1/prescriptions,/api/v1/prescriptions/**,/api/v1/lab-orders,/api/v1/lab-orders/**,/api/v1/lab-results,/api/v1/lab-results/**
+
+            # ============================================================
+            # SYMPTOM SERVICE
+            # ============================================================
+            - id: symptom-service
+              order: 0
+              uri: ${SYMPTOM_SERVICE_URL:https://swiftcare-symptom-service.onrender.com}
+              predicates:
+                - Path=/api/v1/symptoms,/api/v1/symptoms/**
+
+            # ============================================================
+            # SUBSCRIPTION SERVICE
+            # ============================================================
+            - id: subscription-service
+              order: 0
+              uri: ${SUBSCRIPTION_SERVICE_URL:https://swiftcare-subscription-service.onrender.com}
+              predicates:
+                - Path=/api/v1/subscriptions,/api/v1/subscriptions/**,/api/v1/payments,/api/v1/payments/**
+
+            # ============================================================
+            # NOTIFICATION SERVICE
+            # ============================================================
+            - id: notification-service
+              order: 0
+              uri: ${NOTIFICATION_SERVICE_URL:https://swiftcare-notification-service.onrender.com}
+              predicates:
+                - Path=/api/v1/notifications,/api/v1/notifications/**
+
+          # ============================================================
+          # GLOBAL CORS CONFIGURATION
+          # ============================================================
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              "[/**]":
+                allowedOriginPatterns:
+                  - "${CORS_ALLOWED_ORIGIN_PATTERN:*}"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders:
+                  - Authorization
+                  - Content-Type
+                  - Accept
+                  - Origin
+                  - X-Requested-With
+                  - X-Internal-Service-Key
+                exposedHeaders:
+                  - Location
+                  - Authorization
+                allowCredentials: false
+                maxAge: 3600
+
+# ==============================================================
+# SERVER CONFIGURATION
+# ==============================================================
+server:
+  port: ${PORT:8080}
+  address: 0.0.0.0
+
+# ==============================================================
+# ACTUATOR AND MONITORING
+# ==============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - gateway
+
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+    gateway:
+      access: read-only
+
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: notification-service
+  config:
+    import: optional:classpath:application-secrets.yml
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+    hikari:
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:5}
+      minimum-idle: ${DB_MIN_IDLE:1}
+      connection-timeout: 30000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      validation-timeout: 5000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: false
+
+server:
+  port: ${SERVER_PORT:8086}
+  servlet:
+    context-path: /api/v1
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiry-ms: ${JWT_EXPIRY_MS:86400000}
+
+firebase:
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:firebase-service-account.json}
+
+expo:
+  push:
+    url: ${EXPO_PUSH_URL:https://exp.host/--/api/v2/push/send}
+    enabled: ${EXPO_PUSH_ENABLED:true}
+    access-token: ${EXPO_ACCESS_TOKEN:}
+
+internal:
+  service-key: ${INTERNAL_SERVICE_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.swiftcare: INFO
