@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -130,6 +131,8 @@ const validateBloodPressure = (value: string): string | null => {
 };
 
 export default function ConsultationScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
 
   const params = useLocalSearchParams<{
@@ -377,7 +380,7 @@ export default function ConsultationScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator
           size="large"
-          color={Colors.primary}
+          color={colors.primary}
         />
 
         <Text style={styles.loadingText}>
@@ -395,8 +398,8 @@ export default function ConsultationScreen() {
       >
         <LinearGradient
           colors={[
-            Colors.headerGradientStart,
-            Colors.headerGradientEnd,
+            colors.headerGradientStart,
+            colors.headerGradientEnd,
           ]}
           style={styles.header}
         >
@@ -409,7 +412,7 @@ export default function ConsultationScreen() {
               <Ionicons
                 name="arrow-back"
                 size={22}
-                color={Colors.white}
+                color={colors.white}
               />
             </TouchableOpacity>
 
@@ -440,7 +443,7 @@ export default function ConsultationScreen() {
             <Ionicons
               name="alert-circle-outline"
               size={46}
-              color={Colors.danger}
+              color={colors.danger}
             />
           </View>
 
@@ -468,7 +471,7 @@ export default function ConsultationScreen() {
               <Ionicons
                 name="refresh-outline"
                 size={18}
-                color={Colors.white}
+                color={colors.white}
               />
 
               <Text
@@ -504,8 +507,8 @@ export default function ConsultationScreen() {
     >
       <LinearGradient
         colors={[
-          Colors.headerGradientStart,
-          Colors.headerGradientEnd,
+          colors.headerGradientStart,
+          colors.headerGradientEnd,
         ]}
         style={styles.header}
       >
@@ -519,7 +522,7 @@ export default function ConsultationScreen() {
             <Ionicons
               name="arrow-back"
               size={22}
-              color={Colors.white}
+              color={colors.white}
             />
           </TouchableOpacity>
 
@@ -556,7 +559,7 @@ export default function ConsultationScreen() {
             <Ionicons
               name="person-outline"
               size={30}
-              color={Colors.primary}
+              color={colors.primary}
             />
           </View>
 
@@ -622,7 +625,7 @@ export default function ConsultationScreen() {
             onChangeText={setDiagnosis}
             placeholder="Enter the diagnosis"
             placeholderTextColor={
-              Colors.textDisabled
+              colors.textDisabled
             }
             editable={!completing}
             maxLength={500}
@@ -650,7 +653,7 @@ export default function ConsultationScreen() {
             }
             placeholder="Symptoms, examination findings and observations"
             placeholderTextColor={
-              Colors.textDisabled
+              colors.textDisabled
             }
             multiline
             textAlignVertical="top"
@@ -670,7 +673,7 @@ export default function ConsultationScreen() {
               value={temperature}
               onChangeText={setTemperature}
               placeholder="Temperature °C"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               keyboardType="decimal-pad"
               editable={!completing}
             />
@@ -679,7 +682,7 @@ export default function ConsultationScreen() {
               value={bloodPressure}
               onChangeText={setBloodPressure}
               placeholder="Blood pressure 120/80"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               editable={!completing}
             />
             <TextInput
@@ -687,7 +690,7 @@ export default function ConsultationScreen() {
               value={pulseRate}
               onChangeText={setPulseRate}
               placeholder="Pulse bpm"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               keyboardType="number-pad"
               editable={!completing}
             />
@@ -696,7 +699,7 @@ export default function ConsultationScreen() {
               value={respiratoryRate}
               onChangeText={setRespiratoryRate}
               placeholder="Respiratory rate"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               keyboardType="number-pad"
               editable={!completing}
             />
@@ -705,7 +708,7 @@ export default function ConsultationScreen() {
               value={oxygenSaturation}
               onChangeText={setOxygenSaturation}
               placeholder="SpO₂ %"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               keyboardType="number-pad"
               editable={!completing}
             />
@@ -714,7 +717,7 @@ export default function ConsultationScreen() {
               value={weight}
               onChangeText={setWeight}
               placeholder="Weight kg"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               keyboardType="decimal-pad"
               editable={!completing}
             />
@@ -735,7 +738,7 @@ export default function ConsultationScreen() {
             onChangeText={setPrescription}
             placeholder="Medication, dosage and instructions"
             placeholderTextColor={
-              Colors.textDisabled
+              colors.textDisabled
             }
             multiline
             textAlignVertical="top"
@@ -757,7 +760,7 @@ export default function ConsultationScreen() {
             onChangeText={setLabRequest}
             placeholder="Enter any required laboratory tests"
             placeholderTextColor={
-              Colors.textDisabled
+              colors.textDisabled
             }
             multiline
             textAlignVertical="top"
@@ -772,7 +775,7 @@ export default function ConsultationScreen() {
             value={followUpInstructions}
             onChangeText={setFollowUpInstructions}
             placeholder="Review date, home care and warning signs"
-            placeholderTextColor={Colors.textDisabled}
+            placeholderTextColor={colors.textDisabled}
             multiline
             textAlignVertical="top"
             editable={!completing}
@@ -786,7 +789,7 @@ export default function ConsultationScreen() {
             value={referralNotes}
             onChangeText={setReferralNotes}
             placeholder="Optional referral destination and reason"
-            placeholderTextColor={Colors.textDisabled}
+            placeholderTextColor={colors.textDisabled}
             multiline
             textAlignVertical="top"
             editable={!completing}
@@ -812,7 +815,7 @@ export default function ConsultationScreen() {
             <>
               <ActivityIndicator
                 size="small"
-                color={Colors.white}
+                color={colors.white}
               />
 
               <Text
@@ -828,7 +831,7 @@ export default function ConsultationScreen() {
               <Ionicons
                 name="checkmark-done-outline"
                 size={20}
-                color={Colors.white}
+                color={colors.white}
               />
 
               <Text
@@ -847,11 +850,11 @@ export default function ConsultationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor:
-      Colors.headerGradientStart,
+      colors.headerGradientStart,
   },
 
   keyboardView: {
@@ -860,7 +863,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   content: {
@@ -872,13 +875,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   header: {
@@ -910,7 +913,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 23,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
 
   headerSubtitle: {
@@ -924,9 +927,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 16,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   patientAvatar: {
@@ -936,7 +939,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   patientInformation: {
@@ -946,19 +949,19 @@ const styles = StyleSheet.create({
   patientName: {
     fontSize: 17,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   patientId: {
     marginTop: 4,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   patientMeta: {
     marginTop: 3,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   severityBadge: {
@@ -966,27 +969,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     backgroundColor:
-      `${Colors.warning}18`,
+      `${colors.warning}18`,
   },
 
   severityText: {
     fontSize: 13,
     fontWeight: '800',
-    color: Colors.warning,
+    color: colors.warning,
   },
 
   complaintCard: {
     marginTop: 15,
     padding: 15,
     borderRadius: 14,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   sectionLabel: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.7,
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   complaintText: {
@@ -994,14 +997,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   fieldHint: {
     marginTop: -4,
     marginBottom: 10,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   vitalsGrid: {
@@ -1024,7 +1027,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   input: {
@@ -1032,11 +1035,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 12,
     fontSize: 14,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.surface,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
   },
 
   multilineInput: {
@@ -1047,7 +1050,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     alignSelf: 'flex-end',
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   completeButton: {
@@ -1059,13 +1062,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderRadius: 14,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
 
   completeButtonText: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
 
   disabledButton: {
@@ -1077,7 +1080,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   errorIcon: {
@@ -1088,14 +1091,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor:
-      `${Colors.danger}12`,
+      `${colors.danger}12`,
   },
 
   errorTitle: {
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   errorDescription: {
@@ -1103,7 +1106,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   retryButton: {
@@ -1116,13 +1119,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
     borderRadius: 12,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
 
   retryButtonText: {
     fontSize: 13,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
 
   goBackButton: {
@@ -1134,6 +1137,6 @@ const styles = StyleSheet.create({
   goBackButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 });

@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors } from '../../constants/colors';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function DoctorLayout() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textDisabled,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textDisabled,
         tabBarHideOnKeyboard: true,
 
         tabBarLabelStyle: {
@@ -19,11 +22,11 @@ export default function DoctorLayout() {
         },
 
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 88 : 72,
+          height: 64 + insets.bottom,
           paddingTop: 7,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 10,
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
+          paddingBottom: Math.max(insets.bottom, 8),
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
           elevation: 10,
         },

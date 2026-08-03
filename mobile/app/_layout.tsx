@@ -21,6 +21,11 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   // The splash screen may already be controlled elsewhere.
 });
 
+SplashScreen.setOptions({
+  duration: 500,
+  fade: true,
+});
+
 type NotificationData = {
   type?: string;
   route?: string;
@@ -274,22 +279,30 @@ function AppNavigator() {
   );
 }
 
-export function ErrorBoundary({
-  error,
-  retry,
-}: {
+type ErrorBoundaryProps = {
   error: Error;
   retry: () => void;
-}) {
+};
+
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return (
+    <ThemeProvider>
+      <ThemedErrorBoundary {...props} />
+    </ThemeProvider>
+  );
+}
+
+function ThemedErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const router = useRouter();
+  const { colors } = useTheme();
 
   return (
-    <View style={errorStyles.container}>
-      <View style={errorStyles.icon}>
+    <View style={[errorStyles.container, { backgroundColor: colors.background }]}>
+      <View style={[errorStyles.icon, { backgroundColor: colors.dangerLight }]}>
         <Text style={errorStyles.iconText}>!</Text>
       </View>
-      <Text style={errorStyles.title}>SwiftCare encountered a problem</Text>
-      <Text style={errorStyles.message}>
+      <Text style={[errorStyles.title, { color: colors.textPrimary }]}>SwiftCare encountered a problem</Text>
+      <Text style={[errorStyles.message, { color: colors.textSecondary }]}>
         {error?.message || "The screen could not be displayed."}
       </Text>
       <TouchableOpacity style={errorStyles.primaryButton} onPress={retry}>
@@ -299,7 +312,7 @@ export function ErrorBoundary({
         style={errorStyles.secondaryButton}
         onPress={() => router.replace("/(auth)/login")}
       >
-        <Text style={errorStyles.secondaryButtonText}>Return to sign in</Text>
+        <Text style={[errorStyles.secondaryButtonText, { color: colors.primary }]}>Return to sign in</Text>
       </TouchableOpacity>
     </View>
   );

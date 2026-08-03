@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -37,6 +38,8 @@ type LabOrder = {
 };
 
 export default function LabDashboard() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
   const [orders, setOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +171,7 @@ export default function LabDashboard() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -176,7 +179,7 @@ export default function LabDashboard() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
-        colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+        colors={[colors.headerGradientStart, colors.headerGradientEnd]}
         style={styles.header}
       >
         <View style={styles.headerRow}>
@@ -188,14 +191,14 @@ export default function LabDashboard() {
             </View>
           </View>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-            <Ionicons name="log-out-outline" size={21} color={Colors.white} />
+            <Ionicons name="log-out-outline" size={21} color={colors.white} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
 
       {loadError ? (
         <View style={styles.errorBanner}>
-          <Ionicons name="cloud-offline-outline" size={21} color={Colors.danger} />
+          <Ionicons name="cloud-offline-outline" size={21} color={colors.danger} />
           <View style={styles.errorBannerContent}>
             <Text style={styles.errorBannerTitle}>Unable to load laboratory queue</Text>
             <Text style={styles.errorBannerText}>{loadError}</Text>
@@ -221,13 +224,13 @@ export default function LabDashboard() {
               setRefreshing(true);
               void fetchOrders();
             }}
-            tintColor={Colors.primary}
+            tintColor={colors.primary}
           />
         }
         ListEmptyComponent={
           loadError ? null : (
             <View style={styles.emptyState}>
-              <Ionicons name="flask-outline" size={44} color={Colors.primary} />
+              <Ionicons name="flask-outline" size={44} color={colors.primary} />
               <Text style={styles.emptyTitle}>No pending lab orders</Text>
               <Text style={styles.emptyText}>
                 New orders will appear here automatically.
@@ -239,7 +242,7 @@ export default function LabDashboard() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.testIcon}>
-                <Ionicons name="flask-outline" size={20} color={Colors.primary} />
+                <Ionicons name="flask-outline" size={20} color={colors.primary} />
               </View>
               <View style={styles.cardTitleArea}>
                 <Text style={styles.testName}>{item.testName}</Text>
@@ -307,7 +310,7 @@ export default function LabDashboard() {
                 value={result}
                 onChangeText={setResult}
                 placeholder="Result"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 multiline
                 returnKeyType="default"
               />
@@ -316,7 +319,7 @@ export default function LabDashboard() {
                 value={interpretation}
                 onChangeText={setInterpretation}
                 placeholder="Interpretation (optional)"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 returnKeyType="next"
               />
               <TextInput
@@ -324,7 +327,7 @@ export default function LabDashboard() {
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="Notes (optional)"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 returnKeyType="done"
               />
 
@@ -342,7 +345,7 @@ export default function LabDashboard() {
                   disabled={updatingId !== null}
                 >
                   {updatingId ? (
-                    <ActivityIndicator color={Colors.white} />
+                    <ActivityIndicator color={colors.white} />
                   ) : (
                     <Text style={styles.saveButtonText}>Save Result</Text>
                   )}
@@ -356,61 +359,61 @@ export default function LabDashboard() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.headerGradientStart },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.headerGradientStart },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  title: { color: Colors.white, fontSize: 22, fontWeight: '800' },
+  title: { color: colors.white, fontSize: 22, fontWeight: '800' },
   subtitle: { color: 'rgba(255,255,255,0.78)', marginTop: 3 },
   logoutButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' },
-  list: { padding: 18, paddingBottom: 40, backgroundColor: Colors.background, flexGrow: 1 },
+  list: { padding: 18, paddingBottom: 40, backgroundColor: colors.background, flexGrow: 1 },
   errorBanner: {
     marginHorizontal: 18,
     marginTop: 14,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.danger,
-    backgroundColor: Colors.surface,
+    borderColor: colors.danger,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
   },
   errorBannerContent: { flex: 1 },
-  errorBannerTitle: { color: Colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  errorBannerText: { color: Colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  errorBannerTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  errorBannerText: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
   retryButton: { paddingHorizontal: 10, paddingVertical: 8 },
-  retryButtonText: { color: Colors.primary, fontSize: 12, fontWeight: '800' },
-  card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 12 },
+  retryButtonText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  card: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  testIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  testIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   cardTitleArea: { flex: 1, marginLeft: 12 },
-  testName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  patientName: { marginTop: 2, color: Colors.textSecondary },
-  statusBadge: { backgroundColor: Colors.warningLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  statusText: { color: Colors.warning, fontSize: 11, fontWeight: '700' },
-  detail: { color: Colors.textPrimary, lineHeight: 20, marginBottom: 5 },
-  meta: { color: Colors.textSecondary, fontSize: 12, marginTop: 5 },
+  testName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  patientName: { marginTop: 2, color: colors.textSecondary },
+  statusBadge: { backgroundColor: colors.warningLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  statusText: { color: colors.warning, fontSize: 11, fontWeight: '700' },
+  detail: { color: colors.textPrimary, lineHeight: 20, marginBottom: 5 },
+  meta: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  secondaryButton: { flex: 1, borderWidth: 1, borderColor: Colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
-  secondaryButtonText: { color: Colors.primary, fontWeight: '700' },
-  primaryButton: { flex: 2, backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
-  primaryButtonText: { color: Colors.white, fontWeight: '700' },
+  secondaryButton: { flex: 1, borderWidth: 1, borderColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  secondaryButtonText: { color: colors.primary, fontWeight: '700' },
+  primaryButton: { flex: 2, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  primaryButtonText: { color: colors.white, fontWeight: '700' },
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 90 },
-  emptyTitle: { marginTop: 16, fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
-  emptyText: { marginTop: 6, color: Colors.textSecondary, textAlign: 'center' },
+  emptyTitle: { marginTop: 16, fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  emptyText: { marginTop: 6, color: colors.textSecondary, textAlign: 'center' },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalCard: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '82%', overflow: 'hidden' },
+  modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '82%', overflow: 'hidden' },
   modalContent: { padding: 22, paddingBottom: 34 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
-  modalSubtitle: { color: Colors.textSecondary, marginTop: 3, marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 11, color: Colors.textPrimary, marginBottom: 10 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
+  modalSubtitle: { color: colors.textSecondary, marginTop: 3, marginBottom: 16 },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 11, color: colors.textPrimary, marginBottom: 10 },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  cancelButton: { flex: 1, paddingVertical: 13, borderRadius: 11, backgroundColor: Colors.surfaceSecondary, alignItems: 'center' },
-  cancelButtonText: { color: Colors.textSecondary, fontWeight: '700' },
-  saveButton: { flex: 1.5, paddingVertical: 13, borderRadius: 11, backgroundColor: Colors.primary, alignItems: 'center' },
-  saveButtonText: { color: Colors.white, fontWeight: '700' },
+  cancelButton: { flex: 1, paddingVertical: 13, borderRadius: 11, backgroundColor: colors.surfaceSecondary, alignItems: 'center' },
+  cancelButtonText: { color: colors.textSecondary, fontWeight: '700' },
+  saveButton: { flex: 1.5, paddingVertical: 13, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center' },
+  saveButtonText: { color: colors.white, fontWeight: '700' },
 });

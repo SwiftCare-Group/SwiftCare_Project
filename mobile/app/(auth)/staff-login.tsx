@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -27,6 +28,8 @@ import { goBackOrReplace } from '../../utils/navigation';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function StaffLoginScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -114,8 +117,8 @@ export default function StaffLoginScreen() {
     >
       <LinearGradient
         colors={[
-          Colors.headerGradientStart,
-          Colors.headerGradientEnd,
+          colors.headerGradientStart,
+          colors.headerGradientEnd,
         ]}
         style={styles.headerGradient}
       >
@@ -128,7 +131,7 @@ export default function StaffLoginScreen() {
           <Ionicons
             name="arrow-back-outline"
             size={22}
-            color={Colors.white}
+            color={colors.white}
           />
         </TouchableOpacity>
 
@@ -171,7 +174,7 @@ export default function StaffLoginScreen() {
               <Ionicons
                 name="mail-outline"
                 size={18}
-                color={Colors.textDisabled}
+                color={colors.textDisabled}
                 style={styles.inputIcon}
               />
 
@@ -179,7 +182,7 @@ export default function StaffLoginScreen() {
                 style={styles.input}
                 placeholder="Enter your staff email"
                 placeholderTextColor={
-                  Colors.textDisabled
+                  colors.textDisabled
                 }
                 value={email}
                 onChangeText={setEmail}
@@ -201,7 +204,7 @@ export default function StaffLoginScreen() {
               <Ionicons
                 name="lock-closed-outline"
                 size={18}
-                color={Colors.textDisabled}
+                color={colors.textDisabled}
                 style={styles.inputIcon}
               />
 
@@ -209,7 +212,7 @@ export default function StaffLoginScreen() {
                 style={styles.input}
                 placeholder="Enter your password"
                 placeholderTextColor={
-                  Colors.textDisabled
+                  colors.textDisabled
                 }
                 value={password}
                 onChangeText={setPassword}
@@ -238,7 +241,7 @@ export default function StaffLoginScreen() {
                       : 'eye-outline'
                   }
                   size={20}
-                  color={Colors.textDisabled}
+                  color={colors.textDisabled}
                 />
               </TouchableOpacity>
             </View>
@@ -261,7 +264,7 @@ export default function StaffLoginScreen() {
                 >
                   <ActivityIndicator
                     size="small"
-                    color={Colors.white}
+                    color={colors.white}
                   />
 
                   <Text
@@ -305,11 +308,11 @@ export default function StaffLoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor:
-      Colors.headerGradientStart,
+      colors.headerGradientStart,
   },
 
   keyboardView: {
@@ -318,7 +321,7 @@ const styles = StyleSheet.create({
 
   container: {
     flexGrow: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   headerGradient: {
@@ -356,7 +359,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 24,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     marginBottom: 4,
   },
 
@@ -368,7 +371,7 @@ const styles = StyleSheet.create({
 
   formContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     marginTop: -20,
@@ -378,7 +381,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
     marginTop: 14,
   },
@@ -386,9 +389,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 12,
   },
 
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 14,
     fontSize: 15,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   eyeButton: {
@@ -411,7 +414,7 @@ const styles = StyleSheet.create({
 
   loginButton: {
     minHeight: 52,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -427,7 +430,7 @@ const styles = StyleSheet.create({
   },
 
   loginButtonText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -444,11 +447,11 @@ const styles = StyleSheet.create({
 
   linkText: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   linkTextBold: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
 });

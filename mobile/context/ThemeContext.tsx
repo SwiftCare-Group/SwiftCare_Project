@@ -14,7 +14,7 @@ const THEME_STORAGE_KEY = 'swiftcareTheme';
 
 export type ThemeMode = 'light' | 'dark';
 
-type AppColors = {
+export type AppColors = {
   primary: string;
   primaryDark: string;
   primaryLight: string;
@@ -122,14 +122,25 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     if (theme === 'dark') {
       return {
         ...Colors,
-
+        primaryLight: '#123647',
+        primaryMuted: '#4FB6C8',
         background: Colors.dark.background,
         surface: Colors.dark.surface,
         surfaceSecondary: Colors.dark.surfaceSecondary,
         textPrimary: Colors.dark.textPrimary,
         textSecondary: Colors.dark.textSecondary,
+        textDisabled: '#6F879A',
         border: Colors.dark.border,
         borderStrong: Colors.dark.borderStrong,
+        successLight: '#103B32',
+        warningLight: '#3B3014',
+        dangerLight: '#3D1D26',
+        infoLight: '#142F4E',
+        severityMildBg: '#103B32',
+        severityModerateBg: '#3B3014',
+        severitySevereBg: '#3D1D26',
+        tierFreeBg: '#172A3E',
+        tierPremiumBg: '#123647',
       };
     }
 

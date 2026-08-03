@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -14,14 +15,16 @@ import { Colors } from '../../constants/colors';
 
 
 export default function ConsultationsScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
         colors={[
-          Colors.headerGradientStart,
-          Colors.headerGradientEnd,
+          colors.headerGradientStart,
+          colors.headerGradientEnd,
         ]}
         style={styles.header}
       >
@@ -29,7 +32,7 @@ export default function ConsultationsScreen() {
           <Ionicons
             name="document-text-outline"
             size={24}
-            color={Colors.white}
+            color={colors.white}
           />
         </View>
 
@@ -52,7 +55,7 @@ export default function ConsultationsScreen() {
             <Ionicons
               name="medical-outline"
               size={28}
-              color={Colors.primary}
+              color={colors.primary}
             />
           </View>
 
@@ -122,7 +125,7 @@ export default function ConsultationsScreen() {
           <Ionicons
             name="people-outline"
             size={20}
-            color={Colors.white}
+            color={colors.white}
           />
 
           <Text style={styles.queueButtonText}>
@@ -132,7 +135,7 @@ export default function ConsultationsScreen() {
           <Ionicons
             name="arrow-forward"
             size={19}
-            color={Colors.white}
+            color={colors.white}
           />
         </TouchableOpacity>
 
@@ -140,7 +143,7 @@ export default function ConsultationsScreen() {
           <Ionicons
             name="information-circle-outline"
             size={22}
-            color={Colors.info}
+            color={colors.info}
           />
 
           <Text style={styles.infoText}>
@@ -166,6 +169,9 @@ function WorkflowItem({
   title,
   description,
 }: WorkflowItemProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.workflowItem}>
       <View style={styles.workflowNumber}>
@@ -176,7 +182,7 @@ function WorkflowItem({
         <Ionicons
           name={icon}
           size={21}
-          color={Colors.primary}
+          color={colors.primary}
         />
       </View>
 
@@ -190,15 +196,15 @@ function WorkflowItem({
     </View>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor: colors.headerGradientStart,
   },
 
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   content: {
@@ -210,13 +216,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   header: {
@@ -240,9 +246,9 @@ const styles = StyleSheet.create({
   paddingHorizontal: 22,
   paddingVertical: 28,
   borderWidth: 1,
-  borderColor: Colors.border,
+  borderColor: colors.border,
   borderRadius: 18,
-  backgroundColor: Colors.surface,
+  backgroundColor: colors.surface,
 },
 
 overviewIcon: {
@@ -251,7 +257,7 @@ overviewIcon: {
   borderRadius: 22,
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: Colors.primaryLight,
+  backgroundColor: colors.primaryLight,
 },
 
 overviewTitle: {
@@ -259,7 +265,7 @@ overviewTitle: {
   fontSize: 19,
   fontWeight: '800',
   textAlign: 'center',
-  color: Colors.textPrimary,
+  color: colors.textPrimary,
 },
 
 overviewText: {
@@ -267,7 +273,7 @@ overviewText: {
   fontSize: 13,
   lineHeight: 21,
   textAlign: 'center',
-  color: Colors.textSecondary,
+  color: colors.textSecondary,
 },
 
 sectionTitle: {
@@ -275,16 +281,16 @@ sectionTitle: {
   marginBottom: 12,
   fontSize: 18,
   fontWeight: '800',
-  color: Colors.textPrimary,
+  color: colors.textPrimary,
 },
 
 workflowCard: {
   paddingHorizontal: 15,
   paddingVertical: 8,
   borderWidth: 1,
-  borderColor: Colors.border,
+  borderColor: colors.border,
   borderRadius: 18,
-  backgroundColor: Colors.surface,
+  backgroundColor: colors.surface,
 },
 
 workflowItem: {
@@ -299,13 +305,13 @@ workflowNumber: {
   borderRadius: 13,
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: Colors.primary,
+  backgroundColor: colors.primary,
 },
 
 workflowNumberText: {
   fontSize: 11,
   fontWeight: '800',
-  color: Colors.white,
+  color: colors.white,
 },
 
 workflowIcon: {
@@ -315,7 +321,7 @@ workflowIcon: {
   borderRadius: 12,
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: Colors.primaryLight,
+  backgroundColor: colors.primaryLight,
 },
 
 workflowTextContainer: {
@@ -325,20 +331,20 @@ workflowTextContainer: {
 workflowTitle: {
   fontSize: 14,
   fontWeight: '800',
-  color: Colors.textPrimary,
+  color: colors.textPrimary,
 },
 
 workflowDescription: {
   marginTop: 3,
   fontSize: 12,
   lineHeight: 18,
-  color: Colors.textSecondary,
+  color: colors.textSecondary,
 },
 
 workflowDivider: {
   height: 1,
   marginLeft: 77,
-  backgroundColor: Colors.border,
+  backgroundColor: colors.border,
 },
 
 queueButton: {
@@ -350,7 +356,7 @@ queueButton: {
   marginTop: 20,
   paddingHorizontal: 18,
   borderRadius: 14,
-  backgroundColor: Colors.primary,
+  backgroundColor: colors.primary,
 },
 
 queueButtonText: {
@@ -358,7 +364,7 @@ queueButtonText: {
   fontSize: 14,
   fontWeight: '800',
   textAlign: 'center',
-  color: Colors.white,
+  color: colors.white,
 },
 
 infoCard: {
@@ -368,14 +374,14 @@ infoCard: {
   marginTop: 16,
   padding: 14,
   borderRadius: 13,
-  backgroundColor: `${Colors.info}12`,
+  backgroundColor: `${colors.info}12`,
 },
 
 infoText: {
   flex: 1,
   fontSize: 12,
   lineHeight: 19,
-  color: Colors.textSecondary,
+  color: colors.textSecondary,
 },
 
   headerTextContainer: {
@@ -386,7 +392,7 @@ infoText: {
   headerTitle: {
     fontSize: 25,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
 
   headerSubtitle: {
@@ -400,9 +406,9 @@ infoText: {
     alignItems: 'center',
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 16,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   summaryIcon: {
@@ -412,19 +418,19 @@ infoText: {
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   summaryValue: {
     fontSize: 23,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   summaryLabel: {
     marginTop: 2,
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   errorCard: {
@@ -433,9 +439,9 @@ infoText: {
     marginTop: 16,
     padding: 15,
     borderWidth: 1,
-    borderColor: `${Colors.danger}40`,
+    borderColor: `${colors.danger}40`,
     borderRadius: 14,
-    backgroundColor: `${Colors.danger}0D`,
+    backgroundColor: `${colors.danger}0D`,
   },
 
   errorTextContainer: {
@@ -445,14 +451,14 @@ infoText: {
   errorTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.danger,
+    color: colors.danger,
   },
 
   errorText: {
     marginTop: 3,
     fontSize: 12,
     lineHeight: 18,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   sectionHeader: {
@@ -466,7 +472,7 @@ infoText: {
   workflowsectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   sectionCount: {
@@ -477,8 +483,8 @@ infoText: {
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.primary,
-    backgroundColor: Colors.primaryLight,
+    color: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
 
   emptyState: {
@@ -493,14 +499,14 @@ infoText: {
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   emptyTitle: {
     marginTop: 18,
     fontSize: 19,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   emptyText: {
@@ -508,16 +514,16 @@ infoText: {
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   recordCard: {
     marginBottom: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 17,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   recordHeader: {
@@ -532,7 +538,7 @@ infoText: {
     borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   recordPatientInfo: {
@@ -542,13 +548,13 @@ infoText: {
   patientName: {
     fontSize: 15,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   recordDate: {
     marginTop: 3,
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   completedBadge: {
@@ -558,20 +564,20 @@ infoText: {
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 9,
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
   },
 
   completedText: {
     fontSize: 10,
     fontWeight: '800',
-    color: Colors.success,
+    color: colors.success,
   },
 
   recordSection: {
     marginTop: 14,
     paddingTop: 13,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
 
   recordLabel: {
@@ -579,14 +585,14 @@ infoText: {
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
   },
 
   recordValue: {
     marginTop: 5,
     fontSize: 13,
     lineHeight: 20,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   labRequestCard: {
@@ -596,7 +602,7 @@ infoText: {
     marginTop: 14,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: `${Colors.info}12`,
+    backgroundColor: `${colors.info}12`,
   },
 
   labTextContainer: {
@@ -607,13 +613,13 @@ infoText: {
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
-    color: Colors.info,
+    color: colors.info,
   },
 
   labValue: {
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 });

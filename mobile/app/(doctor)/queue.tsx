@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -224,6 +225,8 @@ const getBackendErrorMessage = (
 };
 
 export default function DoctorQueueScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
 
   const [departments, setDepartments] = useState<
@@ -870,7 +873,7 @@ export default function DoctorQueueScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator
           size="large"
-          color={Colors.primary}
+          color={colors.primary}
         />
 
         <Text style={styles.loadingText}>
@@ -887,8 +890,8 @@ export default function DoctorQueueScreen() {
     >
       <LinearGradient
         colors={[
-          Colors.headerGradientStart,
-          Colors.headerGradientEnd,
+          colors.headerGradientStart,
+          colors.headerGradientEnd,
         ]}
         style={styles.header}
       >
@@ -917,7 +920,7 @@ export default function DoctorQueueScreen() {
             <Ionicons
               name="log-out-outline"
               size={22}
-              color={Colors.white}
+              color={colors.white}
             />
           </TouchableOpacity>
         </View>
@@ -976,8 +979,8 @@ export default function DoctorQueueScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
@@ -1001,7 +1004,7 @@ export default function DoctorQueueScreen() {
               <Ionicons
                 name="people-outline"
                 size={20}
-                color={Colors.primary}
+                color={colors.primary}
               />
             </View>
 
@@ -1024,7 +1027,7 @@ export default function DoctorQueueScreen() {
               <Ionicons
                 name="warning-outline"
                 size={20}
-                color={Colors.danger}
+                color={colors.danger}
               />
             </View>
 
@@ -1047,7 +1050,7 @@ export default function DoctorQueueScreen() {
               <Ionicons
                 name="time-outline"
                 size={20}
-                color={Colors.warning}
+                color={colors.warning}
               />
             </View>
 
@@ -1108,13 +1111,13 @@ export default function DoctorQueueScreen() {
             {refreshing ? (
               <ActivityIndicator
                 size="small"
-                color={Colors.primary}
+                color={colors.primary}
               />
             ) : (
               <Ionicons
                 name="refresh-outline"
                 size={18}
-                color={Colors.primary}
+                color={colors.primary}
               />
             )}
 
@@ -1129,7 +1132,7 @@ export default function DoctorQueueScreen() {
             <Ionicons
               name="cloud-offline-outline"
               size={30}
-              color={Colors.danger}
+              color={colors.danger}
             />
 
             <View
@@ -1150,7 +1153,7 @@ export default function DoctorQueueScreen() {
           <View style={styles.inlineLoading}>
             <ActivityIndicator
               size="small"
-              color={Colors.primary}
+              color={colors.primary}
             />
 
             <Text
@@ -1167,7 +1170,7 @@ export default function DoctorQueueScreen() {
               <Ionicons
                 name="checkmark-circle-outline"
                 size={46}
-                color={Colors.success}
+                color={colors.success}
               />
             </View>
 
@@ -1267,7 +1270,7 @@ export default function DoctorQueueScreen() {
                       <Ionicons
                         name="megaphone-outline"
                         size={15}
-                        color={Colors.white}
+                        color={colors.white}
                       />
 
                       <Text
@@ -1294,7 +1297,7 @@ export default function DoctorQueueScreen() {
                     <Ionicons
                       name="megaphone"
                       size={15}
-                      color={Colors.white}
+                      color={colors.white}
                     />
 
                     <Text
@@ -1316,7 +1319,7 @@ export default function DoctorQueueScreen() {
                     <Ionicons
                       name="medical"
                       size={15}
-                      color={Colors.white}
+                      color={colors.white}
                     />
 
                     <Text
@@ -1338,7 +1341,7 @@ export default function DoctorQueueScreen() {
                     <Ionicons
                       name="warning"
                       size={15}
-                      color={Colors.white}
+                      color={colors.white}
                     />
 
                     <Text
@@ -1452,7 +1455,7 @@ export default function DoctorQueueScreen() {
                           name="calendar-outline"
                           size={13}
                           color={
-                            Colors.textSecondary
+                            colors.textSecondary
                           }
                         />
 
@@ -1474,7 +1477,7 @@ export default function DoctorQueueScreen() {
                           name="person-outline"
                           size={13}
                           color={
-                            Colors.textSecondary
+                            colors.textSecondary
                           }
                         />
 
@@ -1495,7 +1498,7 @@ export default function DoctorQueueScreen() {
                         <Ionicons
                           name="diamond-outline"
                           size={13}
-                          color={Colors.warning}
+                          color={colors.warning}
                         />
 
                         <Text
@@ -1537,7 +1540,7 @@ export default function DoctorQueueScreen() {
                       <Ionicons
                         name="calendar-outline"
                         size={15}
-                        color={Colors.primary}
+                        color={colors.primary}
                       />
                     </View>
 
@@ -1575,7 +1578,7 @@ export default function DoctorQueueScreen() {
                       <Ionicons
                         name="hourglass-outline"
                         size={15}
-                        color={Colors.primary}
+                        color={colors.primary}
                       />
                     </View>
 
@@ -1673,14 +1676,14 @@ export default function DoctorQueueScreen() {
                     {viewingPatientId === patient.id ? (
                       <ActivityIndicator
                         size="small"
-                        color={Colors.primary}
+                        color={colors.primary}
                       />
                     ) : (
                       <>
                         <Ionicons
                           name="person-outline"
                           size={17}
-                          color={Colors.primary}
+                          color={colors.primary}
                         />
 
                         <Text
@@ -1715,14 +1718,14 @@ export default function DoctorQueueScreen() {
                       {isProcessing ? (
                         <ActivityIndicator
                           size="small"
-                          color={Colors.white}
+                          color={colors.white}
                         />
                       ) : (
                         <>
                           <Ionicons
                             name="megaphone-outline"
                             size={18}
-                            color={Colors.white}
+                            color={colors.white}
                           />
 
                           <Text
@@ -1756,14 +1759,14 @@ export default function DoctorQueueScreen() {
                         {isProcessing ? (
                           <ActivityIndicator
                             size="small"
-                            color={Colors.warning}
+                            color={colors.warning}
                           />
                         ) : (
                           <>
                             <Ionicons
                               name="play-skip-forward-outline"
                               size={17}
-                              color={Colors.warning}
+                              color={colors.warning}
                             />
 
                             <Text
@@ -1792,14 +1795,14 @@ export default function DoctorQueueScreen() {
                         {isProcessing ? (
                           <ActivityIndicator
                             size="small"
-                            color={Colors.white}
+                            color={colors.white}
                           />
                         ) : (
                           <>
                             <Ionicons
                               name="play-circle-outline"
                               size={18}
-                              color={Colors.white}
+                              color={colors.white}
                             />
 
                             <Text
@@ -1831,14 +1834,14 @@ export default function DoctorQueueScreen() {
                       {isProcessing ? (
                         <ActivityIndicator
                           size="small"
-                          color={Colors.white}
+                          color={colors.white}
                         />
                       ) : (
                         <>
                           <Ionicons
                             name="checkmark-done-outline"
                             size={18}
-                            color={Colors.white}
+                            color={colors.white}
                           />
 
                           <Text
@@ -1862,16 +1865,16 @@ export default function DoctorQueueScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor:
-      Colors.headerGradientStart,
+      colors.headerGradientStart,
   },
 
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   content: {
@@ -1883,13 +1886,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   header: {
@@ -1914,7 +1917,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 25,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
 
   headerSubtitle: {
@@ -1947,7 +1950,7 @@ const styles = StyleSheet.create({
   },
 
   departmentTabActive: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.white,
   },
 
   departmentTabText: {
@@ -1957,7 +1960,7 @@ const styles = StyleSheet.create({
   },
 
   departmentTabTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '800',
   },
 
@@ -1978,18 +1981,18 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
 
   liveText: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.success,
+    color: colors.success,
   },
 
   liveRefreshText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   statisticsRow: {
@@ -2003,9 +2006,9 @@ const styles = StyleSheet.create({
     minHeight: 112,
     padding: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 15,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   statisticIcon: {
@@ -2015,27 +2018,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   criticalStatisticIcon: {
-    backgroundColor: `${Colors.danger}12`,
+    backgroundColor: `${colors.danger}12`,
   },
 
   waitStatisticIcon: {
-    backgroundColor: `${Colors.warning}14`,
+    backgroundColor: `${colors.warning}14`,
   },
 
   statisticValue: {
     fontSize: 21,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   statisticLabel: {
     marginTop: 2,
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   queueHeading: {
@@ -2053,20 +2056,20 @@ const styles = StyleSheet.create({
   queueTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   queueSubtitle: {
     marginTop: 3,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   activeQueueSubtitle: {
     marginTop: 3,
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   refreshButton: {
@@ -2078,13 +2081,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   refreshText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   errorCard: {
@@ -2093,9 +2096,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     padding: 15,
     borderWidth: 1,
-    borderColor: `${Colors.danger}40`,
+    borderColor: `${colors.danger}40`,
     borderRadius: 13,
-    backgroundColor: `${Colors.danger}0D`,
+    backgroundColor: `${colors.danger}0D`,
   },
 
   errorTextContainer: {
@@ -2105,14 +2108,14 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.danger,
+    color: colors.danger,
   },
 
   errorMessage: {
     marginTop: 3,
     fontSize: 12,
     lineHeight: 18,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   inlineLoading: {
@@ -2125,7 +2128,7 @@ const styles = StyleSheet.create({
 
   inlineLoadingText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   emptyState: {
@@ -2141,13 +2144,13 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
   },
 
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   emptyText: {
@@ -2155,33 +2158,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   patientCard: {
     marginBottom: 15,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 17,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   nextPatientCard: {
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
   },
 
   emergencyCard: {
-    borderColor: Colors.danger,
+    borderColor: colors.danger,
   },
 
   calledPatientCard: {
-    borderColor: Colors.warning,
+    borderColor: colors.warning,
   },
 
   consultationPatientCard: {
-    borderColor: Colors.info,
+    borderColor: colors.info,
   },
 
   nextPatientBanner: {
@@ -2195,7 +2198,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopLeftRadius: 15,
     borderTopRightRadius: 15,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
 
   nextPatientBannerLeft: {
@@ -2208,13 +2211,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
-    color: Colors.white,
+    color: colors.white,
   },
 
   nextPatientQueue: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
 
   calledBanner: {
@@ -2226,14 +2229,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: Colors.warning,
+    backgroundColor: colors.warning,
   },
 
   calledBannerText: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.7,
-    color: Colors.white,
+    color: colors.white,
   },
 
   consultationBanner: {
@@ -2245,14 +2248,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: Colors.info,
+    backgroundColor: colors.info,
   },
 
   consultationBannerText: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.7,
-    color: Colors.white,
+    color: colors.white,
   },
 
   emergencyBanner: {
@@ -2264,14 +2267,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: Colors.danger,
+    backgroundColor: colors.danger,
   },
 
   emergencyBannerText: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.7,
-    color: Colors.white,
+    color: colors.white,
   },
 
   cardTopRow: {
@@ -2286,17 +2289,17 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   activePositionBadge: {
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   positionText: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   patientInformation: {
@@ -2307,13 +2310,13 @@ const styles = StyleSheet.create({
   patientName: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   patientNumber: {
     marginTop: 3,
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   severityBadge: {
@@ -2355,12 +2358,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 9,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   patientTagText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   premiumTag: {
@@ -2370,20 +2373,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 9,
-    backgroundColor: `${Colors.warning}14`,
+    backgroundColor: `${colors.warning}14`,
   },
 
   premiumTagText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.warning,
+    color: colors.warning,
   },
 
   complaintContainer: {
     marginTop: 14,
     padding: 12,
     borderRadius: 11,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   complaintLabel: {
@@ -2391,7 +2394,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
   },
 
   complaintText: {
@@ -2399,7 +2402,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   cardMetadata: {
@@ -2408,7 +2411,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
 
   metadataItem: {
@@ -2424,25 +2427,25 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   metadataLabel: {
     fontSize: 10,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
   },
 
   metadataValue: {
     marginTop: 2,
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   metadataDivider: {
     width: 1,
     marginHorizontal: 10,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
 
   statusRow: {
@@ -2474,7 +2477,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 11,
     textAlign: 'right',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   actionRow: {
@@ -2492,15 +2495,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     borderRadius: 11,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   viewPatientButtonText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   primaryActionButton: {
@@ -2511,13 +2514,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderRadius: 11,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
 
   primaryActionButtonText: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
 
   disabledButton: {
@@ -2538,15 +2541,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     borderWidth: 1,
-    borderColor: Colors.warning,
+    borderColor: colors.warning,
     borderRadius: 11,
-    backgroundColor: `${Colors.warning}10`,
+    backgroundColor: `${colors.warning}10`,
   },
 
   skipPatientButtonText: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.warning,
+    color: colors.warning,
   },
 
   completeConsultationButton: {
@@ -2557,12 +2560,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderRadius: 11,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
 
   completeConsultationButtonText: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
 });

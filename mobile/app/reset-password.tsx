@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -25,6 +26,8 @@ const singleParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
 
 export default function ResetPasswordScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
   const params = useLocalSearchParams<{
     token?: string | string[];
@@ -107,7 +110,7 @@ export default function ResetPasswordScreen() {
             accessibilityRole="button"
             accessibilityLabel="Return to login"
           >
-            <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
           </TouchableOpacity>
 
           <View style={styles.form}>
@@ -119,7 +122,7 @@ export default function ResetPasswordScreen() {
 
             {!token ? (
               <View style={styles.warningBox}>
-                <Ionicons name="warning-outline" size={20} color={Colors.danger} />
+                <Ionicons name="warning-outline" size={20} color={colors.danger} />
                 <Text style={styles.warningText}>
                   This link is missing its reset token. Request a new password reset email.
                 </Text>
@@ -149,7 +152,7 @@ export default function ResetPasswordScreen() {
               onPress={() => void submit()}
             >
               {submitting ? (
-                <ActivityIndicator color={Colors.white} />
+                <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.submitText}>Reset Password</Text>
               )}
@@ -183,11 +186,14 @@ function PasswordField({
   onToggle: () => void;
   editable: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputRow}>
-        <Ionicons name="lock-closed-outline" size={19} color={Colors.textSecondary} />
+        <Ionicons name="lock-closed-outline" size={19} color={colors.textSecondary} />
         <TextInput
           style={styles.input}
           value={value}
@@ -197,14 +203,14 @@ function PasswordField({
           autoCorrect={false}
           editable={editable}
           placeholder="At least 8 characters"
-          placeholderTextColor={Colors.textDisabled}
+          placeholderTextColor={colors.textDisabled}
           textContentType="newPassword"
         />
         <TouchableOpacity onPress={onToggle} disabled={!editable}>
           <Ionicons
             name={visible ? 'eye-outline' : 'eye-off-outline'}
             size={20}
-            color={Colors.textSecondary}
+            color={colors.textSecondary}
           />
         </TouchableOpacity>
       </View>
@@ -212,26 +218,26 @@ function PasswordField({
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 18 },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   form: { flex: 1, justifyContent: 'center', paddingBottom: 50 },
   title: {
     marginTop: 22,
     fontSize: 27,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     textAlign: 'center',
   },
   subtitle: {
@@ -239,7 +245,7 @@ const styles = StyleSheet.create({
     marginBottom: 26,
     fontSize: 14,
     lineHeight: 21,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   warningBox: {
@@ -247,37 +253,37 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 9,
     borderWidth: 1,
-    borderColor: Colors.danger,
-    backgroundColor: Colors.dangerLight,
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerLight,
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
   },
-  warningText: { flex: 1, color: Colors.textPrimary, fontSize: 12, lineHeight: 18 },
+  warningText: { flex: 1, color: colors.textPrimary, fontSize: 12, lineHeight: 18 },
   field: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '700', color: Colors.textPrimary, marginBottom: 7 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginBottom: 7 },
   inputRow: {
     minHeight: 54,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
   },
-  input: { flex: 1, color: Colors.textPrimary, fontSize: 15, paddingVertical: 12 },
+  input: { flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 12 },
   submitButton: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
   },
-  submitText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
+  submitText: { color: colors.white, fontSize: 16, fontWeight: '800' },
   disabled: { opacity: 0.55 },
   requestLink: { alignItems: 'center', marginTop: 20, padding: 8 },
-  requestLinkText: { color: Colors.primary, fontSize: 14, fontWeight: '700' },
+  requestLinkText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
 });

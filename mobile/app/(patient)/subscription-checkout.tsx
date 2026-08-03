@@ -4,15 +4,15 @@ import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Colors } from '../../constants/colors';
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import api, { refreshSessionTokens } from '../../services/api';
 import { getApiErrorMessage } from '../../utils/errors';
 import { goBackOrReplace } from '../../utils/navigation';
@@ -23,6 +23,8 @@ function singleParam(value: string | string[] | undefined): string | undefined {
 
 export default function SubscriptionCheckoutScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const params = useLocalSearchParams<{
     paymentUrl?: string | string[];
     reference?: string | string[];
@@ -105,7 +107,7 @@ export default function SubscriptionCheckoutScreen() {
   if (!checkoutUrl || !reference) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Ionicons name="warning-outline" size={42} color={Colors.danger} />
+        <Ionicons name="warning-outline" size={42} color={colors.danger} />
         <Text style={styles.errorTitle}>Checkout could not be opened</Text>
         <Text style={styles.errorText}>
           The payment URL or transaction reference is missing.
@@ -121,14 +123,16 @@ export default function SubscriptionCheckoutScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'bottom', 'left']}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Close payment and return to profile"
           onPress={() => goBackOrReplace(router, '/(patient)/profile')}
           disabled={verifying}
         >
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerText}>
           <Text style={styles.title}>Secure Subscription Payment</Text>
@@ -141,14 +145,14 @@ export default function SubscriptionCheckoutScreen() {
       <View style={styles.webContainer}>
         {webLoading ? (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>Opening Paystack checkout…</Text>
           </View>
         ) : null}
 
         {webError ? (
           <View style={styles.webErrorState}>
-            <Ionicons name="cloud-offline-outline" size={42} color={Colors.textDisabled} />
+            <Ionicons name="cloud-offline-outline" size={42} color={colors.textDisabled} />
             <Text style={styles.errorTitle}>Payment page unavailable</Text>
             <Text style={styles.errorText}>{webError}</Text>
             <TouchableOpacity
@@ -208,7 +212,7 @@ export default function SubscriptionCheckoutScreen() {
           disabled={verifying || completed}
         >
           {verifying ? (
-            <ActivityIndicator color={Colors.white} />
+            <ActivityIndicator color={colors.white} />
           ) : (
             <Text style={styles.primaryButtonText}>
               {completed ? 'Premium Activated' : 'Verify and Activate Premium'}
@@ -220,59 +224,62 @@ export default function SubscriptionCheckoutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 28,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
+    minHeight: 68,
     paddingVertical: 12,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   iconButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: { flex: 1 },
-  title: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  reference: { color: Colors.textSecondary, fontSize: 10, marginTop: 2 },
-  webContainer: { flex: 1, backgroundColor: Colors.white },
+  title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  reference: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
+  webContainer: { flex: 1, backgroundColor: colors.white, overflow: 'hidden' },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
-  loadingText: { color: Colors.textSecondary, fontSize: 13, marginTop: 10 },
+  loadingText: { color: colors.textSecondary, fontSize: 13, marginTop: 10 },
   webErrorState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 28,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   footer: {
-    padding: 16,
-    backgroundColor: Colors.surface,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 18,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
-  helpText: { color: Colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  helpText: { color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
   primaryButton: {
     minHeight: 48,
     borderRadius: 12,
@@ -280,20 +287,25 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    marginTop: 16,
+    backgroundColor: colors.primary,
+    marginTop: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  primaryButtonText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
+  primaryButtonText: { color: colors.white, fontSize: 14, fontWeight: '700' },
   disabled: { opacity: 0.6 },
   errorTitle: {
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 19,
     fontWeight: '700',
     marginTop: 14,
     textAlign: 'center',
   },
   errorText: {
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',

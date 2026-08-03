@@ -2,13 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { ComponentProps } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../../context/ThemeContext";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
 export default function PatientLayout() {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 8);
 
   const renderTabIcon = (
     outlineIcon: IoniconName,
@@ -26,7 +29,7 @@ export default function PatientLayout() {
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: focused
-            ? colors.primaryLight
+            ? (isDarkMode ? colors.surfaceSecondary : colors.primaryLight)
             : "transparent",
         }}
       >
@@ -52,28 +55,26 @@ export default function PatientLayout() {
         },
 
         tabBarStyle: {
-          position: "absolute",
-          left: 16,
-          right: 16,
-          bottom: 18,
-          height: 70,
-          borderRadius: 25,
-          borderTopWidth: 0,
+          height: 66 + bottomPadding,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
           paddingTop: 8,
-          paddingBottom: 8,
+          paddingBottom: bottomPadding,
           backgroundColor: colors.surface,
-          elevation: 10,
+          elevation: 18,
           shadowColor: "#000",
           shadowOffset: {
             width: 0,
-            height: 6,
+            height: -4,
           },
-          shadowOpacity: 0.12,
-          shadowRadius: 12,
+          shadowOpacity: isDarkMode ? 0.3 : 0.12,
+          shadowRadius: 14,
         },
 
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: "700",
           marginTop: 2,
         },
@@ -193,6 +194,7 @@ export default function PatientLayout() {
         name="subscription-checkout"
         options={{
           href: null,
+          tabBarStyle: { display: "none" },
         }}
       />
     </Tabs>

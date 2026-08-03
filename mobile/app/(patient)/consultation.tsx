@@ -18,7 +18,7 @@ import { WebView } from 'react-native-webview';
 import api from '../../services/api';
 import { getPremiumEntitlement } from '../../services/subscription';
 import { requestVideoConsultationPermissions } from '../../services/videoPermissions';
-import { Colors } from '../../constants/colors';
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import { useHaptics } from '../../hooks/useHaptics';
 import { getApiErrorMessage } from '../../utils/errors';
 import { useRefreshOnFocus } from '../../hooks/useRefreshOnFocus';
@@ -45,6 +45,8 @@ const SCHEDULE_OPTIONS = [
 
 export default function ConsultationScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [doctors, setDoctors] = useState<ConsultationDoctor[]>([]);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [isPremium, setIsPremium] = useState<boolean | null>(null);
@@ -256,16 +258,16 @@ export default function ConsultationScreen() {
     Date.parse(consultation.scheduledAt) <= Date.now() + 15 * 60_000;
 
   const STATUS_COLORS: Record<string, string> = {
-    SCHEDULED: Colors.warning,
-    IN_PROGRESS: Colors.primary,
-    COMPLETED: Colors.success,
-    CANCELLED: Colors.danger,
+    SCHEDULED: colors.warning,
+    IN_PROGRESS: colors.primary,
+    COMPLETED: colors.success,
+    CANCELLED: colors.danger,
   };
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -273,7 +275,7 @@ export default function ConsultationScreen() {
   if (loadError && doctors.length === 0 && consultations.length === 0) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="cloud-offline-outline" size={44} color={Colors.textDisabled} />
+        <Ionicons name="cloud-offline-outline" size={44} color={colors.textDisabled} />
         <Text style={styles.loadErrorTitle}>Unable to load consultations</Text>
         <Text style={styles.loadErrorText}>{loadError}</Text>
         <TouchableOpacity
@@ -293,7 +295,7 @@ export default function ConsultationScreen() {
     <>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <LinearGradient
-          colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+          colors={[colors.headerGradientStart, colors.headerGradientEnd]}
           style={styles.header}
         >
           <View style={styles.headerRow}>
@@ -311,7 +313,7 @@ export default function ConsultationScreen() {
               <Ionicons
                 name={!isPremium ? 'lock-closed-outline' : showBooking ? 'close' : 'add'}
                 size={20}
-                color={Colors.primary}
+                color={colors.primary}
               />
             </TouchableOpacity>
           </View>
@@ -322,7 +324,7 @@ export default function ConsultationScreen() {
 
           {isPremium === false ? (
             <View style={styles.upgradeCard}>
-              <Ionicons name="lock-closed-outline" size={28} color={Colors.primary} />
+              <Ionicons name="lock-closed-outline" size={28} color={colors.primary} />
               <View style={styles.upgradeCopy}>
                 <Text style={styles.upgradeTitle}>Premium video consultations</Text>
                 <Text style={styles.upgradeText}>
@@ -338,7 +340,7 @@ export default function ConsultationScreen() {
           {isPremium && showBooking && (
             <View style={styles.bookingCard}>
               <View style={styles.premiumBadge}>
-                <Ionicons name="star-outline" size={14} color={Colors.primary} />
+                <Ionicons name="star-outline" size={14} color={colors.primary} />
                 <Text style={styles.premiumBadgeText}>Premium Feature</Text>
               </View>
               <Text style={styles.bookingTitle}>Book a Doctor</Text>
@@ -348,7 +350,7 @@ export default function ConsultationScreen() {
 
               {doctors.length === 0 ? (
                 <View style={styles.noDoctors}>
-                  <Ionicons name="person-outline" size={32} color={Colors.textDisabled} />
+                  <Ionicons name="person-outline" size={32} color={colors.textDisabled} />
                   <Text style={styles.noDoctorsText}>No doctors available right now</Text>
                 </View>
               ) : (
@@ -362,7 +364,7 @@ export default function ConsultationScreen() {
                     onPress={() => setSelectedDoctor(doctor.id)}
                   >
                     <View style={styles.doctorAvatar}>
-                      <Ionicons name="person-outline" size={24} color={Colors.primary} />
+                      <Ionicons name="person-outline" size={24} color={colors.primary} />
                     </View>
                     <View style={styles.doctorInfo}>
                       <Text style={[
@@ -408,16 +410,16 @@ export default function ConsultationScreen() {
                 disabled={booking}
               >
                 <LinearGradient
-                  colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+                  colors={[colors.headerGradientStart, colors.headerGradientEnd]}
                   style={styles.confirmButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
                   {booking ? (
-                    <ActivityIndicator color={Colors.white} />
+                    <ActivityIndicator color={colors.white} />
                   ) : (
                     <>
-                      <Ionicons name="videocam-outline" size={18} color={Colors.white} />
+                      <Ionicons name="videocam-outline" size={18} color={colors.white} />
                       <Text style={styles.confirmButtonText}>Confirm Booking</Text>
                     </>
                   )}
@@ -431,7 +433,7 @@ export default function ConsultationScreen() {
           {consultations.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="videocam-outline" size={36} color={Colors.primary} />
+                <Ionicons name="videocam-outline" size={36} color={colors.primary} />
               </View>
               <Text style={styles.emptyText}>No consultations yet</Text>
               <Text style={styles.emptySubtext}>
@@ -445,7 +447,7 @@ export default function ConsultationScreen() {
               <View key={con.id} style={styles.consultationCard}>
                 <View style={styles.conHeader}>
                   <View style={styles.doctorAvatarSmall}>
-                    <Ionicons name="person-outline" size={20} color={Colors.primary} />
+                    <Ionicons name="person-outline" size={20} color={colors.primary} />
                   </View>
                   <View style={styles.conInfo}>
                     <Text style={styles.conDoctorName}>Dr. {con.doctorName}</Text>
@@ -486,19 +488,19 @@ export default function ConsultationScreen() {
                       disabled={joiningId === con.id}
                     >
                       <LinearGradient
-                        colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+                        colors={[colors.headerGradientStart, colors.headerGradientEnd]}
                         style={styles.joinButtonGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                       >
                         {joiningId === con.id ? (
-                          <ActivityIndicator size="small" color={Colors.white} />
+                          <ActivityIndicator size="small" color={colors.white} />
                         ) : (
                           <>
                             <Ionicons
                               name={!isPremium ? 'lock-closed-outline' : 'videocam-outline'}
                               size={16}
-                              color={Colors.white}
+                              color={colors.white}
                             />
                             <Text style={styles.joinButtonText}>
                               {!isPremium
@@ -521,7 +523,7 @@ export default function ConsultationScreen() {
                         disabled={cancellingId === con.id}
                       >
                         {cancellingId === con.id ? (
-                          <ActivityIndicator size="small" color={Colors.danger} />
+                          <ActivityIndicator size="small" color={colors.danger} />
                         ) : (
                           <Text style={styles.cancelConsultationText}>Cancel</Text>
                         )}
@@ -560,7 +562,7 @@ export default function ConsultationScreen() {
           </View>
           {sessionError ? (
             <View style={styles.sessionErrorContainer}>
-              <Ionicons name="warning-outline" size={42} color={Colors.danger} />
+              <Ionicons name="warning-outline" size={42} color={colors.danger} />
               <Text style={styles.sessionErrorTitle}>Video session unavailable</Text>
               <Text style={styles.sessionErrorText}>{sessionError}</Text>
             </View>
@@ -590,78 +592,78 @@ export default function ConsultationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.headerGradientStart },
-  container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 20, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, paddingHorizontal: 28 },
-  loadErrorTitle: { marginTop: 14, fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
-  loadErrorText: { marginTop: 8, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  retryButton: { marginTop: 18, backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12 },
-  retryButtonText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.headerGradientStart },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 20, paddingBottom: 32 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background, paddingHorizontal: 28 },
+  loadErrorTitle: { marginTop: 14, fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  loadErrorText: { marginTop: 8, fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  retryButton: { marginTop: 18, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12 },
+  retryButtonText: { color: colors.white, fontWeight: '700', fontSize: 14 },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: colors.white },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)' },
-  addButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
-  upgradeCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.primary, gap: 12 },
+  addButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center' },
+  upgradeCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: colors.primary, gap: 12 },
   upgradeCopy: { gap: 4 },
-  upgradeTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  upgradeText: { fontSize: 13, color: Colors.textSecondary, lineHeight: 19 },
-  upgradeButton: { alignSelf: 'flex-start', backgroundColor: Colors.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  upgradeButtonText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
-  bookingCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: Colors.border },
-  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
-  premiumBadgeText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  bookingTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
-  bookingSubtitle: { fontSize: 13, color: Colors.textSecondary, marginBottom: 16 },
+  upgradeTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  upgradeText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+  upgradeButton: { alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  upgradeButtonText: { color: colors.white, fontSize: 13, fontWeight: '700' },
+  bookingCard: { backgroundColor: colors.surface, borderRadius: 18, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: colors.border, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.09, shadowRadius: 12, elevation: 3 },
+  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 12 },
+  premiumBadgeText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
+  bookingTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  bookingSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 16 },
   noDoctors: { alignItems: 'center', paddingVertical: 24, gap: 8 },
-  noDoctorsText: { fontSize: 14, color: Colors.textDisabled },
-  doctorCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 14, marginBottom: 8 },
-  doctorCardSelected: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  doctorAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  noDoctorsText: { fontSize: 14, color: colors.textDisabled },
+  doctorCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, marginBottom: 8 },
+  doctorCardSelected: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  doctorAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
   doctorInfo: { flex: 1 },
-  doctorName: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
-  doctorNameSelected: { color: Colors.primary },
-  doctorDept: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  availableDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.success },
-  scheduleLabel: { marginTop: 10, marginBottom: 8, fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
+  doctorName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  doctorNameSelected: { color: colors.primary },
+  doctorDept: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  availableDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success },
+  scheduleLabel: { marginTop: 10, marginBottom: 8, fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   scheduleOptions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  scheduleOption: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: Colors.background },
-  scheduleOptionSelected: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  scheduleOptionText: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
-  scheduleOptionTextSelected: { color: Colors.primary },
+  scheduleOption: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: colors.background },
+  scheduleOptionSelected: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  scheduleOptionText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  scheduleOptionTextSelected: { color: colors.primary },
   confirmButton: { borderRadius: 12, overflow: 'hidden', marginTop: 12 },
-  confirmButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  confirmButtonText: { color: colors.white, fontSize: 15, fontWeight: '700' },
   confirmButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
   buttonDisabled: { opacity: 0.6 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 14 },
   emptyState: { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: Colors.textSecondary, marginBottom: 4 },
-  emptySubtext: { fontSize: 13, color: Colors.textDisabled, textAlign: 'center' },
-  consultationCard: { backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: Colors.border },
+  emptyIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  emptyText: { fontSize: 16, fontWeight: '600', color: colors.textSecondary, marginBottom: 4 },
+  emptySubtext: { fontSize: 13, color: colors.textDisabled, textAlign: 'center' },
+  consultationCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2 },
   conHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  doctorAvatarSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  doctorAvatarSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
   conInfo: { flex: 1 },
-  conDoctorName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
-  conTime: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  conDoctorName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  conTime: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 12, fontWeight: '600' },
-  conNotes: { fontSize: 13, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 12 },
+  conNotes: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginBottom: 12 },
   consultationActions: { gap: 8 },
   joinButton: { borderRadius: 12, overflow: 'hidden' },
-  cancelConsultationButton: { borderRadius: 12, borderWidth: 1, borderColor: Colors.danger, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
-  cancelConsultationText: { color: Colors.danger, fontSize: 13, fontWeight: '700' },
+  cancelConsultationButton: { borderRadius: 12, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  cancelConsultationText: { color: colors.danger, fontSize: 13, fontWeight: '700' },
   joinButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
-  joinButtonText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
-  sessionContainer: { flex: 1, backgroundColor: Colors.black },
-  sessionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: Colors.headerGradientStart },
-  sessionTitle: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  leaveButton: { backgroundColor: Colors.danger, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  leaveButtonText: { color: Colors.white, fontWeight: '700' },
+  joinButtonText: { color: colors.white, fontSize: 14, fontWeight: '700' },
+  sessionContainer: { flex: 1, backgroundColor: colors.black },
+  sessionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: colors.headerGradientStart },
+  sessionTitle: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  leaveButton: { backgroundColor: colors.danger, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  leaveButtonText: { color: colors.white, fontWeight: '700' },
   webview: { flex: 1 },
-  sessionErrorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, backgroundColor: Colors.background },
-  sessionErrorTitle: { marginTop: 14, fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
-  sessionErrorText: { marginTop: 8, fontSize: 14, lineHeight: 20, color: Colors.textSecondary, textAlign: 'center' },
+  sessionErrorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, backgroundColor: colors.background },
+  sessionErrorTitle: { marginTop: 14, fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  sessionErrorText: { marginTop: 8, fontSize: 14, lineHeight: 20, color: colors.textSecondary, textAlign: 'center' },
 });

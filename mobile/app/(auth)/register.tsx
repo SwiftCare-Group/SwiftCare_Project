@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,6 +50,8 @@ const isValidPastDate = (value: string): boolean => {
 };
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -144,14 +147,14 @@ export default function RegisterScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
-        colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+        colors={[colors.headerGradientStart, colors.headerGradientEnd]}
         style={styles.headerGradient}
       >
       <TouchableOpacity
   style={styles.backButton}
   onPress={() => router.replace('/(auth)/login')}
 >
-          <Ionicons name="arrow-back-outline" size={22} color={Colors.white} />
+          <Ionicons name="arrow-back-outline" size={22} color={colors.white} />
         </TouchableOpacity>
 <View style={styles.logoContainer}>
   <SwiftCareLogo size={92} />
@@ -171,11 +174,11 @@ export default function RegisterScreen() {
           <View style={styles.formContainer}>
             <Text style={styles.label}>Full Name</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={18} color={Colors.textDisabled} style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={18} color={colors.textDisabled} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Enter your full name"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
@@ -186,11 +189,11 @@ export default function RegisterScreen() {
 
             <Text style={styles.label}>Email Address</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={18} color={Colors.textDisabled} style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={18} color={colors.textDisabled} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Enter your email"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -203,11 +206,11 @@ export default function RegisterScreen() {
 
             <Text style={styles.label}>Phone Number</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={18} color={Colors.textDisabled} style={styles.inputIcon} />
+              <Ionicons name="call-outline" size={18} color={colors.textDisabled} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Enter your phone number"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
@@ -218,11 +221,11 @@ export default function RegisterScreen() {
 
             <Text style={styles.label}>Date of Birth</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="calendar-outline" size={18} color={Colors.textDisabled} style={styles.inputIcon} />
+              <Ionicons name="calendar-outline" size={18} color={colors.textDisabled} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 value={dateOfBirth}
                 onChangeText={setDateOfBirth}
                 keyboardType="numbers-and-punctuation"
@@ -234,11 +237,11 @@ export default function RegisterScreen() {
 
             <Text style={styles.label}>Password</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={18} color={Colors.textDisabled} style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={18} color={colors.textDisabled} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Create a password"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -256,7 +259,7 @@ export default function RegisterScreen() {
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
-                  color={Colors.textDisabled}
+                  color={colors.textDisabled}
                 />
               </TouchableOpacity>
             </View>
@@ -267,7 +270,7 @@ export default function RegisterScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color={Colors.white} />
+                <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.registerButtonText}>Create Account</Text>
               )}
@@ -289,33 +292,33 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.headerGradientStart },
-  container: { flexGrow: 1, backgroundColor: Colors.background, },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.headerGradientStart },
+  container: { flexGrow: 1, backgroundColor: colors.background, },
   headerGradient: { paddingTop: 16, paddingBottom: 32, paddingHorizontal: 20 },
   backButton: { marginBottom: 16 },
   logoContainer: { alignItems: 'center' },
-  appName: { fontSize: 24, fontWeight: '800', color: Colors.white, marginBottom: 4 },
+  appName: { fontSize: 24, fontWeight: '800', color: colors.white, marginBottom: 4 },
   appTagline: { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
-  formContainer: { backgroundColor: Colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, padding: 24, flex: 1 },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8, marginTop: 14 },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 12 },
+  formContainer: { backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, padding: 24, flex: 1 },
+  label: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, marginTop: 14 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12 },
   inputIcon: { paddingLeft: 14 },
-  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 14, fontSize: 15, color: Colors.textPrimary },
+  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 14, fontSize: 15, color: colors.textPrimary },
   eyeButton: { paddingHorizontal: 14 },
-  registerButton: { backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
-  registerButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  registerButton: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
+  registerButtonText: { color: colors.white, fontSize: 16, fontWeight: '700' },
   buttonDisabled: { opacity: 0.6 },
   headerLogo: {
     width: 104,
     height: 104,
     borderRadius: 26,
     marginBottom: 14,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   linkButton: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },
-  linkText: { fontSize: 14, color: Colors.textSecondary },
-  linkTextBold: { color: Colors.primary, fontWeight: '700' },
+  linkText: { fontSize: 14, color: colors.textSecondary },
+  linkTextBold: { color: colors.primary, fontWeight: '700' },
 });

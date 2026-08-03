@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,8 @@ const HOME_BY_ROLE: Record<string, string> = {
 };
 
 export default function NotFoundScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
 
@@ -58,7 +61,7 @@ export default function NotFoundScreen() {
           <Ionicons
             name="compass-outline"
             size={48}
-            color={Colors.primary}
+            color={colors.primary}
           />
         </View>
 
@@ -75,10 +78,10 @@ export default function NotFoundScreen() {
           activeOpacity={0.85}
         >
           {redirecting ? (
-            <ActivityIndicator size="small" color={Colors.white} />
+            <ActivityIndicator size="small" color={colors.white} />
           ) : (
             <>
-              <Ionicons name="home-outline" size={19} color={Colors.white} />
+              <Ionicons name="home-outline" size={19} color={colors.white} />
               <Text style={styles.primaryButtonText}>Return to SwiftCare</Text>
             </>
           )}
@@ -96,10 +99,10 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -114,13 +117,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 22,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
     textAlign: 'center',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   description: {
     marginTop: 10,
@@ -128,7 +131,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   primaryButton: {
     width: '100%',
@@ -138,12 +141,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderRadius: 13,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
   secondaryButton: {
     marginTop: 12,
@@ -152,6 +155,6 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 });

@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -85,6 +86,8 @@ const getHttpStatus = (error: unknown): number | undefined =>
   (error as { response?: { status?: number } })?.response?.status;
 
 export default function DispenseScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
@@ -295,7 +298,7 @@ export default function DispenseScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
-        colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+        colors={[colors.headerGradientStart, colors.headerGradientEnd]}
         style={styles.header}
       >
         <View style={styles.headerRow}>
@@ -309,7 +312,7 @@ export default function DispenseScreen() {
             </View>
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color={Colors.white} />
+            <Ionicons name="log-out-outline" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -327,7 +330,7 @@ export default function DispenseScreen() {
           {!prescription ? (
             <View style={styles.lookupCard}>
               <View style={styles.lookupIcon}>
-                <Ionicons name="qr-code-outline" size={40} color={Colors.primary} />
+                <Ionicons name="qr-code-outline" size={40} color={colors.primary} />
               </View>
               <Text style={styles.lookupTitle}>Scan or Enter Prescription ID</Text>
               <Text style={styles.lookupSubtitle}>
@@ -339,7 +342,7 @@ export default function DispenseScreen() {
                 onPress={() => void openScanner()}
                 disabled={loading}
               >
-                <Ionicons name="camera-outline" size={20} color={Colors.primary} />
+                <Ionicons name="camera-outline" size={20} color={colors.primary} />
                 <Text style={styles.scanButtonText}>Scan QR Code</Text>
               </TouchableOpacity>
 
@@ -353,7 +356,7 @@ export default function DispenseScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 value={qrCode}
                 onChangeText={setQrCode}
                 autoCapitalize="none"
@@ -369,10 +372,10 @@ export default function DispenseScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={Colors.white} />
+                  <ActivityIndicator color={colors.white} />
                 ) : (
                   <>
-                    <Ionicons name="search-outline" size={18} color={Colors.white} />
+                    <Ionicons name="search-outline" size={18} color={colors.white} />
                     <Text style={styles.lookupButtonText}>Look Up Prescription</Text>
                   </>
                 )}
@@ -402,8 +405,8 @@ export default function DispenseScreen() {
                     {
                       backgroundColor:
                         remaining.length === 0
-                          ? Colors.successLight
-                          : Colors.warningLight,
+                          ? colors.successLight
+                          : colors.warningLight,
                     },
                   ]}
                 >
@@ -414,14 +417,14 @@ export default function DispenseScreen() {
                         : 'time-outline'
                     }
                     size={16}
-                    color={remaining.length === 0 ? Colors.success : Colors.warning}
+                    color={remaining.length === 0 ? colors.success : colors.warning}
                   />
                   <Text
                     style={[
                       styles.statusText,
                       {
                         color:
-                          remaining.length === 0 ? Colors.success : Colors.warning,
+                          remaining.length === 0 ? colors.success : colors.warning,
                       },
                     ]}
                   >
@@ -436,7 +439,7 @@ export default function DispenseScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. KNUST Hospital Pharmacy"
-                placeholderTextColor={Colors.textDisabled}
+                placeholderTextColor={colors.textDisabled}
                 value={pharmacyName}
                 onChangeText={setPharmacyName}
                 editable={!dispensing}
@@ -447,7 +450,7 @@ export default function DispenseScreen() {
 
               {remaining.length === 0 ? (
                 <View style={styles.allDoneCard}>
-                  <Ionicons name="checkmark-circle" size={40} color={Colors.success} />
+                  <Ionicons name="checkmark-circle" size={40} color={colors.success} />
                   <Text style={styles.allDoneText}>All drugs have been processed</Text>
                 </View>
               ) : (
@@ -455,7 +458,7 @@ export default function DispenseScreen() {
                   <View key={record.id ?? record.drugName} style={styles.drugCard}>
                     <View style={styles.drugHeader}>
                       <View style={styles.drugIcon}>
-                        <Ionicons name="medical-outline" size={18} color={Colors.primary} />
+                        <Ionicons name="medical-outline" size={18} color={colors.primary} />
                       </View>
                       <Text style={styles.drugName}>{record.drugName}</Text>
                     </View>
@@ -471,10 +474,10 @@ export default function DispenseScreen() {
                         disabled={dispensing !== null}
                       >
                         {dispensing === record.drugName ? (
-                          <ActivityIndicator color={Colors.white} size="small" />
+                          <ActivityIndicator color={colors.white} size="small" />
                         ) : (
                           <>
-                            <Ionicons name="checkmark-outline" size={14} color={Colors.white} />
+                            <Ionicons name="checkmark-outline" size={14} color={colors.white} />
                             <Text style={styles.dispenseButtonText}>Dispense</Text>
                           </>
                         )}
@@ -489,7 +492,7 @@ export default function DispenseScreen() {
                         }
                         disabled={dispensing !== null}
                       >
-                        <Ionicons name="close-outline" size={14} color={Colors.textSecondary} />
+                        <Ionicons name="close-outline" size={14} color={colors.textSecondary} />
                         <Text style={styles.unavailableButtonText}>Unavailable</Text>
                       </TouchableOpacity>
                     </View>
@@ -512,7 +515,7 @@ export default function DispenseScreen() {
               style={styles.scannerCloseButton}
               onPress={() => setScannerVisible(false)}
             >
-              <Ionicons name="close" size={24} color={Colors.white} />
+              <Ionicons name="close" size={24} color={colors.white} />
             </TouchableOpacity>
             <Text style={styles.scannerTitle}>Scan Prescription QR</Text>
             <View style={styles.scannerHeaderSpacer} />
@@ -538,62 +541,62 @@ export default function DispenseScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.headerGradientStart },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.headerGradientStart },
   keyboardView: { flex: 1 },
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 20, paddingBottom: 40 },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerTextContainer: { flex: 1 },
-  headerTitle: { fontSize: 21, fontWeight: '700', color: Colors.white },
+  headerTitle: { fontSize: 21, fontWeight: '700', color: colors.white },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
   logoutBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  lookupCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  lookupIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  lookupTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8, textAlign: 'center' },
-  lookupSubtitle: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-  scanButton: { width: '100%', minHeight: 50, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  scanButtonText: { color: Colors.primary, fontSize: 15, fontWeight: '700' },
+  lookupCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  lookupIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  lookupTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
+  lookupSubtitle: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  scanButton: { width: '100%', minHeight: 50, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  scanButtonText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   orRow: { width: '100%', flexDirection: 'row', alignItems: 'center', marginVertical: 18 },
-  orDivider: { flex: 1, height: 1, backgroundColor: Colors.border },
-  orText: { marginHorizontal: 12, color: Colors.textDisabled, fontSize: 11, fontWeight: '700' },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8, marginTop: 4, alignSelf: 'flex-start', width: '100%' },
-  input: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: Colors.textPrimary, width: '100%', marginBottom: 16 },
-  lookupButton: { backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' },
-  lookupButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  orDivider: { flex: 1, height: 1, backgroundColor: colors.border },
+  orText: { marginHorizontal: 12, color: colors.textDisabled, fontSize: 11, fontWeight: '700' },
+  label: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, marginTop: 4, alignSelf: 'flex-start', width: '100%' },
+  input: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: colors.textPrimary, width: '100%', marginBottom: 16 },
+  lookupButton: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' },
+  lookupButtonText: { color: colors.white, fontSize: 15, fontWeight: '700' },
   buttonDisabled: { opacity: 0.55 },
-  prescCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
+  prescCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   prescHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  rxBadge: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
-  rxText: { fontSize: 16, fontWeight: '800', color: Colors.primary, fontStyle: 'italic' },
+  rxBadge: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  rxText: { fontSize: 16, fontWeight: '800', color: colors.primary, fontStyle: 'italic' },
   prescInfo: { flex: 1 },
-  prescId: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
-  prescDate: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  newScanBtn: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  newScanText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  prescId: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  prescDate: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  newScanBtn: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  newScanText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 10 },
   statusText: { fontSize: 13, fontWeight: '600' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 12, marginTop: 8 },
-  allDoneCard: { alignItems: 'center', paddingVertical: 40, backgroundColor: Colors.successLight, borderRadius: 16, gap: 12 },
-  allDoneText: { fontSize: 16, fontWeight: '600', color: Colors.success },
-  drugCard: { backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: Colors.border },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 12, marginTop: 8 },
+  allDoneCard: { alignItems: 'center', paddingVertical: 40, backgroundColor: colors.successLight, borderRadius: 16, gap: 12 },
+  allDoneText: { fontSize: 16, fontWeight: '600', color: colors.success },
+  drugCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   drugHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  drugIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
-  drugName: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
+  drugIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  drugName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flex: 1 },
   drugActions: { flexDirection: 'row', gap: 10 },
-  dispenseButton: { flex: 1, backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  dispenseButtonText: { color: Colors.white, fontWeight: '700', fontSize: 13 },
-  unavailableButton: { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  unavailableButtonText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
-  scannerSafeArea: { flex: 1, backgroundColor: Colors.black },
-  scannerHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.headerDark },
+  dispenseButton: { flex: 1, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  dispenseButtonText: { color: colors.white, fontWeight: '700', fontSize: 13 },
+  unavailableButton: { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  unavailableButtonText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  scannerSafeArea: { flex: 1, backgroundColor: colors.black },
+  scannerHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.headerDark },
   scannerCloseButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
-  scannerTitle: { color: Colors.white, fontSize: 17, fontWeight: '700' },
+  scannerTitle: { color: colors.white, fontSize: 17, fontWeight: '700' },
   scannerHeaderSpacer: { width: 42 },
   cameraContainer: { flex: 1 },
   scannerOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.18)' },
-  scanFrame: { width: 260, height: 260, borderWidth: 3, borderColor: Colors.white, borderRadius: 24, backgroundColor: 'transparent' },
-  scannerHint: { marginTop: 26, maxWidth: 300, color: Colors.white, fontSize: 14, lineHeight: 20, textAlign: 'center', fontWeight: '600' },
+  scanFrame: { width: 260, height: 260, borderWidth: 3, borderColor: colors.white, borderRadius: 24, backgroundColor: 'transparent' },
+  scannerHint: { marginTop: 26, maxWidth: 300, color: colors.white, fontSize: 14, lineHeight: 20, textAlign: 'center', fontWeight: '600' },
 });

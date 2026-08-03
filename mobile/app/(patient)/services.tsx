@@ -269,6 +269,7 @@ export default function ServicesScreen() {
                         color: colors.textPrimary,
                       },
                     ]}
+                    numberOfLines={1}
                   >
                     {service.title}
                   </Text>
@@ -287,6 +288,7 @@ export default function ServicesScreen() {
                       color: colors.textSecondary,
                     },
                   ]}
+                  numberOfLines={2}
                 >
                   {service.subtitle}
                 </Text>
@@ -386,7 +388,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 28,
   },
 
   introCard: {
@@ -440,6 +442,11 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
 
   serviceIcon: {
@@ -494,6 +501,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 22,
+    marginBottom: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 2,
   },
 
   supportIcon: {

@@ -366,29 +366,16 @@ export default function HomeScreen() {
         >
           <View style={styles.headerTop}>
             <View style={styles.brandGreetingRow}>
-              <SwiftCareLogo size={48} compact />
-
-              <View style={styles.greetingContainer}>
-                <Text style={styles.brandName}>
-                  SwiftCare
-                </Text>
-
-                <Text style={styles.greeting}>
-                  {firstName
-                    ? `${greeting}, ${firstName} 👋`
-                    : `${greeting} 👋`}
-                </Text>
-
-                <Text style={styles.greetingSubtext}>
-                  Your health is our priority today
-                </Text>
-              </View>
+              <SwiftCareLogo size={44} compact />
+              <Text style={styles.brandName}>SwiftCare</Text>
             </View>
 
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.headerIcon}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Open notifications"
                 onPress={async () => {
                   await loadUnreadNotifications();
                   router.push("/notifications" as never);
@@ -402,12 +389,8 @@ export default function HomeScreen() {
 
                 {unreadCount > 0 ? (
                   <View style={styles.notificationBadge}>
-                    <Text
-                      style={styles.notificationBadgeText}
-                    >
-                      {unreadCount > 9
-                        ? "9+"
-                        : String(unreadCount)}
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadCount > 9 ? "9+" : String(unreadCount)}
                     </Text>
                   </View>
                 ) : null}
@@ -416,6 +399,8 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.headerIcon}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="About SwiftCare"
                 onPress={() => {
                   Alert.alert(
                     "SwiftCare",
@@ -432,6 +417,17 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greeting} numberOfLines={2}>
+              {firstName
+                ? `${greeting}, ${firstName} 👋`
+                : `${greeting} 👋`}
+            </Text>
+
+            <Text style={styles.greetingSubtext} numberOfLines={1}>
+              Your health is our priority today
+            </Text>
+          </View>
           <Text style={styles.currentDate}>
             {new Date().toLocaleDateString("en-GB", {
               weekday: "long",
@@ -1450,7 +1446,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 32,
   },
 
   loadingContainer: {
@@ -1481,7 +1477,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingRight: 8,
+    paddingRight: 12,
   },
 
   headerLogo: {
@@ -1495,18 +1491,20 @@ const styles = StyleSheet.create({
   },
 
   greetingContainer: {
-    flex: 1,
+    marginTop: 12,
+    paddingRight: 8,
   },
 
   brandName: {
     fontSize: 13,
     fontWeight: "700",
     color: "rgba(255,255,255,0.82)",
-    marginBottom: 2,
+    marginLeft: 10,
   },
 
   greeting: {
-    fontSize: 19,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "800",
     color: Colors.white,
   },
@@ -1523,9 +1521,9 @@ const styles = StyleSheet.create({
   },
 
   headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
@@ -1553,8 +1551,8 @@ const styles = StyleSheet.create({
   currentDate: {
     fontSize: 12,
     color: "rgba(255,255,255,0.75)",
+    marginTop: 10,
     marginBottom: 18,
-    marginLeft: 68,
   },
 
   queueOverviewCard: {
@@ -1834,7 +1832,7 @@ const styles = StyleSheet.create({
   quickActionTitle: {
     fontSize: 14,
     fontWeight: "800",
-    marginBottom: 2,
+    marginLeft: 10,
   },
 
   quickActionSubtitle: {

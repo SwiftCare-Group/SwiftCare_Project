@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -27,6 +28,8 @@ import SwiftCareLogo from "../../components/branding/SwiftCareLogo";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -114,8 +117,8 @@ export default function LoginScreen() {
     >
       <LinearGradient
         colors={[
-          Colors.headerGradientStart,
-          Colors.headerGradientEnd,
+          colors.headerGradientStart,
+          colors.headerGradientEnd,
         ]}
         style={styles.headerGradient}
       >
@@ -162,7 +165,7 @@ export default function LoginScreen() {
               <Ionicons
                 name="mail-outline"
                 size={19}
-                color={Colors.textDisabled}
+                color={colors.textDisabled}
                 style={styles.inputIcon}
               />
 
@@ -170,7 +173,7 @@ export default function LoginScreen() {
                 style={styles.input}
                 placeholder="Enter your email"
                 placeholderTextColor={
-                  Colors.textDisabled
+                  colors.textDisabled
                 }
                 value={email}
                 onChangeText={setEmail}
@@ -190,7 +193,7 @@ export default function LoginScreen() {
               <Ionicons
                 name="lock-closed-outline"
                 size={19}
-                color={Colors.textDisabled}
+                color={colors.textDisabled}
                 style={styles.inputIcon}
               />
 
@@ -198,7 +201,7 @@ export default function LoginScreen() {
                 style={styles.input}
                 placeholder="Enter your password"
                 placeholderTextColor={
-                  Colors.textDisabled
+                  colors.textDisabled
                 }
                 value={password}
                 onChangeText={setPassword}
@@ -231,7 +234,7 @@ export default function LoginScreen() {
                       : "eye-outline"
                   }
                   size={21}
-                  color={Colors.textDisabled}
+                  color={colors.textDisabled}
                 />
               </TouchableOpacity>
             </View>
@@ -264,7 +267,7 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator
                   size="small"
-                  color={Colors.white}
+                  color={colors.white}
                 />
               ) : (
                 <Text
@@ -317,7 +320,7 @@ export default function LoginScreen() {
               <Ionicons
                 name="people-outline"
                 size={19}
-                color={Colors.primary}
+                color={colors.primary}
               />
 
               <Text style={styles.staffButtonText}>
@@ -331,11 +334,11 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor:
-      Colors.headerGradientStart,
+      colors.headerGradientStart,
   },
 
   keyboardView: {
@@ -344,7 +347,7 @@ const styles = StyleSheet.create({
 
   container: {
     flexGrow: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   headerGradient: {
@@ -363,7 +366,7 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 26,
     marginBottom: 14,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.white,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -371,7 +374,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 29,
     fontWeight: "800",
-    color: Colors.white,
+    color: colors.white,
     marginBottom: 5,
   },
 
@@ -387,7 +390,7 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     paddingHorizontal: 24,
     paddingBottom: 36,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
   },
@@ -395,20 +398,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 5,
   },
 
   subtitle: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 24,
   },
 
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: 12,
     marginBottom: 8,
   },
@@ -417,9 +420,9 @@ const styles = StyleSheet.create({
     minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 12,
   },
 
@@ -432,7 +435,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 14,
     fontSize: 15,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   eyeButton: {
@@ -449,21 +452,21 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     fontSize: 13,
     fontWeight: "600",
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   loginButton: {
     minHeight: 54,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     marginTop: 22,
     paddingVertical: 15,
   },
 
   loginButtonText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -480,11 +483,11 @@ const styles = StyleSheet.create({
 
   linkText: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   linkTextBold: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
 
@@ -498,13 +501,13 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
 
   dividerText: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
   },
 
   staffButton: {
@@ -514,14 +517,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 12,
   },
 
   staffButtonText: {
-    color: Colors.primary,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: "700",
   },

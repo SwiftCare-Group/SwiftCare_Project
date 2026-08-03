@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import {
   ActivityIndicator,
   Alert,
@@ -51,6 +52,8 @@ interface DrugItem {
 }
 
 export default function DoctorConsultationScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [activeConsultation, setActiveConsultation] =
     useState<Consultation | null>(null);
@@ -390,16 +393,16 @@ export default function DoctorConsultationScreen() {
   };
 
   const STATUS_COLORS: Record<ConsultationStatus, string> = {
-    SCHEDULED: Colors.warning,
-    IN_PROGRESS: Colors.primary,
-    COMPLETED: Colors.success,
-    CANCELLED: Colors.danger,
+    SCHEDULED: colors.warning,
+    IN_PROGRESS: colors.primary,
+    COMPLETED: colors.success,
+    CANCELLED: colors.danger,
   };
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading consultations...</Text>
       </View>
     );
@@ -410,8 +413,8 @@ export default function DoctorConsultationScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <LinearGradient
           colors={[
-            Colors.headerGradientStart,
-            Colors.headerGradientEnd,
+            colors.headerGradientStart,
+            colors.headerGradientEnd,
           ]}
           style={styles.header}
         >
@@ -429,12 +432,12 @@ export default function DoctorConsultationScreen() {
               disabled={refreshing}
             >
               {refreshing ? (
-                <ActivityIndicator size="small" color={Colors.white} />
+                <ActivityIndicator size="small" color={colors.white} />
               ) : (
                 <Ionicons
                   name="refresh-outline"
                   size={21}
-                  color={Colors.white}
+                  color={colors.white}
                 />
               )}
             </TouchableOpacity>
@@ -448,8 +451,8 @@ export default function DoctorConsultationScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => fetchConsultations(true)}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         >
@@ -459,7 +462,7 @@ export default function DoctorConsultationScreen() {
                 <Ionicons
                   name="videocam-outline"
                   size={36}
-                  color={Colors.primary}
+                  color={colors.primary}
                 />
               </View>
 
@@ -474,7 +477,7 @@ export default function DoctorConsultationScreen() {
           ) : (
             consultations.map((consultation) => {
               const statusColor =
-                STATUS_COLORS[consultation.status] || Colors.textSecondary;
+                STATUS_COLORS[consultation.status] || colors.textSecondary;
 
               const isJoining = joining === consultation.id;
 
@@ -488,7 +491,7 @@ export default function DoctorConsultationScreen() {
                       <Ionicons
                         name="person-outline"
                         size={20}
-                        color={Colors.primary}
+                        color={colors.primary}
                       />
                     </View>
 
@@ -541,8 +544,8 @@ export default function DoctorConsultationScreen() {
                       >
                         <LinearGradient
                           colors={[
-                            Colors.headerGradientStart,
-                            Colors.headerGradientEnd,
+                            colors.headerGradientStart,
+                            colors.headerGradientEnd,
                           ]}
                           style={styles.joinButtonGradient}
                           start={{ x: 0, y: 0 }}
@@ -551,14 +554,14 @@ export default function DoctorConsultationScreen() {
                           {isJoining ? (
                             <ActivityIndicator
                               size="small"
-                              color={Colors.white}
+                              color={colors.white}
                             />
                           ) : (
                             <>
                               <Ionicons
                                 name="videocam-outline"
                                 size={17}
-                                color={Colors.white}
+                                color={colors.white}
                               />
 
                               <Text style={styles.joinButtonText}>
@@ -611,7 +614,7 @@ export default function DoctorConsultationScreen() {
               <Ionicons
                 name="document-text-outline"
                 size={17}
-                color={Colors.white}
+                color={colors.white}
               />
 
               <Text style={styles.endButtonText}>
@@ -622,7 +625,7 @@ export default function DoctorConsultationScreen() {
 
           {sessionError ? (
             <View style={styles.webviewLoader}>
-              <Ionicons name="warning-outline" size={48} color={Colors.danger} />
+              <Ionicons name="warning-outline" size={48} color={colors.danger} />
               <Text style={styles.webviewLoadingText}>{sessionError}</Text>
             </View>
           ) : sessionUrl ? (
@@ -646,7 +649,7 @@ export default function DoctorConsultationScreen() {
                 <View style={styles.webviewLoader}>
                   <ActivityIndicator
                     size="large"
-                    color={Colors.primary}
+                    color={colors.primary}
                   />
                   <Text style={styles.webviewLoadingText}>
                     Connecting to session...
@@ -659,7 +662,7 @@ export default function DoctorConsultationScreen() {
               <Ionicons
                 name="videocam-off-outline"
                 size={48}
-                color={Colors.textDisabled}
+                color={colors.textDisabled}
               />
               <Text style={styles.webviewLoadingText}>
                 Session URL is unavailable.
@@ -682,8 +685,8 @@ export default function DoctorConsultationScreen() {
         >
           <LinearGradient
             colors={[
-              Colors.headerGradientStart,
-              Colors.headerGradientEnd,
+              colors.headerGradientStart,
+              colors.headerGradientEnd,
             ]}
             style={styles.clinicalHeader}
           >
@@ -696,7 +699,7 @@ export default function DoctorConsultationScreen() {
                 <Ionicons
                   name="videocam-outline"
                   size={21}
-                  color={Colors.white}
+                  color={colors.white}
                 />
               </TouchableOpacity>
 
@@ -718,7 +721,7 @@ export default function DoctorConsultationScreen() {
                 <Ionicons
                   name="close-outline"
                   size={24}
-                  color={Colors.white}
+                  color={colors.white}
                 />
               </TouchableOpacity>
             </View>
@@ -738,7 +741,7 @@ export default function DoctorConsultationScreen() {
                   <Ionicons
                     name="person-outline"
                     size={23}
-                    color={Colors.primary}
+                    color={colors.primary}
                   />
                 </View>
 
@@ -770,7 +773,7 @@ export default function DoctorConsultationScreen() {
                     <Ionicons
                       name="medkit-outline"
                       size={18}
-                      color={Colors.primary}
+                      color={colors.primary}
                     />
                   </View>
 
@@ -790,7 +793,7 @@ export default function DoctorConsultationScreen() {
                 <TextInput
                   style={[styles.input, styles.largeTextArea]}
                   placeholder="Enter the patient's diagnosis..."
-                  placeholderTextColor={Colors.textDisabled}
+                  placeholderTextColor={colors.textDisabled}
                   value={diagnosis}
                   onChangeText={setDiagnosis}
                   multiline
@@ -815,7 +818,7 @@ export default function DoctorConsultationScreen() {
                 <TextInput
                   style={[styles.input, styles.largeTextArea]}
                   placeholder="Enter clinical observations and advice..."
-                  placeholderTextColor={Colors.textDisabled}
+                  placeholderTextColor={colors.textDisabled}
                   value={consultationNotes}
                   onChangeText={setConsultationNotes}
                   multiline
@@ -834,7 +837,7 @@ export default function DoctorConsultationScreen() {
                   <TextInput
                     style={[styles.input, styles.vitalInput]}
                     placeholder="Temperature °C"
-                    placeholderTextColor={Colors.textDisabled}
+                    placeholderTextColor={colors.textDisabled}
                     value={temperature}
                     onChangeText={setTemperature}
                     keyboardType="decimal-pad"
@@ -843,7 +846,7 @@ export default function DoctorConsultationScreen() {
                   <TextInput
                     style={[styles.input, styles.vitalInput]}
                     placeholder="Blood pressure 120/80"
-                    placeholderTextColor={Colors.textDisabled}
+                    placeholderTextColor={colors.textDisabled}
                     value={bloodPressure}
                     onChangeText={setBloodPressure}
                     editable={!submitting}
@@ -851,7 +854,7 @@ export default function DoctorConsultationScreen() {
                   <TextInput
                     style={[styles.input, styles.vitalInput]}
                     placeholder="Pulse bpm"
-                    placeholderTextColor={Colors.textDisabled}
+                    placeholderTextColor={colors.textDisabled}
                     value={pulseRate}
                     onChangeText={setPulseRate}
                     keyboardType="number-pad"
@@ -860,7 +863,7 @@ export default function DoctorConsultationScreen() {
                   <TextInput
                     style={[styles.input, styles.vitalInput]}
                     placeholder="Respiratory rate"
-                    placeholderTextColor={Colors.textDisabled}
+                    placeholderTextColor={colors.textDisabled}
                     value={respiratoryRate}
                     onChangeText={setRespiratoryRate}
                     keyboardType="number-pad"
@@ -869,7 +872,7 @@ export default function DoctorConsultationScreen() {
                   <TextInput
                     style={[styles.input, styles.vitalInput]}
                     placeholder="SpO₂ %"
-                    placeholderTextColor={Colors.textDisabled}
+                    placeholderTextColor={colors.textDisabled}
                     value={oxygenSaturation}
                     onChangeText={setOxygenSaturation}
                     keyboardType="number-pad"
@@ -878,7 +881,7 @@ export default function DoctorConsultationScreen() {
                   <TextInput
                     style={[styles.input, styles.vitalInput]}
                     placeholder="Weight kg"
-                    placeholderTextColor={Colors.textDisabled}
+                    placeholderTextColor={colors.textDisabled}
                     value={weight}
                     onChangeText={setWeight}
                     keyboardType="decimal-pad"
@@ -897,7 +900,7 @@ export default function DoctorConsultationScreen() {
                 <TextInput
                   style={[styles.input, styles.mediumTextArea]}
                   placeholder="e.g. Full blood count, malaria test..."
-                  placeholderTextColor={Colors.textDisabled}
+                  placeholderTextColor={colors.textDisabled}
                   value={labRequest}
                   onChangeText={setLabRequest}
                   multiline
@@ -913,7 +916,7 @@ export default function DoctorConsultationScreen() {
                     <Ionicons
                       name="calendar-outline"
                       size={18}
-                      color={Colors.primary}
+                      color={colors.primary}
                     />
                   </View>
                   <Text style={styles.sectionTitle}>Follow-up and referral</Text>
@@ -923,7 +926,7 @@ export default function DoctorConsultationScreen() {
                 <TextInput
                   style={[styles.input, styles.mediumTextArea]}
                   placeholder="Review date, home care and warning signs..."
-                  placeholderTextColor={Colors.textDisabled}
+                  placeholderTextColor={colors.textDisabled}
                   value={followUpInstructions}
                   onChangeText={setFollowUpInstructions}
                   multiline
@@ -935,7 +938,7 @@ export default function DoctorConsultationScreen() {
                 <TextInput
                   style={[styles.input, styles.mediumTextArea]}
                   placeholder="Optional referral destination and reason..."
-                  placeholderTextColor={Colors.textDisabled}
+                  placeholderTextColor={colors.textDisabled}
                   value={referralNotes}
                   onChangeText={setReferralNotes}
                   multiline
@@ -951,7 +954,7 @@ export default function DoctorConsultationScreen() {
                       <Ionicons
                         name="medical-outline"
                         size={18}
-                        color={Colors.primary}
+                        color={colors.primary}
                       />
                     </View>
 
@@ -968,7 +971,7 @@ export default function DoctorConsultationScreen() {
                     <Ionicons
                       name="add-outline"
                       size={18}
-                      color={Colors.primary}
+                      color={colors.primary}
                     />
 
                     <Text style={styles.addDrugText}>
@@ -993,7 +996,7 @@ export default function DoctorConsultationScreen() {
                     <TextInput
                       style={[styles.input, styles.drugInput]}
                       placeholder="e.g. Paracetamol 500mg, twice daily for 5 days"
-                      placeholderTextColor={Colors.textDisabled}
+                      placeholderTextColor={colors.textDisabled}
                       value={drug.value}
                       onChangeText={(value) =>
                         updateDrug(drug.id, value)
@@ -1009,7 +1012,7 @@ export default function DoctorConsultationScreen() {
                       <Ionicons
                         name="trash-outline"
                         size={19}
-                        color={Colors.danger}
+                        color={colors.danger}
                       />
                     </TouchableOpacity>
                   </View>
@@ -1020,7 +1023,7 @@ export default function DoctorConsultationScreen() {
                     <Ionicons
                       name="information-circle-outline"
                       size={18}
-                      color={Colors.textSecondary}
+                      color={colors.textSecondary}
                     />
 
                     <Text style={styles.optionalNoticeText}>
@@ -1043,7 +1046,7 @@ export default function DoctorConsultationScreen() {
                   <>
                     <ActivityIndicator
                       size="small"
-                      color={Colors.white}
+                      color={colors.white}
                     />
                     <Text style={styles.finishButtonText}>
                       Saving consultation...
@@ -1054,7 +1057,7 @@ export default function DoctorConsultationScreen() {
                     <Ionicons
                       name="checkmark-circle-outline"
                       size={21}
-                      color={Colors.white}
+                      color={colors.white}
                     />
 
                     <Text style={styles.finishButtonText}>
@@ -1172,19 +1175,19 @@ function formatStatus(status: string) {
     .join(' ');
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   flex: {
     flex: 1,
   },
 
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor: colors.headerGradientStart,
   },
 
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   content: {
@@ -1196,13 +1199,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   header: {
@@ -1220,7 +1223,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
 
   headerSubtitle: {
@@ -1247,7 +1250,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -1256,23 +1259,23 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
 
   emptySubtext: {
     fontSize: 13,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
     textAlign: 'center',
   },
 
   consultationCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
 
   cardHeader: {
@@ -1286,7 +1289,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1297,7 +1300,7 @@ const styles = StyleSheet.create({
 
   patientLabel: {
     fontSize: 11,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1305,13 +1308,13 @@ const styles = StyleSheet.create({
   scheduledTime: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: 3,
   },
 
   patientIdText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 4,
   },
 
@@ -1333,14 +1336,14 @@ const styles = StyleSheet.create({
     padding: 11,
     borderRadius: 10,
     marginBottom: 12,
-    backgroundColor: `${Colors.warning}12`,
+    backgroundColor: `${colors.warning}12`,
   },
 
   warningText: {
     flex: 1,
     fontSize: 12,
     lineHeight: 17,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   joinButton: {
@@ -1358,7 +1361,7 @@ const styles = StyleSheet.create({
   },
 
   joinButtonText: {
-    color: Colors.white,
+    color: colors.white,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -1369,7 +1372,7 @@ const styles = StyleSheet.create({
 
   sessionSafeArea: {
     flex: 1,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor: colors.headerGradientStart,
   },
 
   sessionHeader: {
@@ -1378,7 +1381,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor: colors.headerGradientStart,
   },
 
   sessionHeaderInfo: {
@@ -1392,11 +1395,11 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.danger,
+    backgroundColor: colors.danger,
   },
 
   sessionTitle: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -1411,14 +1414,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.danger,
+    backgroundColor: colors.danger,
     paddingHorizontal: 13,
     paddingVertical: 9,
     borderRadius: 9,
   },
 
   endButtonText: {
-    color: Colors.white,
+    color: colors.white,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -1431,18 +1434,18 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   webviewLoadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   clinicalSafeArea: {
     flex: 1,
-    backgroundColor: Colors.headerGradientStart,
+    backgroundColor: colors.headerGradientStart,
   },
 
   clinicalHeader: {
@@ -1463,7 +1466,7 @@ const styles = StyleSheet.create({
   clinicalHeaderTitle: {
     fontSize: 19,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
 
   clinicalHeaderSubtitle: {
@@ -1483,7 +1486,7 @@ const styles = StyleSheet.create({
 
   clinicalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   clinicalContent: {
@@ -1494,9 +1497,9 @@ const styles = StyleSheet.create({
   patientSummaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 14,
     marginBottom: 16,
@@ -1508,7 +1511,7 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   summaryDetails: {
@@ -1519,32 +1522,32 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   summaryText: {
     marginTop: 3,
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   inProgressBadge: {
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 20,
-    backgroundColor: `${Colors.primary}18`,
+    backgroundColor: `${colors.primary}18`,
   },
 
   inProgressText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   formSection: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 16,
     marginBottom: 16,
@@ -1570,13 +1573,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   vitalsGrid: {
@@ -1593,31 +1596,31 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 4,
     marginTop: 14,
   },
 
   required: {
-    color: Colors.danger,
+    color: colors.danger,
   },
 
   fieldHint: {
     fontSize: 12,
     lineHeight: 17,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
     marginBottom: 8,
   },
 
   input: {
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 11,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 
   largeTextArea: {
@@ -1632,7 +1635,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     marginTop: 5,
     fontSize: 11,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
   },
 
   addDrugButton: {
@@ -1642,13 +1645,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 9,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   addDrugText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   drugRow: {
@@ -1664,13 +1667,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
 
   drugNumberText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   drugInput: {
@@ -1683,7 +1686,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: `${Colors.danger}12`,
+    backgroundColor: `${colors.danger}12`,
   },
 
   optionalNotice: {
@@ -1693,14 +1696,14 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 11,
     borderRadius: 10,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   optionalNoticeText: {
     flex: 1,
     fontSize: 12,
     lineHeight: 17,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   finishButton: {
@@ -1711,11 +1714,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 9,
     paddingHorizontal: 18,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
 
   finishButtonText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -1726,6 +1729,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 11,
     lineHeight: 16,
-    color: Colors.textDisabled,
+    color: colors.textDisabled,
   },
 });

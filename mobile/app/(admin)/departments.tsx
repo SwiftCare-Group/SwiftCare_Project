@@ -1,3 +1,4 @@
+import { useTheme, type AppColors } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -27,6 +28,8 @@ type Department = {
 };
 
 export default function DepartmentsScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -112,7 +115,7 @@ export default function DepartmentsScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -120,7 +123,7 @@ export default function DepartmentsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <LinearGradient
-        colors={[Colors.headerGradientStart, Colors.headerGradientEnd]}
+        colors={[colors.headerGradientStart, colors.headerGradientEnd]}
         style={styles.header}
       >
         <View style={styles.headerRow}>
@@ -136,9 +139,9 @@ export default function DepartmentsScreen() {
               accessibilityLabel="Refresh departments"
             >
               {refreshing ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Ionicons name="refresh" size={18} color={Colors.primary} />
+                <Ionicons name="refresh" size={18} color={colors.primary} />
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -146,7 +149,7 @@ export default function DepartmentsScreen() {
               onPress={() => setShowForm(current => !current)}
               accessibilityLabel={showForm ? 'Close department form' : 'Add department'}
             >
-              <Ionicons name={showForm ? 'close' : 'add'} size={20} color={Colors.primary} />
+              <Ionicons name={showForm ? 'close' : 'add'} size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -165,7 +168,7 @@ export default function DepartmentsScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g. Cardiology"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
@@ -175,7 +178,7 @@ export default function DepartmentsScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g. 08:00 - 17:00"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               value={operatingHours}
               onChangeText={setOperatingHours}
               autoCapitalize="none"
@@ -185,7 +188,7 @@ export default function DepartmentsScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g. 100"
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor={colors.textDisabled}
               value={queueCapacity}
               onChangeText={setQueueCapacity}
               keyboardType="number-pad"
@@ -197,7 +200,7 @@ export default function DepartmentsScreen() {
               disabled={submitting}
             >
               {submitting ? (
-                <ActivityIndicator color={Colors.white} />
+                <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.createButtonText}>Create Department</Text>
               )}
@@ -207,7 +210,7 @@ export default function DepartmentsScreen() {
 
         {departments.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="business-outline" size={34} color={Colors.primary} />
+            <Ionicons name="business-outline" size={34} color={colors.primary} />
             <Text style={styles.emptyTitle}>No active departments</Text>
             <Text style={styles.emptyText}>Tap + to configure the first department.</Text>
           </View>
@@ -216,7 +219,7 @@ export default function DepartmentsScreen() {
             <View key={department.id} style={styles.deptCard}>
               <View style={styles.deptHeader}>
                 <View style={styles.deptIcon}>
-                  <Ionicons name="business-outline" size={20} color={Colors.primary} />
+                  <Ionicons name="business-outline" size={20} color={colors.primary} />
                 </View>
                 <View style={styles.deptInfo}>
                   <Text style={styles.deptName}>{department.name}</Text>
@@ -228,11 +231,11 @@ export default function DepartmentsScreen() {
               </View>
               <View style={styles.deptMeta}>
                 <View style={styles.metaItem}>
-                  <Ionicons name="time-outline" size={13} color={Colors.textDisabled} />
+                  <Ionicons name="time-outline" size={13} color={colors.textDisabled} />
                   <Text style={styles.metaText}>{department.operatingHours}</Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Ionicons name="people-outline" size={13} color={Colors.textDisabled} />
+                  <Ionicons name="people-outline" size={13} color={colors.textDisabled} />
                   <Text style={styles.metaText}>Daily capacity: {department.queueCapacity}</Text>
                 </View>
               </View>
@@ -244,36 +247,36 @@ export default function DepartmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.headerGradientStart },
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.headerGradientStart },
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 20, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerActions: { flexDirection: 'row', gap: 10 },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.white },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: colors.white },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
-  addButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
-  formCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: Colors.border },
-  formTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
-  fieldLabel: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
-  createButton: { backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  createButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  addButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center' },
+  formCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
+  formTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  fieldLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: colors.textPrimary },
+  createButton: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  createButtonText: { color: colors.white, fontSize: 15, fontWeight: '700' },
   buttonDisabled: { opacity: 0.6 },
-  deptCard: { backgroundColor: Colors.surface, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: Colors.border },
+  deptCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
   deptHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  deptIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  deptIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
   deptInfo: { flex: 1 },
-  deptName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
-  deptHospital: { fontSize: 12, color: Colors.textDisabled, marginTop: 2 },
-  activeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: Colors.successLight },
-  activeText: { fontSize: 12, fontWeight: '600', color: Colors.success },
+  deptName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  deptHospital: { fontSize: 12, color: colors.textDisabled, marginTop: 2 },
+  activeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.successLight },
+  activeText: { fontSize: 12, fontWeight: '600', color: colors.success },
   deptMeta: { gap: 7 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: 12, color: Colors.textDisabled },
+  metaText: { fontSize: 12, color: colors.textDisabled },
   emptyState: { alignItems: 'center', paddingVertical: 70 },
-  emptyTitle: { marginTop: 12, fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  emptyText: { marginTop: 4, fontSize: 13, color: Colors.textSecondary },
+  emptyTitle: { marginTop: 12, fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  emptyText: { marginTop: 4, fontSize: 13, color: colors.textSecondary },
 });
