@@ -613,6 +613,10 @@ api.interceptors.response.use(
     const isRegisterRequest =
       requestUrl.includes('/auth/register');
 
+    const isEmailVerificationRequest =
+      requestUrl.includes('/auth/verify-email') ||
+      requestUrl.includes('/auth/resend-verification');
+
     const isRefreshRequest =
       requestUrl.includes('/auth/refresh');
 
@@ -625,6 +629,7 @@ api.interceptors.response.use(
       !originalRequest._authRetry &&
       !isLoginRequest &&
       !isRegisterRequest &&
+      !isEmailVerificationRequest &&
       !isRefreshRequest &&
       !isLogoutRequest;
 
@@ -662,6 +667,7 @@ api.interceptors.response.use(
       isUnauthorized &&
       !isLoginRequest &&
       !isRegisterRequest &&
+      !isEmailVerificationRequest &&
       !isRefreshRequest
     ) {
       await clearLocalSession();

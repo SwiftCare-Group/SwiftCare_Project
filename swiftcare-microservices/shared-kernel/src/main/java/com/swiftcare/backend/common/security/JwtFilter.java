@@ -31,6 +31,8 @@ public class JwtFilter extends OncePerRequestFilter {
             "/auth/logout",
             "/auth/forgot-password",
             "/auth/reset-password",
+            "/auth/verify-email",
+            "/auth/resend-verification",
             "/subscriptions/plans",
             "/subscriptions/webhook"
     );

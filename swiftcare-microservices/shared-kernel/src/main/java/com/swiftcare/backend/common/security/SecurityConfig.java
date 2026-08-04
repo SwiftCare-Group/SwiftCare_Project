@@ -61,7 +61,9 @@ public class SecurityConfig {
                                 "/auth/logout",
                                 "/auth/staff/login",
                                 "/auth/forgot-password",
-                                "/auth/reset-password"
+                                "/auth/reset-password",
+                                "/auth/verify-email",
+                                "/auth/resend-verification"
                         ).permitAll()
                         .requestMatchers("/subscriptions/webhook")
                         .permitAll()
