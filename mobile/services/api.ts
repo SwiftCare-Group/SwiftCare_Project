@@ -40,7 +40,7 @@ const resolveApiBaseUrl = (): string => {
 
   // Android emulators cannot reach the host machine through localhost.
   if (Platform.OS === 'android') {
-    return `http://172.20.10.3:8080${API_PATH}`;
+    return `http://172.22.173.138:8080${API_PATH}`;
   }
 
   return `http://localhost:8080${API_PATH}`;
