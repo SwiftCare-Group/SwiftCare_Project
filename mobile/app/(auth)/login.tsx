@@ -280,6 +280,20 @@ export default function LoginScreen() {
 
             <TouchableOpacity
               style={styles.linkButton}
+              onPress={() => router.push({
+                pathname: "/(auth)/verify-email",
+                params: { email: email.trim().toLowerCase() },
+              })}
+              disabled={loading}
+            >
+              <Text style={styles.linkText}>
+                Already registered?{" "}
+                <Text style={styles.linkTextBold}>Verify email</Text>
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.linkButton}
               onPress={() =>
                 router.replace(
                   "/(auth)/register",

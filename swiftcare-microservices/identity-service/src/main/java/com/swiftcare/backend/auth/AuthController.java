@@ -7,6 +7,8 @@ import com.swiftcare.backend.auth.dto.RefreshTokenRequest;
 import com.swiftcare.backend.auth.dto.RegisterRequest;
 import com.swiftcare.backend.auth.dto.ResetPasswordRequest;
 import com.swiftcare.backend.auth.dto.StaffAuthResponse;
+import com.swiftcare.backend.auth.dto.ResendVerificationRequest;
+import com.swiftcare.backend.auth.dto.VerifyEmailRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,18 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        authService.verifyEmail(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Void> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/login")

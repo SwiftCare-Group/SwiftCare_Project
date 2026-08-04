@@ -53,6 +53,9 @@ public class Patient {
     @Column(nullable = false)
     private boolean isDeleted;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

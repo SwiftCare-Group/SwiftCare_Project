@@ -16,13 +16,11 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import api, { clearLocalSession } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { useHaptics } from '../../hooks/useHaptics';
 import SwiftCareLogo from '../../components/branding/SwiftCareLogo';
-import { normalizeRole } from '../../utils/auth';
 import { getApiErrorMessage } from '../../utils/errors';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,7 +97,7 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/register', {
+      await api.post('/auth/register', {
         name: cleanedName,
         email: cleanedEmail,
         phone: cleanedPhone,
@@ -107,28 +105,12 @@ export default function RegisterScreen() {
         password,
       });
 
-      const accessToken = response.data?.accessToken;
-      const refreshToken = response.data?.refreshToken;
-      const role = normalizeRole(response.data?.role) ?? 'PATIENT';
-
-      if (typeof accessToken !== 'string' || !accessToken.trim()) {
-        throw new Error('The server did not return a valid access token.');
-      }
-
       await clearLocalSession();
-
-      const storageEntries: [string, string][] = [
-        ['accessToken', accessToken],
-        ['userRole', role],
-      ];
-
-      if (typeof refreshToken === 'string' && refreshToken.trim()) {
-        storageEntries.push(['refreshToken', refreshToken]);
-      }
-
-      await AsyncStorage.multiSet(storageEntries);
       successNotification();
-      router.replace('/(auth)/health-profile');
+      router.replace({
+        pathname: '/(auth)/verify-email',
+        params: { email: cleanedEmail },
+      });
     } catch (error: unknown) {
       errorNotification();
       Alert.alert(

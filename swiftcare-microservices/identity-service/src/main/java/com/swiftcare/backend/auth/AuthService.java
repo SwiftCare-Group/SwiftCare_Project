@@ -6,6 +6,8 @@ import com.swiftcare.backend.auth.dto.LoginRequest;
 import com.swiftcare.backend.auth.dto.RegisterRequest;
 import com.swiftcare.backend.auth.dto.ResetPasswordRequest;
 import com.swiftcare.backend.auth.dto.StaffAuthResponse;
+import com.swiftcare.backend.auth.dto.ResendVerificationRequest;
+import com.swiftcare.backend.auth.dto.VerifyEmailRequest;
 import com.swiftcare.backend.common.enums.Role;
 import com.swiftcare.backend.common.enums.Tier;
 import com.swiftcare.backend.common.exception.EmailAlreadyExistsException;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.UUID;
+import java.security.SecureRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +39,12 @@ public class AuthService {
     private final DoctorRepository doctorRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    @Value("${app.email-verification.expiry-minutes:15}")
+    private long emailVerificationExpiryMinutes;
 
     @Value("${app.password-reset.expiry-minutes:15}")
     private long passwordResetExpiryMinutes;
@@ -57,21 +66,18 @@ public class AuthService {
                 .phone(request.getPhone().trim())
                 .dateOfBirth(request.getDateOfBirth())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .emailVerified(false)
                 .build();
 
         Patient saved = patientRepository.save(patient);
+        sendVerificationCode(saved);
 
-        String accessToken = jwtUtil.generateToken(
-                saved.getEmail(),
-                Role.PATIENT.name(),
-                saved.getTier().name()
-        );
-
-        return buildPatientResponse(
-                saved,
-                accessToken,
-                createPatientRefreshToken(saved)
-        );
+        return AuthResponse.builder()
+                .patientId(saved.getId())
+                .name(saved.getName())
+                .email(saved.getEmail())
+                .tier(saved.getTier())
+                .build();
     }
 
     @Transactional
@@ -89,6 +95,9 @@ public class AuthService {
                 patient.getPasswordHash()
         )) {
             throw new UnauthorizedException("Invalid email or password");
+        }
+        if (!patient.isEmailVerified()) {
+            throw new UnauthorizedException("Email verification is required");
         }
 
         refreshTokenRepository.deleteByPatientId(patient.getId());
@@ -119,6 +128,9 @@ public class AuthService {
                 throw new UnauthorizedException(
                         "This patient account is inactive"
                 );
+            }
+            if (!patient.isEmailVerified()) {
+                throw new UnauthorizedException("Email verification is required");
             }
 
             String accessToken = jwtUtil.generateToken(
@@ -265,6 +277,44 @@ public class AuthService {
         passwordResetTokenRepository.save(resetToken);
 
         refreshTokenRepository.deleteByPatientId(patient.getId());
+    }
+
+    @Transactional
+    public void verifyEmail(VerifyEmailRequest request) {
+        Patient patient = patientRepository
+                .findByEmailIgnoreCaseAndIsDeletedFalse(normalizeEmail(request.getEmail()))
+                .orElseThrow(() -> new UnauthorizedException("Invalid verification code"));
+        if (patient.isEmailVerified()) return;
+        EmailVerificationToken token = emailVerificationTokenRepository
+                .findTopByPatientIdAndUsedFalseOrderByCreatedAtDesc(patient.getId())
+                .orElseThrow(() -> new UnauthorizedException("Invalid or expired verification code"));
+        if (token.isExpired() || !passwordEncoder.matches(request.getCode(), token.getCodeHash())) {
+            throw new UnauthorizedException("Invalid or expired verification code");
+        }
+        token.setUsed(true);
+        patient.setEmailVerified(true);
+        emailVerificationTokenRepository.save(token);
+        patientRepository.save(patient);
+    }
+
+    @Transactional
+    public void resendVerification(ResendVerificationRequest request) {
+        Patient patient = patientRepository
+                .findByEmailIgnoreCaseAndIsDeletedFalse(normalizeEmail(request.getEmail()))
+                .orElse(null);
+        if (patient != null && !patient.isEmailVerified()) sendVerificationCode(patient);
+    }
+
+    private void sendVerificationCode(Patient patient) {
+        emailVerificationTokenRepository.deleteByPatientId(patient.getId());
+        String code = String.format(Locale.ROOT, "%06d", SECURE_RANDOM.nextInt(1_000_000));
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .id(UUID.randomUUID()).patient(patient)
+                .codeHash(passwordEncoder.encode(code))
+                .expiresAt(LocalDateTime.now().plusMinutes(emailVerificationExpiryMinutes))
+                .createdAt(LocalDateTime.now()).used(false).build();
+        emailVerificationTokenRepository.save(token);
+        emailService.sendEmailVerificationCode(patient.getEmail(), code, emailVerificationExpiryMinutes);
     }
 
     private RefreshToken findUsableRefreshTokenForUpdate(String token) {
