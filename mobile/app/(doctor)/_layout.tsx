@@ -69,9 +69,16 @@ export default function DoctorLayout() {
       <Tabs.Screen
         name="consultation-video"
         options={{
-          href: null,
-        }}
+        title: 'Video Visits',
+        tabBarIcon: ({ color, size, focused }) => (
+      <Ionicons
+        name={focused ? 'videocam' : 'videocam-outline'}
+        size={size}
+        color={color}
       />
+    ),
+  }}
+/>
 
       <Tabs.Screen
         name="patient-details"
